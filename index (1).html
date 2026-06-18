@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Amorino · Panel de Ventas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --cream:#FBF5EA;
+    --cream-2:#F2E8D3;
+    --ink:#2B2117;
+    --ink-soft:#766955;
+    --pistachio:#8FA871;
+    --raspberry:#C84B5E;
+    --mango:#E3A038;
+    --cocoa:#5B3A29;
+    --blueberry:#5E6FA3;
+    --line:#E6D8BB;
+    --white:#FFFFFF;
+    --shadow: 0 2px 14px rgba(91,58,41,0.07);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--cream);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    font-variant-numeric:tabular-nums;
+    -webkit-font-smoothing:antialiased;
+  }
+  #app{max-width:1280px;margin:0 auto;padding:0 24px 64px;}
+
+  /* ---------- Topbar ---------- */
+  .topbar{
+    position:sticky;top:0;z-index:30;
+    background:rgba(251,245,234,0.92);
+    backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line);
+    padding:18px 24px;
+    margin:0 -24px 28px;
+  }
+  .topbar-inner{max-width:1280px;margin:0 auto;display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap;}
+  .brand{display:flex;align-items:baseline;gap:12px;}
+  .brand-mark{
+    width:30px;height:30px;border-radius:50% 50% 50% 4px;
+    background:conic-gradient(var(--raspberry) 0deg 90deg, var(--mango) 90deg 180deg, var(--pistachio) 180deg 270deg, var(--blueberry) 270deg 360deg);
+    flex:none;
+  }
+  .brand h1{
+    font-family:'Fraunces',serif;font-style:italic;font-weight:600;
+    font-size:28px;margin:0;letter-spacing:-0.5px;
+  }
+  .brand .eyebrow{
+    font-size:11px;letter-spacing:0.14em;text-transform:uppercase;
+    color:var(--ink-soft);font-weight:600;margin-top:2px;
+  }
+  .controls{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  .field{display:flex;flex-direction:column;gap:4px;}
+  .field label{font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:600;}
+  select{
+    font-family:'Inter',sans-serif;font-size:14px;font-weight:600;color:var(--ink);
+    background:var(--white);border:1px solid var(--line);border-radius:9px;
+    padding:8px 30px 8px 12px;appearance:none;cursor:pointer;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23766955'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 12px center;
+    min-width:150px;
+  }
+  select:focus{outline:2px solid var(--blueberry);outline-offset:1px;}
+  input[type="date"]{
+    font-family:'Inter',sans-serif;font-size:14px;font-weight:600;color:var(--ink);
+    background:var(--white);border:1px solid var(--line);border-radius:9px;
+    padding:7px 10px;cursor:pointer;min-width:140px;
+  }
+  input[type="date"]:focus{outline:2px solid var(--blueberry);outline-offset:1px;}
+  .preset-row{display:flex;gap:8px;flex-wrap:wrap;}
+  .preset-btn{
+    font-family:'Inter',sans-serif;font-size:12px;font-weight:600;color:var(--cocoa);
+    background:var(--cream-2);border:1px solid var(--line);border-radius:20px;
+    padding:6px 14px;cursor:pointer;transition:background .15s;
+  }
+  .preset-btn:hover{background:var(--white);}
+  .preset-btn.active{background:var(--cocoa);color:var(--white);border-color:var(--cocoa);}
+  .btn{
+    font-family:'Inter',sans-serif;font-weight:700;font-size:13.5px;color:var(--white);
+    background:var(--cocoa);border:none;border-radius:9px;padding:10px 18px;
+    cursor:pointer;display:flex;align-items:center;gap:8px;transition:opacity .15s;
+  }
+  .btn:hover{opacity:.88;}
+  .btn:focus-visible{outline:2px solid var(--blueberry);outline-offset:2px;}
+  .btn .dot{width:7px;height:7px;border-radius:50%;background:#8AE08C;}
+  .btn .dot.busy{background:var(--mango);animation:pulse 1s infinite;}
+  .sync-note{font-size:11px;color:var(--ink-soft);margin-top:4px;text-align:right;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+  /* ---------- Status banner ---------- */
+  .banner{
+    border-radius:12px;padding:16px 20px;margin-bottom:24px;font-size:14px;
+    border:1px solid var(--line);background:var(--white);box-shadow:var(--shadow);
+  }
+  .banner.error{border-color:#E3B0AE;background:#FBEFEE;color:#8A2E2E;}
+  .banner h3{margin:0 0 6px;font-size:15px;}
+  .banner ul{margin:8px 0 0;padding-left:18px;}
+  .banner code{background:rgba(0,0,0,.06);padding:1px 5px;border-radius:4px;}
+
+  /* ---------- Section ---------- */
+  .section-title{
+    font-family:'Fraunces',serif;font-weight:600;font-size:20px;margin:40px 0 16px;
+    display:flex;align-items:center;gap:10px;
+  }
+  .section-title .swatch{width:11px;height:11px;border-radius:3px;}
+
+  /* ---------- KPI scoops ---------- */
+  .kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;}
+  @media (max-width:980px){.kpi-row{grid-template-columns:repeat(3,1fr);}}
+  @media (max-width:560px){.kpi-row{grid-template-columns:repeat(2,1fr);}}
+  .kpi{display:flex;flex-direction:column;align-items:stretch;}
+  .kpi-scoop{
+    height:14px;border-radius:50% 50% 7px 7px;margin:0 10px -1px;
+  }
+  .kpi-body{
+    background:var(--white);border:1px solid var(--line);border-radius:7px 7px 14px 14px;
+    box-shadow:var(--shadow);padding:16px 14px 14px;text-align:left;
+  }
+  .kpi-label{font-size:11px;color:var(--ink-soft);font-weight:600;letter-spacing:0.03em;margin-bottom:6px;min-height:28px;}
+  .kpi-value{font-family:'Fraunces',serif;font-weight:700;font-size:22px;letter-spacing:-0.3px;}
+  .kpi-value.small{font-size:18px;}
+  .kpi-sub{font-size:11px;color:var(--ink-soft);margin-top:3px;}
+  .kpi-sub.pos{color:#4D7A3F;font-weight:700;}
+  .kpi-sub.neg{color:var(--raspberry);font-weight:700;}
+
+  /* ---------- Cards / grid ---------- */
+  .grid-2{display:grid;grid-template-columns:1.6fr 1fr;gap:18px;}
+  @media (max-width:880px){.grid-2{grid-template-columns:1fr;}}
+  .card{background:var(--white);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:20px 22px;}
+  .card h3{font-family:'Fraunces',serif;font-weight:600;font-size:16px;margin:0 0 4px;}
+  .card .hint{font-size:12px;color:var(--ink-soft);margin-bottom:16px;}
+  .empty-note{font-size:13px;color:var(--ink-soft);padding:24px 0;text-align:center;}
+
+  /* ---------- Hourly bars ---------- */
+  .hbars{display:flex;align-items:flex-end;gap:5px;height:200px;padding-top:18px;}
+  .hbar-col{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;min-width:0;}
+  .hbar{width:100%;border-radius:6px 6px 2px 2px;background:linear-gradient(180deg,var(--raspberry),#A8394A);position:relative;min-height:3px;cursor:default;}
+  .hbar:hover{background:linear-gradient(180deg,var(--mango),#C77E1C);}
+  .hbar-axis{font-size:9.5px;color:var(--ink-soft);margin-top:6px;writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);height:34px;}
+
+  /* ---------- Donut ---------- */
+  .donut-wrap{display:flex;align-items:center;gap:20px;flex-wrap:wrap;justify-content:center;}
+  .donut{width:160px;height:160px;border-radius:50%;flex:none;position:relative;}
+  .donut::after{
+    content:'';position:absolute;inset:26px;border-radius:50%;background:var(--white);
+    display:flex;
+  }
+  .donut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;}
+  .donut-center .v{font-family:'Fraunces',serif;font-weight:700;font-size:17px;}
+  .donut-center .l{font-size:9.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.05em;}
+  .legend{display:flex;flex-direction:column;gap:8px;min-width:160px;}
+  .legend-row{display:flex;align-items:center;gap:8px;font-size:13px;}
+  .legend-sw{width:10px;height:10px;border-radius:3px;flex:none;}
+  .legend-row .pct{margin-left:auto;font-weight:700;}
+
+  /* ---------- Flavors ranking ---------- */
+  .rank-list{display:flex;flex-direction:column;gap:10px;}
+  .rank-row{display:grid;grid-template-columns:22px 1fr auto;align-items:center;gap:10px;font-size:13.5px;}
+  .rank-num{font-family:'Fraunces',serif;font-weight:700;color:var(--ink-soft);font-size:13px;}
+  .rank-bar-wrap{background:var(--cream-2);border-radius:6px;height:9px;overflow:hidden;}
+  .rank-bar{height:100%;border-radius:6px;background:linear-gradient(90deg,var(--pistachio),#6E8C52);}
+  .rank-name{grid-column:2/3;margin-bottom:3px;}
+  .rank-val{font-weight:700;font-size:12.5px;}
+  .rank-item{display:flex;flex-direction:column;}
+
+  /* ---------- Employees table ---------- */
+  table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  thead th{
+    text-align:left;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--ink-soft);font-weight:700;padding:0 10px 10px;border-bottom:1px solid var(--line);
+  }
+  tbody td{padding:10px 10px;border-bottom:1px solid var(--cream-2);}
+  tbody tr:hover{background:var(--cream-2);}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}
+  .emp-name{font-weight:700;}
+  .shop-tag{font-size:10.5px;color:var(--ink-soft);}
+  .sort-select{margin-bottom:14px;}
+
+  /* ---------- Ultimos ---------- */
+  .tickets-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;}
+  @media (max-width:980px){.tickets-grid{grid-template-columns:repeat(2,1fr);}}
+  .ticket-card{background:var(--white);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow);}
+  .ticket-card h4{font-family:'Fraunces',serif;font-size:13.5px;margin:0 0 10px;font-weight:700;}
+  .ticket-row{display:flex;justify-content:space-between;font-size:13px;padding:5px 0;border-bottom:1px dashed var(--cream-2);}
+  .ticket-row:last-child{border-bottom:none;}
+  .ticket-row .t-idx{color:var(--ink-soft);}
+  .ticket-row.latest{font-weight:700;color:var(--raspberry);}
+  .tape-list{display:flex;flex-direction:column;gap:0;max-width:340px;}
+
+  footer{margin-top:48px;font-size:12px;color:var(--ink-soft);text-align:center;border-top:1px solid var(--line);padding-top:18px;}
+  footer a{color:var(--blueberry);}
+
+  .skeleton{height:120px;border-radius:14px;background:linear-gradient(90deg,var(--cream-2) 25%,var(--white) 37%,var(--cream-2) 63%);background-size:400% 100%;animation:shimmer 1.4s infinite;}
+  @keyframes shimmer{0%{background-position:100% 0;}100%{background-position:0 0;}}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <div class="brand-mark"></div>
+        <div>
+          <h1>Amorino</h1>
+          <div class="eyebrow">Panel de ventas · 5 tiendas</div>
+        </div>
+      </div>
+      <div class="controls">
+        <div class="field">
+          <label for="shopSelect">Tienda</label>
+          <select id="shopSelect"></select>
+        </div>
+        <div class="field">
+          <label for="dateFrom">Desde</label>
+          <input type="date" id="dateFrom">
+        </div>
+        <div class="field">
+          <label for="dateTo">Hasta</label>
+          <input type="date" id="dateTo">
+        </div>
+        <div class="field">
+          <label>&nbsp;</label>
+          <button class="btn" id="refreshBtn"><span class="dot" id="statusDot"></span><span id="refreshLabel">Actualizar</span></button>
+        </div>
+      </div>
+    </div>
+    <div class="topbar-inner" style="margin-top:10px;">
+      <div class="preset-row" id="presetRow">
+        <button class="preset-btn" data-preset="today">Hoy</button>
+        <button class="preset-btn" data-preset="7d">Últimos 7 días</button>
+        <button class="preset-btn" data-preset="30d">Últimos 30 días</button>
+        <button class="preset-btn" data-preset="month">Mes en curso</button>
+        <button class="preset-btn" data-preset="all">Todo el periodo</button>
+      </div>
+      <div class="sync-note" id="syncNote">Cargando datos…</div>
+    </div>
+  </div>
+
+  <div id="content">
+    <div class="skeleton"></div>
+  </div>
+
+  <footer>
+    Datos en vivo desde Google Sheets (Table1, Table 2, Table 3, Table 5, Table 6, Ultimos) · Se actualiza automáticamente cada 5 minutos
+  </footer>
+</div>
+
+<script>
+/* ================= CONFIG ================= */
+const SHEET_ID = '10M-nDp0_McsiShRHMHnjccJsb03avGDvPGwdY8cj598';
+const TABS = { t1:'Table1', t2:'Table 2', t3:'Table 3', t5:'Table 5', t6:'Table 6', ult:'Ultimos' };
+const SHOP_ORDER = ['Amorino Sevilla Avenida','Amorino Patio de los Naranjos','Amorino Catedral','Amorino Plaza Nueva','Amorino Alcázar'];
+const FLAVOR_COLORS = ['#C84B5E','#8FA871','#E3A038','#5E6FA3','#5B3A29','#B07AA8','#4D9E96','#D17C3C'];
+const AUTO_REFRESH_MS = 5 * 60 * 1000;
+
+/* ================= UTILS ================= */
+function parseNum(raw){
+  if (raw === null || raw === undefined) return NaN;
+  let s = String(raw).trim();
+  if (s === '' || s === '-') return NaN;
+  if (/\?/.test(s)) return NaN;
+  s = s.replace(/€/g,'').replace(/%/g,'').replace(/Lt\.?/gi,'').trim();
+  if (s === '') return NaN;
+  let neg = false;
+  if (s.startsWith('-')) { neg = true; s = s.slice(1); }
+  const lastComma = s.lastIndexOf(','), lastDot = s.lastIndexOf('.');
+  const lastSep = Math.max(lastComma, lastDot);
+  let intPart, decPart;
+  if (lastSep === -1){ intPart = s; decPart=''; }
+  else {
+    const tail = s.slice(lastSep+1);
+    if (/^\d{1,2}$/.test(tail)){ intPart = s.slice(0,lastSep).replace(/[.,]/g,''); decPart = tail; }
+    else { intPart = s.replace(/[.,]/g,''); decPart=''; }
+  }
+  const numStr = (intPart || '0') + (decPart ? '.'+decPart : '');
+  const num = parseFloat(numStr);
+  return isNaN(num) ? NaN : (neg ? -num : num);
+}
+function normDate(s){
+  if (!s) return null;
+  const parts = String(s).trim().split('/');
+  if (parts.length !== 3) return null;
+  let [d,m,y] = parts.map(p=>p.trim());
+  if (!d || !m || !y) return null;
+  d = d.padStart(2,'0'); m = m.padStart(2,'0');
+  if (y.length === 2) y = '20'+y;
+  return `${y}-${m}-${d}`;
+}
+function dateLabel(key){
+  if (!key) return '';
+  const [y,m,d] = key.split('-');
+  return `${d}/${m}/${y}`;
+}
+function shiftDate(dkey, days){
+  const [y,m,d] = dkey.split('-').map(Number);
+  const dt = new Date(y, m-1, d);
+  dt.setDate(dt.getDate()+days);
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+}
+function monthStart(dkey){ const [y,m] = dkey.split('-'); return `${y}-${m}-01`; }
+function clampDate(dkey, min, max){ if (dkey < min) return min; if (dkey > max) return max; return dkey; }
+function inRange(dkey, from, to){ return !!dkey && (!from || dkey >= from) && (!to || dkey <= to); }
+function rangeLabel(from, to){ return from === to ? dateLabel(from) : `${dateLabel(from)} → ${dateLabel(to)}`; }
+function fmtEUR(n){ return isNaN(n) ? '—' : n.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'; }
+function fmtInt(n){ return isNaN(n) ? '—' : Math.round(n).toLocaleString('es-ES'); }
+function fmtPct(n,d=1){ return isNaN(n) ? '—' : n.toLocaleString('es-ES',{minimumFractionDigits:d,maximumFractionDigits:d})+' %'; }
+function fmtNum(n,d=2){ return isNaN(n) ? '—' : n.toLocaleString('es-ES',{minimumFractionDigits:d,maximumFractionDigits:d}); }
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function hourOrderKey(h){
+  const start = parseInt(String(h).split('-')[0], 10);
+  if (isNaN(start)) return 999;
+  return start < 11 ? start + 24 : start;
+}
+
+function parseCSV(text){
+  const rows = []; let row = []; let field=''; let inQuotes=false;
+  for (let i=0;i<text.length;i++){
+    const c = text[i];
+    if (inQuotes){
+      if (c === '"'){ if (text[i+1] === '"'){ field+='"'; i++; } else inQuotes=false; }
+      else field += c;
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ',') { row.push(field); field=''; }
+      else if (c === '\n') { row.push(field); rows.push(row); row=[]; field=''; }
+      else if (c === '\r') { /* skip */ }
+      else field += c;
+    }
+  }
+  if (field.length || row.length){ row.push(field); rows.push(row); }
+  return rows;
+}
+function dedupe(rows, keyFn){
+  const map = new Map(); const order = [];
+  rows.forEach(r => { const k = keyFn(r); if (!map.has(k)) order.push(k); map.set(k, r); });
+  return order.map(k => map.get(k));
+}
+let jsonpCounter = 0;
+function loadViaJSONP(sheetName){
+  return new Promise((resolve, reject) => {
+    const cbName = '__gvizCb' + (jsonpCounter++);
+    const scriptEl = document.createElement('script');
+    let settled = false;
+    function cleanup(){
+      delete window[cbName];
+      if (scriptEl.parentNode) scriptEl.parentNode.removeChild(scriptEl);
+      clearTimeout(timer);
+    }
+    window[cbName] = (json) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      if (!json || json.status === 'error'){
+        const msg = (json && json.errors && json.errors[0] && json.errors[0].detailed_message) || 'Respuesta no válida para ' + sheetName;
+        reject(new Error(msg));
+      } else {
+        resolve(json);
+      }
+    };
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error('Tiempo de espera agotado cargando "' + sheetName + '"'));
+    }, 15000);
+    scriptEl.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json;responseHandler:${cbName}&sheet=${encodeURIComponent(sheetName)}&_=${Date.now()}`;
+    scriptEl.onerror = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error('No se pudo cargar la pestaña "' + sheetName + '" (revisa el nombre exacto y los permisos de uso compartido)'));
+    };
+    document.head.appendChild(scriptEl);
+  });
+}
+function gvizJsonToRows(json){
+  const cols = (json.table.cols || []).map(c => c.label || c.id || '');
+  const rows = (json.table.rows || []).map(r => {
+    const cells = r.c || [];
+    return cols.map((_, i) => {
+      const cell = cells[i];
+      if (!cell) return '';
+      const v = (cell.f !== undefined && cell.f !== null) ? cell.f : cell.v;
+      return v === null || v === undefined ? '' : String(v);
+    });
+  });
+  return [cols, ...rows];
+}
+
+/* ================= STATE ================= */
+const State = { shop:'all', from:null, to:null, raw:null, loading:false, error:null, lastSync:null };
+
+/* ================= DATA LOADING ================= */
+async function fetchTab(name){
+  const json = await loadViaJSONP(name);
+  return gvizJsonToRows(json);
+}
+
+async function loadData(){
+  State.loading = true; State.error = null;
+  document.getElementById('statusDot').classList.add('busy');
+  document.getElementById('syncNote').textContent = 'Actualizando…';
+  try {
+    const entries = Object.entries(TABS);
+    const results = await Promise.all(entries.map(([k,name]) => fetchTab(name).then(rows => [k, rows])));
+    const rowsByKey = Object.fromEntries(results);
+
+    const t1 = dedupe(
+      rowsByKey.t1.slice(1).filter(r => r[0] && r[0] !== 'Shop').map(r => ({
+        shop:r[0], dkey:normDate(r[1]), horario:r[2], ventas:parseNum(r[3]), tickets:parseNum(r[4]), vt:parseNum(r[5])
+      })),
+      r => `${r.shop}|${r.dkey}|${r.horario}`
+    );
+
+    const t2 = dedupe(
+      rowsByKey.t2.slice(1).filter(r => r[0] && r[0] !== 'Shop').map(r => ({
+        shop:r[0], dkey:normDate(r[1]),
+        ticketsKioskoMes:parseNum(r[2]), totalMesKiosko:parseNum(r[3]),
+        ticketsKioskoDia:parseNum(r[4]), totalDiaKiosko:parseNum(r[5]),
+        ticketsTotal:parseNum(r[6]), ticketMedio:parseNum(r[7]), ticketMedioGelato:parseNum(r[8]),
+        clienteMedio:parseNum(r[9]), litrosDia:parseNum(r[10]), sugerenciasPct:parseNum(r[11]),
+        totalMesEnCurso:parseNum(r[12]), totalMesAnoAnterior:parseNum(r[13]), diferenciaPct:parseNum(r[14]),
+        totalAno:parseNum(r[15]), totalAnoAnterior:parseNum(r[16])
+      })),
+      r => `${r.shop}|${r.dkey}`
+    );
+
+    const t3 = dedupe(
+      rowsByKey.t3.slice(1).filter(r => r[0] && r[0] !== 'Shop').map(r => ({
+        shop:r[0], dkey:normDate(r[1]), empleado:(r[2]||'').trim(),
+        ticketMedio:parseNum(r[3]), tickets:parseNum(r[4]), sugerencias:parseNum(r[5]),
+        anulaciones:parseNum(r[6]), descuentos:parseNum(r[7]), medHel:parseNum(r[8]), sugerenciasPct:parseNum(r[9])
+      })),
+      r => `${r.shop}|${r.dkey}|${r.empleado}`
+    );
+
+    const t5 = dedupe(
+      rowsByKey.t5.slice(1).filter(r => r[0] && r[0] !== 'Shop').map(r => ({
+        shop:r[0], dkey:normDate(r[1]), sabor:(r[2]||'').trim(), unidades:parseNum(r[3])
+      })),
+      r => `${r.shop}|${r.dkey}|${r.sabor}`
+    );
+
+    const t6 = dedupe(
+      rowsByKey.t6.slice(1).filter(r => r[0] && r[0] !== 'Shop').map(r => ({
+        shop:r[0], dkey:normDate(r[1]), forma:(r[2]||'').trim(), pct:parseNum(r[3]),
+        base:parseNum(r[4]), iva:parseNum(r[5]), total:parseNum(r[6]), pctTotal:parseNum(r[7])
+      })),
+      r => `${r.shop}|${r.dkey}|${r.forma}`
+    );
+
+    const ult = dedupe(
+      rowsByKey.ult.slice(1).filter(r => r[0] && r[0] !== 'Shop').map(r => ({
+        shop:r[0], dkey:normDate(r[1]), tickets:[r[2],r[3],r[4],r[5],r[6],r[7],r[8],r[9],r[10],r[11]].map(x => (x||'').trim()).filter(Boolean)
+      })),
+      r => `${r.shop}|${r.dkey}`
+    );
+
+    State.raw = { t1, t2, t3, t5, t6, ult };
+    State.lastSync = new Date();
+
+    const shopsFound = Array.from(new Set(t2.map(r => r.shop)));
+    const orderedShops = SHOP_ORDER.filter(s => shopsFound.includes(s)).concat(shopsFound.filter(s => !SHOP_ORDER.includes(s)));
+    State.shops = orderedShops;
+
+    populateShopSelect();
+    syncDateBounds(true);
+    renderAll();
+    document.getElementById('syncNote').textContent = 'Última sincronización: ' + State.lastSync.toLocaleTimeString('es-ES');
+  } catch (err) {
+    State.error = err;
+    renderError(err);
+    document.getElementById('syncNote').textContent = 'Error de sincronización';
+  } finally {
+    State.loading = false;
+    document.getElementById('statusDot').classList.remove('busy');
+  }
+}
+
+function getDatesForShop(shop){
+  if (!State.raw) return [];
+  const pool = shop === 'all' ? State.raw.t2 : State.raw.t2.filter(r => r.shop === shop);
+  const keys = Array.from(new Set(pool.map(r => r.dkey).filter(Boolean)));
+  keys.sort((a,b) => b.localeCompare(a));
+  return keys;
+}
+
+/* ================= UI: selects ================= */
+function populateShopSelect(){
+  const sel = document.getElementById('shopSelect');
+  const prev = State.shop;
+  sel.innerHTML = '<option value="all">Todas las tiendas</option>' +
+    State.shops.map(s => `<option value="${esc(s)}">${esc(s.replace('Amorino ',''))}</option>`).join('');
+  sel.value = State.shops.includes(prev) || prev === 'all' ? prev : 'all';
+  State.shop = sel.value;
+}
+
+function dateBoundsForShop(shop){
+  const dates = getDatesForShop(shop);
+  if (!dates.length) return null;
+  return { min: dates[dates.length-1], max: dates[0] };
+}
+
+function syncDateBounds(resetToLatest){
+  const bounds = dateBoundsForShop(State.shop);
+  const fromEl = document.getElementById('dateFrom'), toEl = document.getElementById('dateTo');
+  if (!bounds){
+    State.from = State.to = null;
+    fromEl.value = toEl.value = '';
+    return;
+  }
+  fromEl.min = toEl.min = bounds.min;
+  fromEl.max = toEl.max = bounds.max;
+  if (resetToLatest || !State.from || !State.to){
+    State.from = bounds.max;
+    State.to = bounds.max;
+  } else {
+    State.from = clampDate(State.from, bounds.min, bounds.max);
+    State.to = clampDate(State.to, bounds.min, bounds.max);
+  }
+  fromEl.value = State.from;
+  toEl.value = State.to;
+  updatePresetHighlight(bounds);
+}
+
+function updatePresetHighlight(bounds){
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  if (!bounds) return;
+  let match = null;
+  if (State.from === bounds.max && State.to === bounds.max) match = 'today';
+  else if (State.from === bounds.min && State.to === bounds.max) match = 'all';
+  else if (State.to === bounds.max && State.from === clampDate(shiftDate(bounds.max,-6), bounds.min, bounds.max)) match = '7d';
+  else if (State.to === bounds.max && State.from === clampDate(shiftDate(bounds.max,-29), bounds.min, bounds.max)) match = '30d';
+  else if (State.to === bounds.max && State.from === clampDate(monthStart(bounds.max), bounds.min, bounds.max)) match = 'month';
+  if (match){
+    const btn = document.querySelector(`.preset-btn[data-preset="${match}"]`);
+    if (btn) btn.classList.add('active');
+  }
+}
+
+document.getElementById('shopSelect').addEventListener('change', e => {
+  State.shop = e.target.value;
+  syncDateBounds(false);
+  renderAll();
+});
+document.getElementById('dateFrom').addEventListener('change', e => {
+  const bounds = dateBoundsForShop(State.shop);
+  if (!bounds) return;
+  State.from = clampDate(e.target.value, bounds.min, bounds.max);
+  if (State.from > State.to) State.to = State.from;
+  document.getElementById('dateFrom').value = State.from;
+  document.getElementById('dateTo').value = State.to;
+  updatePresetHighlight(bounds);
+  renderAll();
+});
+document.getElementById('dateTo').addEventListener('change', e => {
+  const bounds = dateBoundsForShop(State.shop);
+  if (!bounds) return;
+  State.to = clampDate(e.target.value, bounds.min, bounds.max);
+  if (State.to < State.from) State.from = State.to;
+  document.getElementById('dateFrom').value = State.from;
+  document.getElementById('dateTo').value = State.to;
+  updatePresetHighlight(bounds);
+  renderAll();
+});
+document.getElementById('presetRow').addEventListener('click', e => {
+  const btn = e.target.closest('.preset-btn');
+  if (!btn) return;
+  const bounds = dateBoundsForShop(State.shop);
+  if (!bounds) return;
+  const preset = btn.dataset.preset;
+  if (preset === 'today'){ State.from = bounds.max; State.to = bounds.max; }
+  else if (preset === '7d'){ State.from = clampDate(shiftDate(bounds.max,-6), bounds.min, bounds.max); State.to = bounds.max; }
+  else if (preset === '30d'){ State.from = clampDate(shiftDate(bounds.max,-29), bounds.min, bounds.max); State.to = bounds.max; }
+  else if (preset === 'month'){ State.from = clampDate(monthStart(bounds.max), bounds.min, bounds.max); State.to = bounds.max; }
+  else if (preset === 'all'){ State.from = bounds.min; State.to = bounds.max; }
+  document.getElementById('dateFrom').value = State.from;
+  document.getElementById('dateTo').value = State.to;
+  updatePresetHighlight(bounds);
+  renderAll();
+});
+document.getElementById('refreshBtn').addEventListener('click', loadData);
+
+/* ================= RENDER ================= */
+function renderError(err){
+  document.getElementById('content').innerHTML = `
+    <div class="banner error">
+      <h3>No se han podido cargar los datos del Google Sheet</h3>
+      <p>${esc(err.message || String(err))}</p>
+      <p>Comprueba lo siguiente y pulsa "Actualizar":</p>
+      <ul>
+        <li>La hoja debe compartirse como <code>Cualquier persona con el enlace · Lector</code>.</li>
+        <li>Las pestañas deben llamarse exactamente: <code>Table1</code>, <code>Table 2</code>, <code>Table 3</code>, <code>Table 5</code>, <code>Table 6</code>, <code>Ultimos</code>.</li>
+        <li>Si el enlace cambió, dime la nueva URL del Google Sheet.</li>
+      </ul>
+    </div>`;
+}
+
+function renderAll(){
+  if (!State.raw) return;
+  const shop = State.shop, from = State.from, to = State.to;
+  const html = `
+    ${renderKPIs(shop, from, to)}
+    <div class="section-title"><span class="swatch" style="background:var(--raspberry)"></span>Ventas por hora</div>
+    <div class="grid-2">
+      ${renderHourlyCard(shop, from, to)}
+      ${renderPaymentCard(shop, from, to)}
+    </div>
+    <div class="section-title"><span class="swatch" style="background:var(--pistachio)"></span>Equipo y sabores</div>
+    <div class="grid-2">
+      ${renderEmployeesCard(shop, from, to)}
+      ${renderFlavorsCard(shop, from, to)}
+    </div>
+    <div class="section-title"><span class="swatch" style="background:var(--mango)"></span>Últimos tickets</div>
+    ${renderUltimosCard(shop, from, to)}
+  `;
+  document.getElementById('content').innerHTML = html;
+  attachSortHandler();
+}
+
+/* ---- KPIs ---- */
+function renderKPIs(shop, from, to){
+  if (!from || !to) return `<div class="banner">No hay fechas seleccionadas todavía.</div>`;
+  const inScope = r => inRange(r.dkey, from, to) && (shop === 'all' || r.shop === shop);
+  const t1rows = State.raw.t1.filter(inScope);
+  const t2rows = State.raw.t2.filter(inScope);
+  const t3rows = State.raw.t3.filter(inScope);
+
+  const ventasPeriodo = sum(t1rows.map(r => r.ventas));
+  const ticketsTotal = sum(t2rows.map(r => r.ticketsTotal));
+  const litros = sum(t2rows.map(r => r.litrosDia));
+  const ticketMedio = ticketsTotal ? ventasPeriodo / ticketsTotal : NaN;
+  const sgTotal = sum(t3rows.map(r => r.sugerencias));
+  const ticketsConT3 = sum(t3rows.map(r => r.tickets));
+  const sugPct = ticketsConT3 ? (sgTotal / ticketsConT3) * 100 : NaN;
+
+  // "Diferencia vs año anterior" es una comparación mensual acumulada, no se puede sumar
+  // día a día sin distorsionar: se toma la foto del último día del rango seleccionado.
+  const snapRows = State.raw.t2.filter(r => r.dkey === to && (shop === 'all' || r.shop === shop));
+  let difPct = NaN;
+  if (snapRows.length){
+    const mesActual = sum(snapRows.map(r => r.totalMesEnCurso));
+    const mesAnt = sum(snapRows.map(r => r.totalMesAnoAnterior));
+    difPct = mesAnt ? ((mesActual - mesAnt) / mesAnt) * 100 : NaN;
+  }
+
+  const isRange = from !== to;
+  const cards = [
+    { label: isRange ? 'Ventas del periodo' : 'Ventas del día', value:fmtEUR(ventasPeriodo), color:'var(--raspberry)' },
+    { label:'Tickets totales', value:fmtInt(ticketsTotal), color:'var(--mango)' },
+    { label:'Ticket medio', value:fmtEUR(ticketMedio), color:'var(--pistachio)' },
+    { label:'Litros de helado', value:fmtNum(litros,1)+' Lt.', color:'var(--blueberry)' },
+    { label:'% Sugerencias/ticket', value:fmtPct(sugPct), color:'var(--cocoa)' },
+    { label:'Var. mes vs año anterior', value:fmtPct(difPct), color: (difPct>=0?'#4D7A3F':'var(--raspberry)'), note: isRange ? ('a '+dateLabel(to)) : null },
+  ];
+  return `<div class="kpi-row">${cards.map(c => `
+    <div class="kpi">
+      <div class="kpi-scoop" style="background:${c.color}"></div>
+      <div class="kpi-body">
+        <div class="kpi-label">${esc(c.label)}</div>
+        <div class="kpi-value ${c.value.length>8?'small':''}">${c.value}</div>
+        ${c.note ? `<div class="kpi-sub">${esc(c.note)}</div>` : ''}
+      </div>
+    </div>`).join('')}</div>`;
+}
+function sum(arr){ const v = arr.filter(n => !isNaN(n)); return v.length ? v.reduce((a,b)=>a+b,0) : NaN; }
+
+/* ---- Hourly chart ---- */
+function renderHourlyCard(shop, from, to){
+  if (!from || !to) return `<div class="card"><div class="empty-note">Sin fechas seleccionadas</div></div>`;
+  const rows = State.raw.t1.filter(r => inRange(r.dkey, from, to) && (shop === 'all' || r.shop === shop));
+  if (!rows.length) return `<div class="card"><h3>Ventas por hora</h3><div class="empty-note">Sin datos para esta selección</div></div>`;
+  const map = new Map();
+  rows.forEach(r => map.set(r.horario, (map.get(r.horario)||0) + (isNaN(r.ventas)?0:r.ventas)));
+  const horas = Array.from(map.keys()).sort((a,b) => hourOrderKey(a) - hourOrderKey(b));
+  const max = Math.max(...horas.map(h => map.get(h)), 1);
+  const bars = horas.map(h => {
+    const v = map.get(h);
+    const pct = Math.max((v/max)*100, 2);
+    return `<div class="hbar-col">
+        <div class="hbar" style="height:${pct}%" title="${esc(h)}h · ${fmtEUR(v)}"></div>
+        <div class="hbar-axis">${esc(h)}</div>
+      </div>`;
+  }).join('');
+  return `<div class="card">
+    <h3>Ventas por hora</h3>
+    <div class="hint">${shop==='all'?'Todas las tiendas':esc(shop)} · ${rangeLabel(from,to)}${from!==to?' (suma del periodo)':''}</div>
+    <div class="hbars">${bars}</div>
+  </div>`;
+}
+
+/* ---- Payment donut ---- */
+function renderPaymentCard(shop, from, to){
+  if (!from || !to) return `<div class="card"><div class="empty-note">Sin fechas seleccionadas</div></div>`;
+  const rows = State.raw.t6.filter(r => inRange(r.dkey, from, to) && (shop === 'all' || r.shop === shop));
+  if (!rows.length) return `<div class="card"><h3>Formas de pago</h3><div class="empty-note">Sin datos para esta selección</div></div>`;
+  const map = new Map();
+  rows.forEach(r => map.set(r.forma, (map.get(r.forma)||0) + (isNaN(r.total)?0:r.total)));
+  const entries = Array.from(map.entries()).sort((a,b) => b[1]-a[1]);
+  const total = sum(entries.map(e => e[1])) || 1;
+  let acc = 0;
+  const stops = entries.map((e,i) => {
+    const pct = (e[1]/total)*100;
+    const pctFrom = acc; acc += pct;
+    return `${FLAVOR_COLORS[i % FLAVOR_COLORS.length]} ${pctFrom}% ${acc}%`;
+  }).join(', ');
+  const legend = entries.map((e,i) => `
+    <div class="legend-row">
+      <span class="legend-sw" style="background:${FLAVOR_COLORS[i % FLAVOR_COLORS.length]}"></span>
+      <span>${esc(e[0])}</span>
+      <span class="pct">${fmtPct((e[1]/total)*100)}</span>
+    </div>`).join('');
+  return `<div class="card">
+    <h3>Formas de pago</h3>
+    <div class="hint">${shop==='all'?'Todas las tiendas':esc(shop)} · ${rangeLabel(from,to)}</div>
+    <div class="donut-wrap">
+      <div style="position:relative;">
+        <div class="donut" style="background:conic-gradient(${stops})"></div>
+        <div class="donut-center"><div class="v">${fmtEUR(total)}</div><div class="l">Total</div></div>
+      </div>
+      <div class="legend">${legend}</div>
+    </div>
+  </div>`;
+}
+
+/* ---- Employees ---- */
+let empSortKey = 'tickets';
+function renderEmployeesCard(shop, from, to){
+  if (!from || !to) return `<div class="card"><div class="empty-note">Sin fechas seleccionadas</div></div>`;
+  const rows = State.raw.t3.filter(r => inRange(r.dkey, from, to) && (shop === 'all' || r.shop === shop) && r.empleado);
+  if (!rows.length) return `<div class="card"><h3>Empleados</h3><div class="empty-note">Sin datos para esta selección</div></div>`;
+
+  const groups = new Map();
+  rows.forEach(r => {
+    const key = `${r.shop}|${r.empleado}`;
+    if (!groups.has(key)) groups.set(key, { shop:r.shop, empleado:r.empleado, dias:0, ticketsSum:0, sgSum:0, ticketMedioSum:0, ticketMedioN:0 });
+    const g = groups.get(key);
+    g.dias += 1;
+    if (!isNaN(r.tickets)) g.ticketsSum += r.tickets;
+    if (!isNaN(r.sugerencias)) g.sgSum += r.sugerencias;
+    if (!isNaN(r.ticketMedio)) { g.ticketMedioSum += r.ticketMedio; g.ticketMedioN += 1; }
+  });
+  const agg = Array.from(groups.values()).map(g => ({
+    shop: g.shop, empleado: g.empleado, dias: g.dias,
+    tickets: g.ticketsSum,
+    ticketMedio: g.ticketMedioN ? g.ticketMedioSum / g.ticketMedioN : NaN,
+    sugerenciasPct: g.ticketsSum ? (g.sgSum / g.ticketsSum) * 100 : NaN
+  }));
+
+  const sorted = agg.sort((a,b) => (b[empSortKey]||0) - (a[empSortKey]||0));
+  const showShop = shop === 'all';
+  const isRange = from !== to;
+  return `<div class="card">
+    <h3>Rendimiento del equipo</h3>
+    <div class="hint">${shop==='all'?'Todas las tiendas':esc(shop)} · ${rangeLabel(from,to)}</div>
+    <select class="sort-select" id="empSortSelect">
+      <option value="tickets" ${empSortKey==='tickets'?'selected':''}>Ordenar por Nº de tickets</option>
+      <option value="ticketMedio" ${empSortKey==='ticketMedio'?'selected':''}>Ordenar por ticket medio</option>
+      <option value="sugerenciasPct" ${empSortKey==='sugerenciasPct'?'selected':''}>Ordenar por % sugerencias</option>
+    </select>
+    <table>
+      <thead><tr>
+        <th>Empleado${showShop?' / Tienda':''}</th>
+        ${isRange?'<th class="num">Días</th>':''}
+        <th class="num">Tickets</th>
+        <th class="num">Ticket medio</th>
+        <th class="num">% Sug.</th>
+      </tr></thead>
+      <tbody>
+        ${sorted.slice(0,12).map(r => `
+          <tr>
+            <td><div class="emp-name">${esc(r.empleado)}</div>${showShop?`<div class="shop-tag">${esc(r.shop.replace('Amorino ',''))}</div>`:''}</td>
+            ${isRange?`<td class="num">${fmtInt(r.dias)}</td>`:''}
+            <td class="num">${fmtInt(r.tickets)}</td>
+            <td class="num">${fmtEUR(r.ticketMedio)}</td>
+            <td class="num">${fmtPct(r.sugerenciasPct)}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+    ${isRange?'<div class="hint" style="margin:10px 0 0;">Ticket medio: media diaria del vendedor en el periodo · % Sugerencias: Sg totales ÷ tickets totales del periodo</div>':''}
+  </div>`;
+}
+function attachSortHandler(){
+  const el = document.getElementById('empSortSelect');
+  if (el) el.addEventListener('change', e => { empSortKey = e.target.value; renderAll(); });
+}
+
+/* ---- Flavors ---- */
+function renderFlavorsCard(shop, from, to){
+  if (!from || !to) return `<div class="card"><div class="empty-note">Sin fechas seleccionadas</div></div>`;
+  const rows = State.raw.t5.filter(r => inRange(r.dkey, from, to) && (shop === 'all' || r.shop === shop) && r.sabor);
+  if (!rows.length) return `<div class="card"><h3>Sabores más vendidos</h3><div class="empty-note">Sin datos para esta selección</div></div>`;
+  const map = new Map();
+  rows.forEach(r => map.set(r.sabor, (map.get(r.sabor)||0) + (isNaN(r.unidades)?0:r.unidades)));
+  const top = Array.from(map.entries()).sort((a,b) => b[1]-a[1]).slice(0,10);
+  const max = Math.max(...top.map(t => t[1]), 1);
+  return `<div class="card">
+    <h3>Sabores más vendidos</h3>
+    <div class="hint">${shop==='all'?'Todas las tiendas':esc(shop)} · ${rangeLabel(from,to)}</div>
+    <div class="rank-list">
+      ${top.map((t,i) => `
+        <div class="rank-row">
+          <div class="rank-num">${i+1}</div>
+          <div class="rank-item">
+            <div class="rank-name">${esc(t[0])}</div>
+            <div class="rank-bar-wrap"><div class="rank-bar" style="width:${(t[1]/max)*100}%"></div></div>
+          </div>
+          <div class="rank-val">${fmtInt(t[1])} ud.</div>
+        </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+/* ---- Ultimos ---- */
+function latestUltRow(shop, from, to){
+  const candidates = State.raw.ult.filter(r => r.shop === shop && inRange(r.dkey, from, to));
+  if (!candidates.length) return null;
+  return candidates.reduce((best, r) => (!best || r.dkey > best.dkey) ? r : best, null);
+}
+function renderUltimosCard(shop, from, to){
+  if (!from || !to) return `<div class="card"><div class="empty-note">Sin fechas seleccionadas</div></div>`;
+  const isRange = from !== to;
+  if (shop !== 'all'){
+    const row = latestUltRow(shop, from, to);
+    if (!row || !row.tickets.length) return `<div class="card"><div class="empty-note">Sin datos para esta selección</div></div>`;
+    return `<div class="card">
+      <h3>${esc(shop)}</h3>
+      <div class="hint">Horas de los últimos 10 tickets · ${dateLabel(row.dkey)}${isRange?' (fecha más reciente con datos dentro del rango)':''}</div>
+      <div class="tape-list">
+        ${row.tickets.map((t,i) => `<div class="ticket-row ${i===0?'latest':''}"><span class="t-idx">Ticket ${i+1}</span><span>${esc(t)}</span></div>`).join('')}
+      </div>
+    </div>`;
+  }
+  const cards = State.shops.map(s => {
+    const row = latestUltRow(s, from, to);
+    const tickets = row ? row.tickets.slice(0,5) : [];
+    return `<div class="ticket-card">
+      <h4>${esc(s.replace('Amorino ',''))}</h4>
+      ${row ? `<div class="hint" style="margin-bottom:8px;">${dateLabel(row.dkey)}</div>` : ''}
+      ${tickets.length ? tickets.map((t,i) => `<div class="ticket-row ${i===0?'latest':''}"><span class="t-idx">#${i+1}</span><span>${esc(t)}</span></div>`).join('') : '<div class="empty-note" style="padding:10px 0;">Sin datos</div>'}
+    </div>`;
+  }).join('');
+  return `<div class="tickets-grid">${cards}</div>`;
+}
+
+/* ================= INIT ================= */
+loadData();
+setInterval(() => { if (!State.loading) loadData(); }, AUTO_REFRESH_MS);
+</script>
+</body>
+</html>
