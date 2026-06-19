@@ -141,6 +141,9 @@
 
   /* ---------- Hourly bars ---------- */
   .hbars{display:flex;align-items:flex-end;gap:5px;height:200px;padding-top:18px;}
+  .series-svg{width:100%;height:240px;overflow:visible;}
+  .series-dot{transition:r .15s;cursor:default;}
+  .series-dot:hover{r:5.5;}
   .hbar-col{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;min-width:0;}
   .hbar{width:100%;border-radius:6px 6px 2px 2px;background:linear-gradient(180deg,var(--raspberry),#A8394A);position:relative;min-height:3px;cursor:default;}
   .hbar:hover{background:linear-gradient(180deg,var(--mango),#C77E1C);}
@@ -610,6 +613,8 @@ function renderAll(){
   const shop = State.shop, from = State.from, to = State.to;
   const html = `
     ${renderKPIs(shop, from, to)}
+    <div class="section-title"><span class="swatch" style="background:var(--raspberry)"></span>Evolución diaria de ventas</div>
+    ${renderDailySeriesCard(shop, from, to)}
     <div class="section-title"><span class="swatch" style="background:var(--raspberry)"></span>Ventas por hora</div>
     <div class="grid-2">
       ${renderHourlyCard(shop, from, to)}
@@ -625,6 +630,71 @@ function renderAll(){
   `;
   document.getElementById('content').innerHTML = html;
   attachSortHandler();
+}
+
+/* ---- Evolución diaria (serie temporal) ---- */
+function renderDailySeriesCard(shop, from, to){
+  if (!from || !to) return `<div class="card"><div class="empty-note">Sin fechas seleccionadas</div></div>`;
+
+  const days = [];
+  let d = from;
+  while (d <= to) { days.push(d); d = shiftDate(d, 1); }
+
+  if (days.length < 2){
+    return `<div class="card">
+      <div class="hint">${shop==='all'?'Todas las tiendas':esc(shop)} · ${rangeLabel(from,to)}</div>
+      <div class="empty-note">Selecciona un rango de varios días (botones rápidos arriba: 7 días, 30 días…) para ver la evolución.</div>
+    </div>`;
+  }
+
+  const rows = State.raw.t1.filter(r => inRange(r.dkey, from, to) && (shop === 'all' || r.shop === shop));
+  const byDay = new Map();
+  days.forEach(dd => byDay.set(dd, 0));
+  rows.forEach(r => { if (!isNaN(r.ventas)) byDay.set(r.dkey, (byDay.get(r.dkey) || 0) + r.ventas); });
+
+  const values = days.map(dd => byDay.get(dd) || 0);
+  const max = Math.max(...values, 1);
+  const W = 760, H = 240, padL = 14, padR = 14, padT = 18, padB = 34;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+  const stepX = innerW / (days.length - 1);
+
+  const points = values.map((v, i) => [
+    padL + i * stepX,
+    padT + innerH - (max ? (v / max) * innerH : 0)
+  ]);
+
+  const linePath = points.map((p, i) => (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+  const baseline = (padT + innerH).toFixed(1);
+  const areaPath = linePath +
+    ` L${points[points.length - 1][0].toFixed(1)},${baseline}` +
+    ` L${points[0][0].toFixed(1)},${baseline} Z`;
+
+  const labelEvery = days.length <= 8 ? 1 : Math.ceil(days.length / 8);
+  const dots = points.map((p, i) => `<circle class="series-dot" cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3.5" fill="#C84B5E" stroke="#FFFFFF" stroke-width="1.5"><title>${dateLabel(days[i])}: ${fmtEUR(values[i])}</title></circle>`).join('');
+  const xLabels = points.map((p, i) => (i % labelEvery === 0 || i === points.length - 1)
+    ? `<text x="${p[0].toFixed(1)}" y="${H - 12}" font-size="10" fill="#766955" text-anchor="middle">${dateLabel(days[i]).slice(0, 5)}</text>`
+    : '').join('');
+
+  const total = values.reduce((a, b) => a + b, 0);
+  const avg = total / values.length;
+  const best = Math.max(...values);
+  const bestDay = days[values.indexOf(best)];
+
+  return `<div class="card">
+    <div class="hint">${shop==='all'?'Todas las tiendas':esc(shop)} · ${rangeLabel(from,to)} · media diaria ${fmtEUR(avg)} · mejor día ${dateLabel(bestDay)} (${fmtEUR(best)})</div>
+    <svg viewBox="0 0 ${W} ${H}" class="series-svg" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="seriesFill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#C84B5E" stop-opacity="0.28"/>
+          <stop offset="100%" stop-color="#C84B5E" stop-opacity="0.02"/>
+        </linearGradient>
+      </defs>
+      <path d="${areaPath}" fill="url(#seriesFill)" stroke="none"/>
+      <path d="${linePath}" fill="none" stroke="#C84B5E" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+      ${dots}
+      ${xLabels}
+    </svg>
+  </div>`;
 }
 
 /* ---- KPIs ---- */
