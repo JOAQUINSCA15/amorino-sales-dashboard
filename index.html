@@ -142,6 +142,17 @@
 
   /* ---------- Hourly bars ---------- */
   .hbars{display:flex;align-items:flex-end;gap:5px;height:200px;padding-top:18px;}
+  .eval-table{width:100%;border-collapse:collapse;font-size:13px;}
+  .eval-table thead th{text-align:left;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);font-weight:700;padding:0 8px 8px;border-bottom:1px solid var(--line);}
+  .eval-table tbody td{padding:7px 8px;border-bottom:1px solid var(--cream-2);}
+  .eval-table tr.ev-pos td{background:rgba(79,122,63,0.09);}
+  .eval-table tr.ev-neg td{background:rgba(94,111,163,0.1);}
+  .eval-table tbody tr:hover td{filter:brightness(0.95);}
+  .eval-shop-block{margin-bottom:28px;}
+  .eval-shop-title{font-family:'Fraunces',serif;font-size:14px;font-weight:700;margin:0 0 10px;}
+  .prod-control{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-soft);margin-bottom:14px;}
+  .prod-control input{width:68px;padding:4px 8px;border:1px solid var(--line);border-radius:6px;font-size:13px;font-family:'Inter',sans-serif;}
+  .prod-control input:focus{outline:2px solid var(--blueberry);outline-offset:1px;}
   .series-svg{width:100%;height:240px;overflow:visible;}
   .series-dot{transition:r .15s;cursor:default;}
   .series-dot:hover{r:5.5;}
@@ -401,7 +412,7 @@ function gvizJsonToRows(json){
 }
 
 /* ================= STATE ================= */
-const State = { shop:'all', from:null, to:null, raw:null, loading:false, error:null, lastSync:null, weather:{}, weatherFetching:false };
+const State = { shop:'all', from:null, to:null, raw:null, loading:false, error:null, lastSync:null, weather:{}, weatherFetching:false, radiografia:{}, productividad:110 };
 
 /* Sevilla coordinates for weather */
 const WEATHER_LAT = 37.39, WEATHER_LON = -5.98;
@@ -683,9 +694,193 @@ function buildWeatherKPIsHTML(from, to){
   </div>`;
 }
 
+/* ================= EVALUACIÓN DEL TURNO ================= */
+const RADIOGRAFIAS_SHEET_ID = '1b2QhZCIKoMWwNFG051O-Hj0zx4y5Zi3sxPdM9_68ozo';
+const MONTH_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const SHOP_RAD_KEY = {
+  'Amorino Sevilla Avenida':       'AVENIDA',
+  'Amorino Patio de los Naranjos': 'NARANJOS',
+  'Amorino Plaza Nueva':           'PLAZA NUEVA',
+  'Amorino Alcázar':               'ALCÁZAR',
+  'Amorino Catedral':              'CATEDRAL'
+};
+const RAD_DAYS    = ['LUNES','MARTES','MIÉRCOLES','JUEVES','VIERNES','SÁBADO','DOMINGO'];
+const RAD_DAYS_JS = [1, 2, 3, 4, 5, 6, 0]; // JS getDay() Mon–Sun
+
+function getRadiografiaTab(dkey){
+  const [y,m,d] = dkey.split('-').map(Number);
+  if (y >= 2026) return MONTH_ES[m-1] + ' ' + y;
+  if (y === 2025){
+    if (m === 10){ return d <= 19 ? '6 y 13 Octubre 2025' : '20 Octubre 2025'; }
+    if (m === 11){ return d <= 16 ? '3 y 10 Noviembre 2025' : '17 y 24 Noviembre 2025'; }
+    if (m === 12){
+      if (d <= 7)  return '1 Diciembre 2025';
+      if (d <= 14) return '8 Diciembre 2025';
+      if (d <= 21) return '15 Diciembre 2025';
+      return '22 Diciembre 2025';
+    }
+  }
+  return null;
+}
+
+/* Convert a slot label like "10-11", "10:30-11:00", "00-01" → {start, end} minutes
+   Hours < 7 are treated as 24+ to handle post-midnight slots. */
+function slotToMins(s){
+  s = String(s).trim().replace(/\s/g,'');
+  const parts = s.split('-');
+  if (parts.length !== 2) return null;
+  const parseT = t => {
+    let h, m = 0;
+    if (t.includes(':')){ const [a,b]=t.split(':'); h=parseInt(a,10); m=parseInt(b,10)||0; }
+    else h = parseInt(t, 10);
+    if (isNaN(h)) return null;
+    if (h < 7) h += 24;
+    return h*60 + m;
+  };
+  const s2 = parseT(parts[0]), e2 = parseT(parts[1]);
+  if (s2===null || e2===null) return null;
+  return {start:s2, end: e2 <= s2 ? e2+1440 : e2};
+}
+
+/* Parse the 2D rows from a radiografía sheet into:
+   { SHOP_KEY: { jsDay: [{slot, staff}] } } */
+function parseRadiografiaRows(rows){
+  const result = {};
+  const SHOP_KEYS = Object.values(SHOP_RAD_KEY);
+  let currentShop = null, dayColMap = null, inData = false;
+  for (const row of rows){
+    const shopFound = SHOP_KEYS.find(k => row.some(c => String(c).trim() === k));
+    if (shopFound){
+      currentShop = shopFound;
+      result[currentShop] = {0:[],1:[],2:[],3:[],4:[],5:[],6:[]};
+      inData = false; dayColMap = null;
+      continue;
+    }
+    if (!inData && row.some(c => String(c).trim() === 'LUNES')){
+      dayColMap = {};
+      row.forEach((cell,i) => {
+        const di = RAD_DAYS.indexOf(String(cell).trim());
+        if (di !== -1) dayColMap[RAD_DAYS_JS[di]] = i + 1;
+      });
+      inData = true;
+      continue;
+    }
+    if (!currentShop || !inData || !dayColMap) continue;
+    const timeLabel = String(row[1]||'').trim();
+    if (!timeLabel || !timeLabel.match(/[\-:]/)) continue;
+    for (const [jsDay, colIdx] of Object.entries(dayColMap)){
+      const rawVal = String(row[colIdx]||'').trim().replace(',','.');
+      const staff = parseFloat(rawVal);
+      if (!isNaN(staff)) result[currentShop][parseInt(jsDay)].push({slot:timeLabel, staff});
+    }
+  }
+  return result;
+}
+
+/* Load a tab from a different sheet using JSONP */
+function loadViaJSONP_2(sheetId, sheetName){
+  return new Promise((resolve, reject) => {
+    const cbName = '__gvizCb' + (jsonpCounter++);
+    const scriptEl = document.createElement('script');
+    let settled = false;
+    function cleanup(){ delete window[cbName]; if(scriptEl.parentNode) scriptEl.parentNode.removeChild(scriptEl); clearTimeout(timer); }
+    window[cbName] = json => {
+      if(settled) return; settled=true; cleanup();
+      if(!json || json.status==='error') reject(new Error('Error: '+sheetName)); else resolve(json);
+    };
+    const timer = setTimeout(()=>{ if(settled) return; settled=true; cleanup(); reject(new Error('Timeout: '+sheetName)); }, 15000);
+    scriptEl.src = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json;responseHandler:${cbName}&sheet=${encodeURIComponent(sheetName)}&_=${Date.now()}`;
+    scriptEl.onerror = ()=>{ if(settled) return; settled=true; cleanup(); reject(new Error('Load error: '+sheetName)); };
+    document.head.appendChild(scriptEl);
+  });
+}
+
+async function fetchRadiografiaIfNeeded(dkey){
+  if (!dkey) return;
+  const tabName = getRadiografiaTab(dkey);
+  if (!tabName || State.radiografia[tabName] !== undefined) return;
+  State.radiografia[tabName] = null; // mark as loading
+  try {
+    const json = await loadViaJSONP_2(RADIOGRAFIAS_SHEET_ID, tabName);
+    const rows = gvizJsonToRows(json);
+    State.radiografia[tabName] = parseRadiografiaRows(rows);
+  } catch(e){
+    State.radiografia[tabName] = null;
+  }
+  const el = document.getElementById('evalTurnoSection');
+  if (el) el.innerHTML = buildEvalTurnoHTML(State.shop, State.from);
+}
+
+function getStaffForSlot(shopKey, jsDay, t1Slot, radData){
+  if (!radData || !radData[shopKey]) return NaN;
+  const slots = radData[shopKey][jsDay];
+  if (!slots || !slots.length) return NaN;
+  const target = slotToMins(t1Slot);
+  if (!target) return NaN;
+  const overlapping = slots.filter(r => {
+    const rm = slotToMins(r.slot);
+    return rm && rm.start < target.end && rm.end > target.start;
+  });
+  if (!overlapping.length) return NaN;
+  return overlapping.reduce((a,r)=>a+r.staff, 0) / overlapping.length;
+}
+
+function buildEvalTurnoHTML(shop, dkey){
+  if (!dkey) return '<div class="empty-note">Selecciona un día para ver la evaluación del turno.</div>';
+  const tabName = getRadiografiaTab(dkey);
+  if (!tabName) return '<div class="empty-note">Sin radiografía disponible para esta fecha.</div>';
+  const radData = State.radiografia[tabName];
+  if (!radData) return '<div class="empty-note" style="padding:16px;">Cargando radiografía…</div>';
+  const [y,m,d] = dkey.split('-').map(Number);
+  const jsDay = new Date(y, m-1, d).getDay();
+  const shopsToShow = shop === 'all' ? SHOP_ORDER : [shop];
+  const productividad = State.productividad;
+  let html = '';
+  for (const shopFull of shopsToShow){
+    const shopKey = SHOP_RAD_KEY[shopFull];
+    if (!shopKey) continue;
+    const t1rows = (State.raw.t1||[]).filter(r => r.dkey === dkey && r.shop === shopFull);
+    if (!t1rows.length){
+      html += `<div class="eval-shop-block"><div class="eval-shop-title">${esc(shopFull.replace('Amorino ',''))}</div><div class="empty-note">Sin datos de ventas para este día.</div></div>`;
+      continue;
+    }
+    const sorted = [...t1rows].sort((a,b)=>hourOrderKey(a.horario)-hourOrderKey(b.horario));
+    html += `<div class="eval-shop-block">
+      <div class="eval-shop-title">${esc(shopFull.replace('Amorino ',''))}</div>
+      <table class="eval-table">
+        <thead><tr>
+          <th>Franja</th>
+          <th class="num">Ventas</th>
+          <th class="num">P. necesarias</th>
+          <th class="num">P. radiografía</th>
+          <th class="num">Ev</th>
+        </tr></thead>
+        <tbody>
+          ${sorted.map(row => {
+            const staff   = getStaffForSlot(shopKey, jsDay, row.horario, radData);
+            const needed  = isNaN(row.ventas) ? NaN : row.ventas / productividad;
+            const ev      = (!isNaN(needed) && !isNaN(staff)) ? staff - needed : NaN;
+            const evClass = isNaN(ev) ? '' : (ev >= 0 ? 'ev-pos' : 'ev-neg');
+            const evStr   = isNaN(ev) ? '—' : (ev >= 0 ? '+' : '') + ev.toFixed(2);
+            return `<tr class="${evClass}">
+              <td>${esc(row.horario)}</td>
+              <td class="num">${fmtEUR(row.ventas)}</td>
+              <td class="num">${isNaN(needed)?'—':needed.toFixed(2)}</td>
+              <td class="num">${isNaN(staff)?'—':staff.toFixed(1)}</td>
+              <td class="num"><strong>${evStr}</strong></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  }
+  return html || '<div class="empty-note">Sin datos para mostrar.</div>';
+}
+
 function renderAll(){
   if (!State.raw) return;
   const shop = State.shop, from = State.from, to = State.to;
+  const isRange = from !== to;
   const html = `
     ${renderKPIs(shop, from, to)}
     <div id="weatherKPIs">${buildWeatherKPIsHTML(from, to)}</div>
@@ -703,10 +898,21 @@ function renderAll(){
     </div>
     <div class="section-title"><span class="swatch" style="background:var(--mango)"></span>Últimos tickets</div>
     ${renderUltimosCard(shop, from, to)}
+    ${!isRange ? `
+    <div class="section-title"><span class="swatch" style="background:#8FA871"></span>Evaluación del turno</div>
+    <div class="card">
+      <div class="prod-control">
+        <label for="prodInput">Productividad:</label>
+        <input type="number" id="prodInput" value="${State.productividad}" min="1" max="9999" step="5">
+        <span>€ / persona / hora</span>
+      </div>
+      <div id="evalTurnoSection">${buildEvalTurnoHTML(shop, from)}</div>
+    </div>` : ''}
   `;
   document.getElementById('content').innerHTML = html;
   attachSortHandler();
   fetchWeatherIfNeeded(from, to);
+  if (!isRange) fetchRadiografiaIfNeeded(from);
 }
 
 /* ---- Evolución diaria (serie temporal) ---- */
@@ -964,6 +1170,11 @@ function renderEmployeesCard(shop, from, to){
 function attachSortHandler(){
   const el = document.getElementById('empSortSelect');
   if (el) el.addEventListener('change', e => { empSortKey = e.target.value; renderAll(); });
+  const prod = document.getElementById('prodInput');
+  if (prod) prod.addEventListener('change', e => {
+    const v = parseFloat(e.target.value);
+    if (!isNaN(v) && v > 0){ State.productividad = v; const sec = document.getElementById('evalTurnoSection'); if(sec) sec.innerHTML = buildEvalTurnoHTML(State.shop, State.from); }
+  });
 }
 
 /* ---- Flavors ---- */
