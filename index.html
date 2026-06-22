@@ -215,6 +215,91 @@
 
   .skeleton{height:120px;border-radius:14px;background:linear-gradient(90deg,var(--cream-2) 25%,var(--white) 37%,var(--cream-2) 63%);background-size:400% 100%;animation:shimmer 1.4s infinite;}
   @keyframes shimmer{0%{background-position:100% 0;}100%{background-position:0 0;}}
+
+  /* ===== MOBILE — iPhone ===== */
+  @media (max-width:520px){
+    #app{padding:0 10px 48px;}
+
+    /* Topbar */
+    .topbar{padding:10px 14px 8px;margin:0 -10px 20px;}
+    .topbar-inner{flex-direction:column;align-items:flex-start;gap:8px;}
+    .brand h1{font-size:22px;}
+    .brand .eyebrow{font-size:9.5px;}
+    .brand-mark{width:22px;height:22px;}
+    .controls{display:grid;grid-template-columns:1fr 1fr;gap:7px;width:100%;}
+    .controls .field{width:100%;}
+    .controls .field-wide{grid-column:1/-1;}
+    select,input[type="date"]{width:100%;min-width:unset;font-size:13px;padding:7px 8px;}
+    .btn{justify-content:center;width:100%;padding:10px;}
+    .preset-row{overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px;-webkit-overflow-scrolling:touch;gap:5px;}
+    .preset-btn{white-space:nowrap;flex-shrink:0;font-size:11px;padding:5px 10px;}
+    .sync-note{font-size:10px;}
+
+    /* KPIs */
+    .kpi-section-label{margin-top:14px;margin-bottom:6px;}
+    .kpi-row{grid-template-columns:repeat(2,1fr) !important;gap:8px;}
+    .kpi-scoop{margin:0 8px -1px;}
+    .kpi-body{padding:10px 10px 8px;}
+    .kpi-label{font-size:9.5px;min-height:24px;}
+    .kpi-value{font-size:18px;}
+    .kpi-value.small{font-size:15px;}
+    .kpi-sub{font-size:10px;}
+
+    /* Section titles */
+    .section-title{font-size:15px;margin:22px 0 8px;}
+    .section-title .swatch{width:9px;height:9px;}
+
+    /* Cards */
+    .card{padding:14px 12px;border-radius:12px;}
+    .card h3{font-size:14px;}
+    .hint{font-size:11px;}
+    .grid-2{grid-template-columns:1fr !important;gap:12px;}
+
+    /* Hourly bars */
+    .hbars{height:140px;gap:3px;}
+    .hbar-axis{font-size:8px;height:26px;}
+
+    /* Series SVG */
+    .series-svg{height:auto !important;}
+
+    /* Donut */
+    .donut-wrap{flex-direction:column;align-items:center;gap:14px;}
+    .legend{min-width:unset;width:100%;}
+    .legend-row{font-size:12px;}
+
+    /* Employee / Flavor tables */
+    table{font-size:12px;}
+    thead th{font-size:9.5px;padding:0 6px 8px;}
+    tbody td{padding:8px 6px;}
+    .sort-select{font-size:12px;}
+    .emp-name{font-size:12px;}
+    .shop-tag{font-size:9.5px;}
+
+    /* Rank list */
+    .rank-row{font-size:12px;gap:6px;}
+    .rank-num{font-size:11px;}
+    .rank-val{font-size:11px;}
+
+    /* Eval table */
+    .eval-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+    .eval-table{min-width:340px;font-size:12px;}
+    .eval-table thead th{font-size:9.5px;padding:0 6px 7px;}
+    .eval-table tbody td{padding:7px 6px;}
+    .eval-shop-title{font-size:13px;}
+    .prod-control{flex-wrap:wrap;font-size:11px;}
+    .prod-control input{width:58px;font-size:12px;}
+
+    /* Tickets */
+    .tickets-grid{grid-template-columns:repeat(2,1fr) !important;}
+    .ticket-card{padding:12px;}
+    .ticket-card h4{font-size:12px;}
+    .ticket-row{font-size:12px;}
+    .tape-list{max-width:100%;}
+
+    /* Footer */
+    footer{font-size:10px;}
+    footer a{word-break:break-all;}
+  }
 </style>
 </head>
 <body>
@@ -230,7 +315,7 @@
         </div>
       </div>
       <div class="controls">
-        <div class="field">
+        <div class="field field-wide">
           <label for="shopSelect">Tienda</label>
           <select id="shopSelect"></select>
         </div>
@@ -242,7 +327,7 @@
           <label for="dateTo">Hasta</label>
           <input type="date" id="dateTo">
         </div>
-        <div class="field">
+        <div class="field field-wide">
           <label>&nbsp;</label>
           <button class="btn" id="refreshBtn"><span class="dot" id="statusDot"></span><span id="refreshLabel">Actualizar</span></button>
         </div>
@@ -847,6 +932,7 @@ function buildEvalTurnoHTML(shop, dkey){
     const sorted = [...t1rows].sort((a,b)=>hourOrderKey(a.horario)-hourOrderKey(b.horario));
     html += `<div class="eval-shop-block">
       <div class="eval-shop-title">${esc(shopFull.replace('Amorino ',''))}</div>
+      <div class="eval-table-wrap">
       <table class="eval-table">
         <thead><tr>
           <th>Franja</th>
@@ -872,6 +958,7 @@ function buildEvalTurnoHTML(shop, dkey){
           }).join('')}
         </tbody>
       </table>
+      </div>
     </div>`;
   }
   return html || '<div class="empty-note">Sin datos para mostrar.</div>';
