@@ -114,6 +114,7 @@
 
   /* ---------- KPI scoops ---------- */
   .kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;}
+  .kpi-section-label{font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;margin-top:24px;}
   @media (max-width:980px){.kpi-row{grid-template-columns:repeat(3,1fr);}}
   @media (max-width:560px){.kpi-row{grid-template-columns:repeat(2,1fr);}}
   .kpi{display:flex;flex-direction:column;align-items:stretch;}
@@ -400,7 +401,11 @@ function gvizJsonToRows(json){
 }
 
 /* ================= STATE ================= */
-const State = { shop:'all', from:null, to:null, raw:null, loading:false, error:null, lastSync:null };
+const State = { shop:'all', from:null, to:null, raw:null, loading:false, error:null, lastSync:null, weather:{}, weatherFetching:false };
+
+/* Sevilla coordinates for weather */
+const WEATHER_LAT = 37.39, WEATHER_LON = -5.98;
+const RAIN_THRESHOLD = 0;
 
 /* ================= DATA LOADING ================= */
 async function fetchTab(name){
@@ -608,11 +613,82 @@ function renderError(err){
     </div>`;
 }
 
+/* ================= PREVIOUS YEAR (sheet data only) ================= */
+function prevYearKey(dkey){
+  const [y,m,d] = dkey.split('-');
+  return `${parseInt(y,10)-1}-${m}-${d}`;
+}
+function getPrevYearTotalForShop(dkey, shop){
+  if (!State.raw) return NaN;
+  const pkey = prevYearKey(dkey);
+  const rows = State.raw.t1.filter(r => r.dkey === pkey && (shop === 'all' || r.shop === shop));
+  if (!rows.length) return NaN;
+  const s = rows.reduce((a,r) => a+(isNaN(r.ventas)?0:r.ventas), 0);
+  return s > 0 ? s : NaN;
+}
+
+/* ================= WEATHER ================= */
+async function fetchWeatherIfNeeded(from, to){
+  if (!from || !to || State.weatherFetching) return;
+  const days = []; let d = from; while(d<=to){ days.push(d); d=shiftDate(d,1); }
+  const missing = days.filter(d => !State.weather[d]);
+  if (!missing.length) return;
+  State.weatherFetching = true;
+  const wFrom = missing[0], wTo = missing[missing.length-1];
+  function parseW(data){
+    if (!data.daily) return;
+    data.daily.time.forEach((dkey,i) => {
+      const tempMax = data.daily.temperature_2m_max[i];
+      const precip  = data.daily.precipitation_sum[i];
+      if (!State.weather[dkey]) State.weather[dkey] = { tempMax, precip, rain: precip > RAIN_THRESHOLD };
+    });
+  }
+  try { const r = await fetch(`https://archive-api.open-meteo.com/v1/archive?latitude=${WEATHER_LAT}&longitude=${WEATHER_LON}&start_date=${wFrom}&end_date=${wTo}&daily=temperature_2m_max,precipitation_sum&timezone=Europe%2FMadrid`); if(r.ok) parseW(await r.json()); } catch(e){}
+  try {
+    const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${WEATHER_LAT}&longitude=${WEATHER_LON}&daily=temperature_2m_max,precipitation_sum&timezone=Europe%2FMadrid&past_days=92&forecast_days=1`);
+    if(r.ok){ const data = await r.json(); if(data.daily) data.daily.time.forEach((dkey,i) => {
+      if(dkey<wFrom||dkey>wTo) return;
+      State.weather[dkey] = { tempMax:data.daily.temperature_2m_max[i], precip:data.daily.precipitation_sum[i], rain:data.daily.precipitation_sum[i]>RAIN_THRESHOLD };
+    }); }
+  } catch(e){}
+  State.weatherFetching = false;
+  const el = document.getElementById('weatherKPIs');
+  if (el) el.innerHTML = buildWeatherKPIsHTML(State.from, State.to);
+}
+
+function buildWeatherKPIsHTML(from, to){
+  if (!from || !to) return '';
+  const isRange = from !== to;
+  const days = []; let d = from; while(d<=to){ days.push(d); d=shiftDate(d,1); }
+  const wDays = days.map(d => State.weather[d]).filter(w => w && w.tempMax !== null && w.tempMax !== undefined);
+  if (!wDays.length) return `<div style="font-size:12px;color:var(--ink-soft);padding:8px 0;">Cargando datos meteorológicos…</div>`;
+  let rainVal, tempVal;
+  if (isRange){
+    const rainy = wDays.filter(w=>w.rain).length;
+    const avgT = wDays.reduce((a,w)=>a+w.tempMax,0)/wDays.length;
+    const maxT = Math.max(...wDays.map(w=>w.tempMax));
+    rainVal = `${rainy} día${rainy!==1?'s':''} de ${days.length}`;
+    tempVal = `Media ${avgT.toFixed(1)}° · Máx ${maxT.toFixed(1)}°`;
+  } else {
+    const w = State.weather[from];
+    if (!w) return `<div style="font-size:12px;color:var(--ink-soft);padding:8px 0;">Sin datos meteorológicos</div>`;
+    rainVal = w.rain ? `Sí · ${w.precip.toFixed(1)} mm` : 'No';
+    tempVal = w.tempMax !== null ? `${w.tempMax.toFixed(1)} °C` : '—';
+  }
+  const rainColor = wDays.some(w=>w.rain) ? '#5E6FA3' : '#E3A038';
+  return `<div class="kpi-section-label" style="margin-top:18px;">Meteorología · Sevilla</div>
+  <div class="kpi-row" style="grid-template-columns:repeat(2,1fr);max-width:420px;">
+    <div class="kpi"><div class="kpi-scoop" style="background:${rainColor}"></div><div class="kpi-body"><div class="kpi-label">${isRange?'Días de lluvia':'Lluvia'}</div><div class="kpi-value small">${esc(rainVal)}</div></div></div>
+    <div class="kpi"><div class="kpi-scoop" style="background:var(--raspberry)"></div><div class="kpi-body"><div class="kpi-label">${isRange?'Temperatura máx.':'Temp. máx. del día'}</div><div class="kpi-value small">${esc(tempVal)}</div></div></div>
+  </div>`;
+}
+
 function renderAll(){
   if (!State.raw) return;
   const shop = State.shop, from = State.from, to = State.to;
   const html = `
     ${renderKPIs(shop, from, to)}
+    <div id="weatherKPIs">${buildWeatherKPIsHTML(from, to)}</div>
     <div class="section-title"><span class="swatch" style="background:var(--raspberry)"></span>Evolución diaria de ventas</div>
     ${renderDailySeriesCard(shop, from, to)}
     <div class="section-title"><span class="swatch" style="background:var(--raspberry)"></span>Ventas por hora</div>
@@ -630,6 +706,7 @@ function renderAll(){
   `;
   document.getElementById('content').innerHTML = html;
   attachSortHandler();
+  fetchWeatherIfNeeded(from, to);
 }
 
 /* ---- Evolución diaria (serie temporal) ---- */
@@ -643,7 +720,7 @@ function renderDailySeriesCard(shop, from, to){
   if (days.length < 2){
     return `<div class="card">
       <div class="hint">${shop==='all'?'Todas las tiendas':esc(shop)} · ${rangeLabel(from,to)}</div>
-      <div class="empty-note">Selecciona un rango de varios días (botones rápidos arriba: 7 días, 30 días…) para ver la evolución.</div>
+      <div class="empty-note">Selecciona un rango de varios días para ver la evolución.</div>
     </div>`;
   }
 
@@ -651,48 +728,72 @@ function renderDailySeriesCard(shop, from, to){
   const byDay = new Map();
   days.forEach(dd => byDay.set(dd, 0));
   rows.forEach(r => { if (!isNaN(r.ventas)) byDay.set(r.dkey, (byDay.get(r.dkey) || 0) + r.ventas); });
-
   const values = days.map(dd => byDay.get(dd) || 0);
-  const max = Math.max(...values, 1);
-  const W = 760, H = 240, padL = 14, padR = 14, padT = 18, padB = 34;
+
+  // Previous year: same calendar dates, -1 year, from Google Sheet only
+  const prevValues = days.map(dd => getPrevYearTotalForShop(dd, shop));
+  const hasPrev = prevValues.some(v => !isNaN(v));
+
+  const allVals = values.concat(prevValues.filter(v => !isNaN(v)));
+  const max = Math.max(...allVals, 1);
+  const W = 760, H = 260, padL = 14, padR = 14, padT = 18, padB = 50;
   const innerW = W - padL - padR, innerH = H - padT - padB;
-  const stepX = innerW / (days.length - 1);
+  const stepX = days.length > 1 ? innerW / (days.length - 1) : 0;
+  const toY = v => padT + innerH - (isNaN(v) || !max ? 0 : (v / max) * innerH);
 
-  const points = values.map((v, i) => [
-    padL + i * stepX,
-    padT + innerH - (max ? (v / max) * innerH : 0)
-  ]);
+  const pts = values.map((v, i) => [padL + i * stepX, toY(v)]);
+  const prevPts = prevValues.map((v, i) => [padL + i * stepX, isNaN(v) ? null : toY(v)]);
 
-  const linePath = points.map((p, i) => (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+  const linePath = pts.map((p, i) => (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
   const baseline = (padT + innerH).toFixed(1);
-  const areaPath = linePath +
-    ` L${points[points.length - 1][0].toFixed(1)},${baseline}` +
-    ` L${points[0][0].toFixed(1)},${baseline} Z`;
+  const areaPath = linePath + ` L${pts[pts.length-1][0].toFixed(1)},${baseline} L${pts[0][0].toFixed(1)},${baseline} Z`;
+
+  let prevPath = '';
+  prevPts.forEach((p, i) => {
+    if (p[1] === null) return;
+    const pp = prevPts[i-1];
+    prevPath += (i === 0 || pp === null || pp[1] === null ? 'M' : 'L') + p[0].toFixed(1) + ',' + p[1].toFixed(1) + ' ';
+  });
 
   const labelEvery = days.length <= 8 ? 1 : Math.ceil(days.length / 8);
-  const dots = points.map((p, i) => `<circle class="series-dot" cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3.5" fill="#C84B5E" stroke="#FFFFFF" stroke-width="1.5"><title>${dateLabel(days[i])}: ${fmtEUR(values[i])}</title></circle>`).join('');
-  const xLabels = points.map((p, i) => (i % labelEvery === 0 || i === points.length - 1)
-    ? `<text x="${p[0].toFixed(1)}" y="${H - 12}" font-size="10" fill="#766955" text-anchor="middle">${dateLabel(days[i]).slice(0, 5)}</text>`
+  const dots = pts.map((p, i) => `<circle class="series-dot" cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3.5" fill="#C84B5E" stroke="#FFF" stroke-width="1.5"><title>${dateLabel(days[i])}: ${fmtEUR(values[i])}</title></circle>`).join('');
+  const prevDots = hasPrev ? prevPts.map((p, i) => p[1] === null ? '' :
+    `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.5" fill="#5E6FA3" stroke="#FFF" stroke-width="1"><title>${dateLabel(prevYearKey(days[i]))}: ${fmtEUR(prevValues[i])}</title></circle>`
+  ).join('') : '';
+  const xLabels = pts.map((p, i) => (i % labelEvery === 0 || i === pts.length - 1)
+    ? `<text x="${p[0].toFixed(1)}" y="${H - 28}" font-size="10" fill="#766955" text-anchor="middle">${dateLabel(days[i]).slice(0, 5)}</text>`
     : '').join('');
 
-  const total = values.reduce((a, b) => a + b, 0);
+  const total = values.reduce((a,b)=>a+b,0);
   const avg = total / values.length;
   const best = Math.max(...values);
   const bestDay = days[values.indexOf(best)];
+
+  const legend = `<g transform="translate(${padL}, ${H - 16})">
+    <line x1="0" y1="-4" x2="18" y2="-4" stroke="#C84B5E" stroke-width="2.5"/>
+    <circle cx="9" cy="-4" r="3" fill="#C84B5E"/>
+    <text x="22" y="0" font-size="11" fill="#766955">Este año</text>
+    ${hasPrev ? `<line x1="80" y1="-4" x2="98" y2="-4" stroke="#5E6FA3" stroke-width="1.8" stroke-dasharray="4 3"/>
+    <circle cx="89" cy="-4" r="2.5" fill="#5E6FA3"/>
+    <text x="102" y="0" font-size="11" fill="#766955">Año anterior</text>` : ''}
+  </g>`;
 
   return `<div class="card">
     <div class="hint">${shop==='all'?'Todas las tiendas':esc(shop)} · ${rangeLabel(from,to)} · media diaria ${fmtEUR(avg)} · mejor día ${dateLabel(bestDay)} (${fmtEUR(best)})</div>
     <svg viewBox="0 0 ${W} ${H}" class="series-svg" preserveAspectRatio="none">
       <defs>
         <linearGradient id="seriesFill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#C84B5E" stop-opacity="0.28"/>
+          <stop offset="0%" stop-color="#C84B5E" stop-opacity="0.22"/>
           <stop offset="100%" stop-color="#C84B5E" stop-opacity="0.02"/>
         </linearGradient>
       </defs>
       <path d="${areaPath}" fill="url(#seriesFill)" stroke="none"/>
+      ${hasPrev && prevPath ? `<path d="${prevPath.trim()}" fill="none" stroke="#5E6FA3" stroke-width="1.8" stroke-dasharray="5 3" stroke-linejoin="round" stroke-linecap="round" opacity="0.8"/>` : ''}
       <path d="${linePath}" fill="none" stroke="#C84B5E" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+      ${hasPrev ? prevDots : ''}
       ${dots}
       ${xLabels}
+      ${legend}
     </svg>
   </div>`;
 }
@@ -732,7 +833,8 @@ function renderKPIs(shop, from, to){
     { label:'% Sugerencias/ticket', value:fmtPct(sugPct), color:'var(--cocoa)' },
     { label:'Var. mes vs año anterior', value:fmtPct(difPct), color: (difPct>=0?'#4D7A3F':'var(--raspberry)'), note: isRange ? ('a '+dateLabel(to)) : null },
   ];
-  return `<div class="kpi-row">${cards.map(c => `
+  return `<div class="kpi-section-label">${isRange ? 'Rendimiento del periodo' : 'Rendimiento del día'}</div>
+  <div class="kpi-row">${cards.map(c => `
     <div class="kpi">
       <div class="kpi-scoop" style="background:${c.color}"></div>
       <div class="kpi-body">
