@@ -244,18 +244,41 @@
   .eval-grand-total > strong:first-child{font-family:'Fraunces',serif;font-size:15px;margin-right:8px;}
 
   /* ===== PRINT / PDF ===== */
+  .print-only{display:none;}
+  .print-header{margin-bottom:24px;}
+  .print-header-inner{display:flex;align-items:flex-start;justify-content:space-between;}
+  .print-brand{display:flex;align-items:center;gap:12px;}
+  .print-brand-mark{
+    width:36px;height:36px;border-radius:50% 50% 50% 4px;flex:none;
+    background:conic-gradient(#C84B5E 0deg 90deg,#E3A038 90deg 180deg,#8FA871 180deg 270deg,#5E6FA3 270deg 360deg);
+  }
+  .print-brand-name{font-family:'Fraunces',serif;font-style:italic;font-size:28px;font-weight:600;line-height:1.1;}
+  .print-brand-sub{font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-soft);margin-top:2px;}
+  .print-meta-block{text-align:right;}
+  .print-meta-label{font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-soft);}
+  .print-meta-value{font-size:13px;font-weight:600;margin-top:3px;}
+  .print-divider{height:2px;background:linear-gradient(90deg,var(--raspberry),var(--mango),var(--pistachio));border-radius:2px;margin-top:14px;}
+
   @media print{
-    .topbar,.tab-bar,.no-print,footer,#weatherKPIs,.preset-row,.sync-note{display:none!important;}
-    body{background:#fff;font-size:11px;}
-    #app{max-width:100%;padding:0;}
-    .card{box-shadow:none;border:1px solid #ddd;break-inside:avoid;}
-    .section-title{margin:12px 0 6px;font-size:14px;}
-    .kpi-row{grid-template-columns:repeat(3,1fr);}
-    .grid-2{grid-template-columns:1fr 1fr;}
+    .print-only{display:block !important;}
+    .no-print,.topbar,.tab-bar,footer,#weatherKPIs,.preset-row,.sync-note{display:none !important;}
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body{background:#fff;font-size:11px;margin:0;padding:0;}
+    #app{max-width:100%;padding:12px 20px 20px;}
+    .card{box-shadow:none;border:1px solid #ddd;break-inside:avoid;margin-bottom:12px;}
+    .kpi-scoop{display:none;}
+    .kpi-body{border:1px solid #e0d8c8;border-radius:8px;padding:10px;}
+    .kpi-row{grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px;}
+    .kpi-section-label{margin:16px 0 6px;font-size:9px;}
+    .section-title{margin:16px 0 8px;font-size:13px;page-break-after:avoid;}
+    .grid-2{grid-template-columns:1fr 1fr;gap:10px;}
     .eval-table-wrap{overflow:visible;}
-    .eval-table{page-break-inside:avoid;}
-    .series-svg{height:180px!important;}
+    .eval-table{page-break-inside:avoid;font-size:11px;}
+    .series-svg{height:160px !important;}
+    .hbars{height:120px;}
+    .tickets-grid{grid-template-columns:repeat(3,1fr);}
     a{color:inherit;text-decoration:none;}
+    @page{margin:1.5cm;size:A4 landscape;}
   }
 
   @keyframes shimmer{0%{background-position:100% 0;}100%{background-position:0 0;}}
@@ -358,6 +381,24 @@
 </head>
 <body>
 <div id="app">
+
+  <!-- Print header: hidden on screen, visible in PDF export -->
+  <div class="print-header print-only" id="printHeader">
+    <div class="print-header-inner">
+      <div class="print-brand">
+        <div class="print-brand-mark"></div>
+        <div>
+          <div class="print-brand-name">Amorino</div>
+          <div class="print-brand-sub">Panel de Ventas · Sevilla</div>
+        </div>
+      </div>
+      <div class="print-meta-block">
+        <div class="print-meta-label">Informe generado</div>
+        <div class="print-meta-value" id="printMeta">—</div>
+      </div>
+    </div>
+    <div class="print-divider"></div>
+  </div>
 
   <div class="topbar">
     <div class="topbar-inner">
@@ -1304,8 +1345,43 @@ function renderKPIs(shop, from, to){
     { label:'% Sugerencias/ticket', value:fmtPct(sugPct), color:'var(--cocoa)' },
     { label:'Var. mes vs año anterior', value:fmtPct(difPct), color: (difPct>=0?'#4D7A3F':'var(--raspberry)'), note: isRange ? ('a '+dateLabel(to)) : null },
   ];
+
+  // True period-vs-period YoY: sum same calendar dates last year
+  const prevDays = [];
+  { let dp = from; while(dp <= to){ prevDays.push(dp); dp = shiftDate(dp,1); } }
+  const prevValues = prevDays.map(dp => getPrevYearTotalForShop(dp, shop));
+  const validPrev = prevValues.filter(v => !isNaN(v));
+  const ventasPrevPeriodo = validPrev.length ? validPrev.reduce((a,b)=>a+b,0) : NaN;
+  const yoyPct = (!isNaN(ventasPeriodo) && !isNaN(ventasPrevPeriodo) && ventasPrevPeriodo > 0)
+    ? ((ventasPeriodo - ventasPrevPeriodo) / ventasPrevPeriodo) * 100 : NaN;
+  const yoyColor = isNaN(yoyPct) ? 'var(--blueberry)' : (yoyPct >= 0 ? '#4D7A3F' : 'var(--raspberry)');
+  const yoyCards = [
+    { label: isRange ? 'Mismo periodo año anterior' : 'Mismo día año anterior',
+      value: fmtEUR(ventasPrevPeriodo),
+      color: '#5E6FA3',
+      note: validPrev.length < prevDays.length ? `${validPrev.length}/${prevDays.length} días con datos` : null },
+    { label: 'Variación interanual', value: fmtPct(yoyPct), color: yoyColor },
+  ];
+
+  // Update print header meta
+  const metaEl = document.getElementById('printMeta');
+  if (metaEl){
+    const shopLabel = shop === 'all' ? 'Todas las tiendas' : shop.replace('Amorino ','');
+    metaEl.textContent = `${shopLabel} · ${rangeLabel(from, to)} · Generado el ${new Date().toLocaleDateString('es-ES', {day:'2-digit',month:'long',year:'numeric'})}`;
+  }
+
   return `<div class="kpi-section-label">${isRange ? 'Rendimiento del periodo' : 'Rendimiento del día'}</div>
   <div class="kpi-row">${cards.map(c => `
+    <div class="kpi">
+      <div class="kpi-scoop" style="background:${c.color}"></div>
+      <div class="kpi-body">
+        <div class="kpi-label">${esc(c.label)}</div>
+        <div class="kpi-value ${c.value.length>8?'small':''}">${c.value}</div>
+        ${c.note ? `<div class="kpi-sub">${esc(c.note)}</div>` : ''}
+      </div>
+    </div>`).join('')}</div>
+  <div class="kpi-section-label" style="margin-top:18px;">Comparación interanual · mismo periodo</div>
+  <div class="kpi-row" style="grid-template-columns:repeat(2,1fr);max-width:420px;">${yoyCards.map(c => `
     <div class="kpi">
       <div class="kpi-scoop" style="background:${c.color}"></div>
       <div class="kpi-body">
