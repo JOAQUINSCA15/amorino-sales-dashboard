@@ -148,6 +148,8 @@
   .eval-table tr.ev-pos td{background:rgba(79,122,63,0.09);}
   .eval-table tr.ev-neg td{background:rgba(94,111,163,0.1);}
   .eval-table tbody tr:hover td{filter:brightness(0.95);}
+  td.cell-good{background:rgba(79,122,63,0.10);}
+  td.cell-bad {background:rgba(200,75,94,0.10);}
   .eval-shop-block{margin-bottom:28px;}
   .eval-shop-title{font-family:'Fraunces',serif;font-size:14px;font-weight:700;margin:0 0 10px;}
   .prod-control{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-soft);margin-bottom:14px;}
@@ -1461,18 +1463,20 @@ function renderEmployeesCard(shop, from, to){
   const groups = new Map();
   rows.forEach(r => {
     const key = `${r.shop}|${r.empleado}`;
-    if (!groups.has(key)) groups.set(key, { shop:r.shop, empleado:r.empleado, dias:0, ticketsSum:0, sgSum:0, ticketMedioSum:0, ticketMedioN:0 });
+    if (!groups.has(key)) groups.set(key, { shop:r.shop, empleado:r.empleado, dias:0, ticketsSum:0, sgSum:0, ticketMedioSum:0, ticketMedioN:0, medHelSum:0, medHelN:0 });
     const g = groups.get(key);
     g.dias += 1;
-    if (!isNaN(r.tickets)) g.ticketsSum += r.tickets;
-    if (!isNaN(r.sugerencias)) g.sgSum += r.sugerencias;
-    if (!isNaN(r.ticketMedio)) { g.ticketMedioSum += r.ticketMedio; g.ticketMedioN += 1; }
+    if (!isNaN(r.tickets))    g.ticketsSum    += r.tickets;
+    if (!isNaN(r.sugerencias)) g.sgSum         += r.sugerencias;
+    if (!isNaN(r.ticketMedio)){ g.ticketMedioSum += r.ticketMedio; g.ticketMedioN += 1; }
+    if (!isNaN(r.medHel))     { g.medHelSum    += r.medHel;    g.medHelN    += 1; }
   });
   const agg = Array.from(groups.values()).map(g => ({
     shop: g.shop, empleado: g.empleado, dias: g.dias,
-    tickets: g.ticketsSum,
-    ticketMedio: g.ticketMedioN ? g.ticketMedioSum / g.ticketMedioN : NaN,
-    sugerenciasPct: g.ticketsSum ? (g.sgSum / g.ticketsSum) * 100 : NaN
+    tickets:       g.ticketsSum,
+    ticketMedio:   g.ticketMedioN ? g.ticketMedioSum / g.ticketMedioN : NaN,
+    medHel:        g.medHelN      ? g.medHelSum      / g.medHelN      : NaN,
+    sugerenciasPct: g.ticketsSum  ? (g.sgSum / g.ticketsSum) * 100    : NaN
   }));
 
   const sorted = agg.sort((a,b) => (b[empSortKey]||0) - (a[empSortKey]||0));
@@ -1480,32 +1484,39 @@ function renderEmployeesCard(shop, from, to){
   const isRange = from !== to;
   return `<div class="card">
     <h3>Rendimiento del equipo</h3>
-    <div class="hint">${shop==='all'?'Todas las tiendas':esc(shop)} · ${rangeLabel(from,to)}</div>
+    <div class="hint">${shop==='all'?'Todas las tiendas':esc(shop)} · ${rangeLabel(from,to)} · ${sorted.length} persona${sorted.length!==1?'s':''}</div>
     <select class="sort-select" id="empSortSelect">
-      <option value="tickets" ${empSortKey==='tickets'?'selected':''}>Ordenar por Nº de tickets</option>
-      <option value="ticketMedio" ${empSortKey==='ticketMedio'?'selected':''}>Ordenar por ticket medio</option>
-      <option value="sugerenciasPct" ${empSortKey==='sugerenciasPct'?'selected':''}>Ordenar por % sugerencias</option>
+      <option value="tickets"       ${empSortKey==='tickets'?'selected':''}>Ordenar por Nº de tickets</option>
+      <option value="ticketMedio"   ${empSortKey==='ticketMedio'?'selected':''}>Ordenar por ticket medio</option>
+      <option value="medHel"        ${empSortKey==='medHel'?'selected':''}>Ordenar por media helado</option>
+      <option value="sugerenciasPct"${empSortKey==='sugerenciasPct'?'selected':''}>Ordenar por % sugerencias</option>
     </select>
+    <div style="overflow-x:auto;">
     <table>
       <thead><tr>
         <th>Empleado${showShop?' / Tienda':''}</th>
         ${isRange?'<th class="num">Días</th>':''}
         <th class="num">Tickets</th>
         <th class="num">Ticket medio</th>
+        <th class="num">Med. Hel.</th>
         <th class="num">% Sug.</th>
       </tr></thead>
       <tbody>
-        ${sorted.slice(0,12).map(r => `
-          <tr>
+        ${sorted.map(r => {
+            const sugClass = isNaN(r.sugerenciasPct) ? '' : (r.sugerenciasPct >= 20 ? 'cell-good' : 'cell-bad');
+            const helClass = isNaN(r.medHel)         ? '' : (r.medHel >= 5.20        ? 'cell-good' : 'cell-bad');
+            return `<tr>
             <td><div class="emp-name">${esc(r.empleado)}</div>${showShop?`<div class="shop-tag">${esc(r.shop.replace('Amorino ',''))}</div>`:''}</td>
             ${isRange?`<td class="num">${fmtInt(r.dias)}</td>`:''}
             <td class="num">${fmtInt(r.tickets)}</td>
             <td class="num">${fmtEUR(r.ticketMedio)}</td>
-            <td class="num">${fmtPct(r.sugerenciasPct)}</td>
-          </tr>`).join('')}
+            <td class="num ${helClass}">${isNaN(r.medHel)?'—':fmtNum(r.medHel,2)+' €'}</td>
+            <td class="num ${sugClass}">${fmtPct(r.sugerenciasPct)}</td>
+          </tr>`;}).join('')}
       </tbody>
     </table>
-    ${isRange?'<div class="hint" style="margin:10px 0 0;">Ticket medio: media diaria del vendedor en el periodo · % Sugerencias: Sg totales ÷ tickets totales del periodo</div>':''}
+    </div>
+    ${isRange?'<div class="hint" style="margin:10px 0 0;">Ticket medio y Med. Hel.: media diaria del vendedor en el periodo · % Sug.: Sg totales ÷ tickets totales</div>':''}
   </div>`;
 }
 function attachSortHandler(){
