@@ -744,9 +744,24 @@ async function loadData(){
 
 function getDatesForShop(shop){
   if (!State.raw) return [];
-  const pool = shop === 'all' ? State.raw.t2 : State.raw.t2.filter(r => r.shop === shop);
-  const keys = Array.from(new Set(pool.map(r => r.dkey).filter(Boolean)));
+
+  let keys = [];
+
+  if (shop === 'all') {
+    keys = [
+      ...State.raw.t1.map(r => r.dkey),
+      ...State.raw.t2.map(r => r.dkey)
+    ];
+  } else {
+    keys = [
+      ...State.raw.t1.filter(r => r.shop === shop).map(r => r.dkey),
+      ...State.raw.t2.filter(r => r.shop === shop).map(r => r.dkey)
+    ];
+  }
+
+  keys = Array.from(new Set(keys.filter(Boolean)));
   keys.sort((a,b) => b.localeCompare(a));
+
   return keys;
 }
 
