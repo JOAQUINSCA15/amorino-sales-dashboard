@@ -489,13 +489,32 @@ function parseNum(raw){
 }
 function normDate(s){
   if (!s) return null;
-  const parts = String(s).trim().split('/');
-  if (parts.length !== 3) return null;
-  let [d,m,y] = parts.map(p=>p.trim());
-  if (!d || !m || !y) return null;
-  d = d.padStart(2,'0'); m = m.padStart(2,'0');
-  if (y.length === 2) y = '20'+y;
-  return `${y}-${m}-${d}`;
+  const str = String(s).trim();
+  if (!str) return null;
+  // ISO format already: YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+  // dd/MM/yyyy or d/M/yy (slash-separated)
+  if (str.includes('/')) {
+    const parts = str.split('/');
+    if (parts.length !== 3) return null;
+    let [d,m,y] = parts.map(p=>p.trim());
+    if (!d || !m || !y) return null;
+    d = d.padStart(2,'0'); m = m.padStart(2,'0');
+    if (y.length === 2) y = '20'+y;
+    return `${y}-${m}-${d}`;
+  }
+  // Sheets date serial number returned as a number
+  if (/^\d+$/.test(str)) {
+    const serial = parseInt(str, 10);
+    // Sheets epoch: Dec 30 1899
+    const ms = (serial - 25569) * 86400000;
+    const dt = new Date(ms);
+    if (isNaN(dt.getTime())) return null;
+    return dt.getUTCFullYear() + '-' +
+      String(dt.getUTCMonth()+1).padStart(2,'0') + '-' +
+      String(dt.getUTCDate()).padStart(2,'0');
+  }
+  return null;
 }
 function dateLabel(key){
   if (!key) return '';
