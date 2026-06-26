@@ -744,24 +744,13 @@ async function loadData(){
 
 function getDatesForShop(shop){
   if (!State.raw) return [];
-
-  let keys = [];
-
-  if (shop === 'all') {
-    keys = [
-      ...State.raw.t1.map(r => r.dkey),
-      ...State.raw.t2.map(r => r.dkey)
-    ];
-  } else {
-    keys = [
-      ...State.raw.t1.filter(r => r.shop === shop).map(r => r.dkey),
-      ...State.raw.t2.filter(r => r.shop === shop).map(r => r.dkey)
-    ];
-  }
-
-  keys = Array.from(new Set(keys.filter(Boolean)));
+  // Use both t1 and t2 so manually-entered rows (which only write to t1)
+  // are included in the date bounds — otherwise syncDateBounds clamps them out.
+  const t1pool = shop === 'all' ? State.raw.t1 : State.raw.t1.filter(r => r.shop === shop);
+  const t2pool = shop === 'all' ? State.raw.t2 : State.raw.t2.filter(r => r.shop === shop);
+  const allKeys = [...t1pool.map(r => r.dkey), ...t2pool.map(r => r.dkey)].filter(Boolean);
+  const keys = Array.from(new Set(allKeys));
   keys.sort((a,b) => b.localeCompare(a));
-
   return keys;
 }
 
