@@ -1,0 +1,1672 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Amorino · Panel de Ventas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --cream:#FBF5EA;
+    --cream-2:#F2E8D3;
+    --ink:#2B2117;
+    --ink-soft:#766955;
+    --pistachio:#8FA871;
+    --raspberry:#C84B5E;
+    --mango:#E3A038;
+    --cocoa:#5B3A29;
+    --blueberry:#5E6FA3;
+    --line:#E6D8BB;
+    --white:#FFFFFF;
+    --shadow: 0 2px 14px rgba(91,58,41,0.07);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--cream);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    font-variant-numeric:tabular-nums;
+    -webkit-font-smoothing:antialiased;
+  }
+  #app{max-width:1280px;margin:0 auto;padding:0 24px 64px;}
+
+  /* ---------- Topbar ---------- */
+  .topbar{
+    position:sticky;top:0;z-index:30;
+    background:rgba(251,245,234,0.92);
+    backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line);
+    padding:18px 24px;
+    margin:0 -24px 28px;
+  }
+  .topbar-inner{max-width:1280px;margin:0 auto;display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap;}
+  .brand{display:flex;align-items:baseline;gap:12px;}
+  .brand-mark{
+    width:30px;height:30px;border-radius:50% 50% 50% 4px;
+    background:conic-gradient(var(--raspberry) 0deg 90deg, var(--mango) 90deg 180deg, var(--pistachio) 180deg 270deg, var(--blueberry) 270deg 360deg);
+    flex:none;
+  }
+  .brand h1{
+    font-family:'Fraunces',serif;font-style:italic;font-weight:600;
+    font-size:28px;margin:0;letter-spacing:-0.5px;
+  }
+  .brand .eyebrow{
+    font-size:11px;letter-spacing:0.14em;text-transform:uppercase;
+    color:var(--ink-soft);font-weight:600;margin-top:2px;
+  }
+  .controls{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  .field{display:flex;flex-direction:column;gap:4px;}
+  .field label{font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:600;}
+  select{
+    font-family:'Inter',sans-serif;font-size:14px;font-weight:600;color:var(--ink);
+    background:var(--white);border:1px solid var(--line);border-radius:9px;
+    padding:8px 30px 8px 12px;appearance:none;cursor:pointer;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23766955'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 12px center;
+    min-width:150px;
+  }
+  select:focus{outline:2px solid var(--blueberry);outline-offset:1px;}
+  input[type="date"]{
+    font-family:'Inter',sans-serif;font-size:14px;font-weight:600;color:var(--ink);
+    background:var(--white);border:1px solid var(--line);border-radius:9px;
+    padding:7px 10px;cursor:pointer;min-width:140px;
+  }
+  input[type="date"]:focus{outline:2px solid var(--blueberry);outline-offset:1px;}
+  .preset-row{display:flex;gap:8px;flex-wrap:wrap;}
+  .preset-btn{
+    font-family:'Inter',sans-serif;font-size:12px;font-weight:600;color:var(--cocoa);
+    background:var(--cream-2);border:1px solid var(--line);border-radius:20px;
+    padding:6px 14px;cursor:pointer;transition:background .15s;
+  }
+  .preset-btn:hover{background:var(--white);}
+  .preset-btn.active{background:var(--cocoa);color:var(--white);border-color:var(--cocoa);}
+  .btn{
+    font-family:'Inter',sans-serif;font-weight:700;font-size:13.5px;color:var(--white);
+    background:var(--cocoa);border:none;border-radius:9px;padding:10px 18px;
+    cursor:pointer;display:flex;align-items:center;gap:8px;transition:opacity .15s;
+  }
+  .btn:hover{opacity:.88;}
+  .btn:focus-visible{outline:2px solid var(--blueberry);outline-offset:2px;}
+  .btn .dot{width:7px;height:7px;border-radius:50%;background:#8AE08C;}
+  .btn .dot.busy{background:var(--mango);animation:pulse 1s infinite;}
+  .sync-note{font-size:11px;color:var(--ink-soft);margin-top:4px;text-align:right;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+  /* ---------- Status banner ---------- */
+  .banner{
+    border-radius:12px;padding:16px 20px;margin-bottom:24px;font-size:14px;
+    border:1px solid var(--line);background:var(--white);box-shadow:var(--shadow);
+  }
+  .banner.error{border-color:#E3B0AE;background:#FBEFEE;color:#8A2E2E;}
+  .banner h3{margin:0 0 6px;font-size:15px;}
+  .banner ul{margin:8px 0 0;padding-left:18px;}
+  .banner code{background:rgba(0,0,0,.06);padding:1px 5px;border-radius:4px;}
+
+  /* ---------- Section ---------- */
+  .section-title{
+    font-family:'Fraunces',serif;font-weight:600;font-size:20px;margin:40px 0 16px;
+    display:flex;align-items:center;gap:10px;
+  }
+  .section-title .swatch{width:11px;height:11px;border-radius:3px;}
+
+  /* ---------- KPI scoops ---------- */
+  .kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;}
+  .kpi-section-label{font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;margin-top:24px;}
+  @media (max-width:980px){.kpi-row{grid-template-columns:repeat(3,1fr);}}
+  @media (max-width:560px){.kpi-row{grid-template-columns:repeat(2,1fr);}}
+  .kpi{display:flex;flex-direction:column;align-items:stretch;}
+  .kpi-scoop{
+    height:14px;border-radius:50% 50% 7px 7px;margin:0 10px -1px;
+  }
+  .kpi-body{
+    background:var(--white);border:1px solid var(--line);border-radius:7px 7px 14px 14px;
+    box-shadow:var(--shadow);padding:16px 14px 14px;text-align:left;
+  }
+  .kpi-label{font-size:11px;color:var(--ink-soft);font-weight:600;letter-spacing:0.03em;margin-bottom:6px;min-height:28px;}
+  .kpi-value{font-family:'Fraunces',serif;font-weight:700;font-size:22px;letter-spacing:-0.3px;}
+  .kpi-value.small{font-size:18px;}
+  .kpi-sub{font-size:11px;color:var(--ink-soft);margin-top:3px;}
+  .kpi-sub.pos{color:#4D7A3F;font-weight:700;}
+  .kpi-sub.neg{color:var(--raspberry);font-weight:700;}
+
+  /* ---------- Cards / grid ---------- */
+  .grid-2{display:grid;grid-template-columns:1.6fr 1fr;gap:18px;}
+  @media (max-width:880px){.grid-2{grid-template-columns:1fr;}}
+  .card{background:var(--white);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:20px 22px;}
+  .card h3{font-family:'Fraunces',serif;font-weight:600;font-size:16px;margin:0 0 4px;}
+  .card .hint{font-size:12px;color:var(--ink-soft);margin-bottom:16px;}
+  .empty-note{font-size:13px;color:var(--ink-soft);padding:24px 0;text-align:center;}
+
+  /* ---------- Hourly bars ---------- */
+  .hbars{display:flex;align-items:flex-end;gap:5px;height:200px;padding-top:18px;}
+  .eval-table{width:100%;border-collapse:collapse;font-size:13px;}
+  .eval-table thead th{text-align:left;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);font-weight:700;padding:0 8px 8px;border-bottom:1px solid var(--line);}
+  .eval-table tbody td{padding:7px 8px;border-bottom:1px solid var(--cream-2);}
+  .eval-table tr.ev-pos td{background:rgba(79,122,63,0.09);}
+  .eval-table tr.ev-neg td{background:rgba(94,111,163,0.1);}
+  .eval-table tbody tr:hover td{filter:brightness(0.95);}
+  td.cell-good{background:rgba(79,122,63,0.10);}
+  td.cell-bad {background:rgba(200,75,94,0.10);}
+  .eval-shop-block{margin-bottom:28px;}
+  .eval-shop-title{font-family:'Fraunces',serif;font-size:14px;font-weight:700;margin:0 0 10px;}
+  .prod-control{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-soft);margin-bottom:14px;}
+  .prod-control input{width:68px;padding:4px 8px;border:1px solid var(--line);border-radius:6px;font-size:13px;font-family:'Inter',sans-serif;}
+  .prod-control input:focus{outline:2px solid var(--blueberry);outline-offset:1px;}
+  .series-svg{width:100%;height:240px;overflow:visible;}
+  .series-dot{transition:r .15s;cursor:default;}
+  .series-dot:hover{r:5.5;}
+  .hbar-col{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;min-width:0;}
+  .hbar{width:100%;border-radius:6px 6px 2px 2px;background:linear-gradient(180deg,var(--raspberry),#A8394A);position:relative;min-height:3px;cursor:default;}
+  .hbar:hover{background:linear-gradient(180deg,var(--mango),#C77E1C);}
+  .hbar-axis{font-size:9.5px;color:var(--ink-soft);margin-top:6px;writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);height:34px;}
+
+  /* ---------- Donut ---------- */
+  .donut-wrap{display:flex;align-items:center;gap:20px;flex-wrap:wrap;justify-content:center;}
+  .donut{width:160px;height:160px;border-radius:50%;flex:none;position:relative;}
+  .donut::after{
+    content:'';position:absolute;inset:26px;border-radius:50%;background:var(--white);
+    display:flex;
+  }
+  .donut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;}
+  .donut-center .v{font-family:'Fraunces',serif;font-weight:700;font-size:17px;}
+  .donut-center .l{font-size:9.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.05em;}
+  .legend{display:flex;flex-direction:column;gap:8px;min-width:160px;}
+  .legend-row{display:flex;align-items:center;gap:8px;font-size:13px;}
+  .legend-sw{width:10px;height:10px;border-radius:3px;flex:none;}
+  .legend-row .pct{margin-left:auto;font-weight:700;}
+
+  /* ---------- Flavors ranking ---------- */
+  .rank-list{display:flex;flex-direction:column;gap:10px;}
+  .rank-row{display:grid;grid-template-columns:22px 1fr auto;align-items:center;gap:10px;font-size:13.5px;}
+  .rank-num{font-family:'Fraunces',serif;font-weight:700;color:var(--ink-soft);font-size:13px;}
+  .rank-bar-wrap{background:var(--cream-2);border-radius:6px;height:9px;overflow:hidden;}
+  .rank-bar{height:100%;border-radius:6px;background:linear-gradient(90deg,var(--pistachio),#6E8C52);}
+  .rank-name{grid-column:2/3;margin-bottom:3px;}
+  .rank-val{font-weight:700;font-size:12.5px;}
+  .rank-item{display:flex;flex-direction:column;}
+
+  /* ---------- Employees table ---------- */
+  table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  thead th{
+    text-align:left;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--ink-soft);font-weight:700;padding:0 10px 10px;border-bottom:1px solid var(--line);
+  }
+  tbody td{padding:10px 10px;border-bottom:1px solid var(--cream-2);}
+  tbody tr:hover{background:var(--cream-2);}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}
+  .emp-name{font-weight:700;}
+  .shop-tag{font-size:10.5px;color:var(--ink-soft);}
+  .sort-select{margin-bottom:14px;}
+
+  /* ---------- Ultimos ---------- */
+  .tickets-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;}
+  @media (max-width:980px){.tickets-grid{grid-template-columns:repeat(2,1fr);}}
+  .ticket-card{background:var(--white);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow);}
+  .ticket-card h4{font-family:'Fraunces',serif;font-size:13.5px;margin:0 0 10px;font-weight:700;}
+  .ticket-row{display:flex;justify-content:space-between;font-size:13px;padding:5px 0;border-bottom:1px dashed var(--cream-2);}
+  .ticket-row:last-child{border-bottom:none;}
+  .ticket-row .t-idx{color:var(--ink-soft);}
+  .ticket-row.latest{font-weight:700;color:var(--raspberry);}
+  .tape-list{display:flex;flex-direction:column;gap:0;max-width:340px;}
+
+  footer{margin-top:48px;font-size:12px;color:var(--ink-soft);text-align:center;border-top:1px solid var(--line);padding-top:18px;}
+  footer a{color:var(--blueberry);}
+
+  .skeleton{height:120px;border-radius:14px;background:linear-gradient(90deg,var(--cream-2) 25%,var(--white) 37%,var(--cream-2) 63%);background-size:400% 100%;animation:shimmer 1.4s infinite;}
+  /* ===== DEBUG (temporary) ===== */
+  #debugBtn{position:fixed;bottom:16px;right:16px;z-index:9999;background:#333;color:#fff;border:none;border-radius:8px;padding:10px 16px;font-size:13px;cursor:pointer;}
+  #debugOut{position:fixed;bottom:60px;right:16px;z-index:9999;background:#fff;border:1px solid #ccc;border-radius:8px;padding:12px;font-size:11px;max-width:340px;max-height:300px;overflow-y:auto;display:none;white-space:pre-wrap;word-break:break-all;box-shadow:0 4px 20px rgba(0,0,0,.2);}
+  .tab-bar{
+    display:flex;align-items:center;gap:6px;
+    padding:0 24px;margin:0 -24px 24px;
+    border-bottom:2px solid var(--line);background:rgba(251,245,234,0.92);
+  }
+  .main-tab{
+    font-family:'Inter',sans-serif;font-size:13px;font-weight:600;
+    color:var(--ink-soft);background:none;border:none;
+    padding:12px 18px;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;
+    transition:color .15s, border-color .15s;
+  }
+  .main-tab:hover{color:var(--ink);}
+  .main-tab.active{color:var(--cocoa);border-bottom-color:var(--cocoa);}
+  .main-tab.print-btn{margin-left:auto;color:var(--ink-soft);font-size:12px;}
+  .main-tab.print-btn:hover{color:var(--ink);}
+
+  /* ===== EVAL ENHANCEMENTS ===== */
+  .eval-global-controls{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--line);}
+  .eval-cost-row{display:flex;flex-wrap:wrap;gap:16px;font-size:12.5px;color:var(--ink-soft);padding:10px 2px 0;border-top:1px dashed var(--line);margin-top:8px;}
+  .eval-cost-row strong{color:var(--ink);}
+  .eval-grand-total{
+    display:flex;flex-wrap:wrap;align-items:center;gap:16px;
+    background:var(--cocoa);color:var(--white);
+    border-radius:12px;padding:14px 18px;margin-top:20px;font-size:13px;
+  }
+  .eval-grand-total strong{color:var(--white);}
+  .eval-grand-total > strong:first-child{font-family:'Fraunces',serif;font-size:15px;margin-right:8px;}
+
+  /* ===== PRINT / PDF ===== */
+  .print-only{display:none;}
+  .print-header{margin-bottom:24px;}
+  .print-header-inner{display:flex;align-items:flex-start;justify-content:space-between;}
+  .print-brand{display:flex;align-items:center;gap:12px;}
+  .print-brand-mark{
+    width:36px;height:36px;border-radius:50% 50% 50% 4px;flex:none;
+    background:conic-gradient(#C84B5E 0deg 90deg,#E3A038 90deg 180deg,#8FA871 180deg 270deg,#5E6FA3 270deg 360deg);
+  }
+  .print-brand-name{font-family:'Fraunces',serif;font-style:italic;font-size:28px;font-weight:600;line-height:1.1;}
+  .print-brand-sub{font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-soft);margin-top:2px;}
+  .print-meta-block{text-align:right;}
+  .print-meta-label{font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-soft);}
+  .print-meta-value{font-size:13px;font-weight:600;margin-top:3px;}
+  .print-divider{height:2px;background:linear-gradient(90deg,var(--raspberry),var(--mango),var(--pistachio));border-radius:2px;margin-top:14px;}
+
+  @media print{
+    .print-only{display:block !important;}
+    .no-print,.topbar,.tab-bar,footer,#weatherKPIs,.preset-row,.sync-note{display:none !important;}
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body{background:#fff;font-size:11px;margin:0;padding:0;}
+    #app{max-width:100%;padding:12px 20px 20px;}
+    .card{box-shadow:none;border:1px solid #ddd;break-inside:avoid;margin-bottom:12px;}
+    .kpi-scoop{display:none;}
+    .kpi-body{border:1px solid #e0d8c8;border-radius:8px;padding:10px;}
+    .kpi-row{grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px;}
+    .kpi-section-label{margin:16px 0 6px;font-size:9px;}
+    .section-title{margin:16px 0 8px;font-size:13px;page-break-after:avoid;}
+    .grid-2{grid-template-columns:1fr 1fr;gap:10px;}
+    .eval-table-wrap{overflow:visible;}
+    .eval-table{page-break-inside:avoid;font-size:11px;}
+    .series-svg{height:160px !important;}
+    .hbars{height:120px;}
+    .tickets-grid{grid-template-columns:repeat(3,1fr);}
+    a{color:inherit;text-decoration:none;}
+    @page{margin:1.5cm;size:A4 landscape;}
+  }
+
+  @keyframes shimmer{0%{background-position:100% 0;}100%{background-position:0 0;}}
+
+  /* ===== MOBILE — iPhone ===== */
+  @media (max-width:520px){
+    #app{padding:0 10px 48px;}
+
+    /* Topbar */
+    .topbar{padding:10px 14px 8px;margin:0 -10px 20px;}
+    .topbar-inner{flex-direction:column;align-items:flex-start;gap:8px;}
+    .brand h1{font-size:22px;}
+    .brand .eyebrow{font-size:9.5px;}
+    .brand-mark{width:22px;height:22px;}
+    .controls{display:grid;grid-template-columns:1fr 1fr;gap:7px;width:100%;}
+    .controls .field{width:100%;}
+    .controls .field-wide{grid-column:1/-1;}
+    select,input[type="date"]{width:100%;min-width:unset;font-size:13px;padding:7px 8px;}
+    .btn{justify-content:center;width:100%;padding:10px;}
+    .preset-row{overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px;-webkit-overflow-scrolling:touch;gap:5px;}
+    .preset-btn{white-space:nowrap;flex-shrink:0;font-size:11px;padding:5px 10px;}
+    .sync-note{font-size:10px;}
+
+    /* KPIs */
+    .kpi-section-label{margin-top:14px;margin-bottom:6px;}
+    .kpi-row{grid-template-columns:repeat(2,1fr) !important;gap:8px;}
+    .kpi-scoop{margin:0 8px -1px;}
+    .kpi-body{padding:10px 10px 8px;}
+    .kpi-label{font-size:9.5px;min-height:24px;}
+    .kpi-value{font-size:18px;}
+    .kpi-value.small{font-size:15px;}
+    .kpi-sub{font-size:10px;}
+
+    /* Section titles */
+    .section-title{font-size:15px;margin:22px 0 8px;}
+    .section-title .swatch{width:9px;height:9px;}
+
+    /* Cards */
+    .card{padding:14px 12px;border-radius:12px;}
+    .card h3{font-size:14px;}
+    .hint{font-size:11px;}
+    .grid-2{grid-template-columns:1fr !important;gap:12px;}
+
+    /* Hourly bars */
+    .hbars{height:140px;gap:3px;}
+    .hbar-axis{font-size:8px;height:26px;}
+
+    /* Series SVG */
+    .series-svg{height:auto !important;}
+
+    /* Donut */
+    .donut-wrap{flex-direction:column;align-items:center;gap:14px;}
+    .legend{min-width:unset;width:100%;}
+    .legend-row{font-size:12px;}
+
+    /* Employee / Flavor tables */
+    table{font-size:12px;}
+    thead th{font-size:9.5px;padding:0 6px 8px;}
+    tbody td{padding:8px 6px;}
+    .sort-select{font-size:12px;}
+    .emp-name{font-size:12px;}
+    .shop-tag{font-size:9.5px;}
+
+    /* Rank list */
+    .rank-row{font-size:12px;gap:6px;}
+    .rank-num{font-size:11px;}
+    .rank-val{font-size:11px;}
+
+    /* Eval table */
+    .eval-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+    .eval-table{min-width:340px;font-size:12px;}
+    .eval-table thead th{font-size:9.5px;padding:0 6px 7px;}
+    .eval-table tbody td{padding:7px 6px;}
+    .eval-shop-title{font-size:13px;}
+    .prod-control{flex-wrap:wrap;font-size:11px;}
+    .prod-control input{width:58px;font-size:12px;}
+
+    /* Tickets */
+    .tickets-grid{grid-template-columns:repeat(2,1fr) !important;}
+    .ticket-card{padding:12px;}
+    .ticket-card h4{font-size:12px;}
+    .ticket-row{font-size:12px;}
+    .tape-list{max-width:100%;}
+
+    /* Footer */
+    footer{font-size:10px;}
+    footer a{word-break:break-all;}
+
+    /* Tab bar on mobile */
+    .tab-bar{padding:0 10px;gap:0;}
+    .main-tab{font-size:12px;padding:10px 12px;}
+    .main-tab.print-btn{font-size:11px;padding:10px 8px;}
+
+    /* Eval mobile */
+    .eval-global-controls{flex-direction:column;align-items:flex-start;}
+    .eval-cost-row{gap:8px;font-size:11.5px;}
+    .eval-grand-total{font-size:11.5px;gap:8px;padding:10px 12px;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Print header: hidden on screen, visible in PDF export -->
+  <div class="print-header print-only" id="printHeader">
+    <div class="print-header-inner">
+      <div class="print-brand">
+        <div class="print-brand-mark"></div>
+        <div>
+          <div class="print-brand-name">Amorino</div>
+          <div class="print-brand-sub">Panel de Ventas · Sevilla</div>
+        </div>
+      </div>
+      <div class="print-meta-block">
+        <div class="print-meta-label">Informe generado</div>
+        <div class="print-meta-value" id="printMeta">—</div>
+      </div>
+    </div>
+    <div class="print-divider"></div>
+  </div>
+
+  <button id="debugBtn" onclick="
+    const out = document.getElementById('debugOut');
+    const rows = State.raw ? State.raw.t1.filter(r => r.dkey === State.from) : [];
+    const shopVal = State.shop;
+    let txt = 'Date: ' + State.from + '\nShop filter: [' + shopVal + ']\n\nt1 rows for this date:\n';
+    if (!rows.length) { txt += '(none found)'; }
+    else { rows.forEach(r => { txt += '[' + r.shop + '] ventas=' + r.ventas + '\n  shop===filter: ' + (r.shop===shopVal) + '\n  shopEq: ' + shopEq(r.shop,shopVal) + '\n'; }); }
+    out.textContent = txt;
+    out.style.display = out.style.display === 'none' ? 'block' : 'none';
+  ">🔍 Debug</button>
+  <div id="debugOut"></div>
+
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <div class="brand-mark"></div>
+        <div>
+          <h1>Amorino</h1>
+          <div class="eyebrow">Panel de ventas · 5 tiendas</div>
+        </div>
+      </div>
+      <div class="controls">
+        <div class="field field-wide">
+          <label for="shopSelect">Tienda</label>
+          <select id="shopSelect"></select>
+        </div>
+        <div class="field">
+          <label for="dateFrom">Desde</label>
+          <input type="date" id="dateFrom">
+        </div>
+        <div class="field">
+          <label for="dateTo">Hasta</label>
+          <input type="date" id="dateTo">
+        </div>
+        <div class="field field-wide">
+          <label>&nbsp;</label>
+          <button class="btn" id="refreshBtn"><span class="dot" id="statusDot"></span><span id="refreshLabel">Actualizar</span></button>
+        </div>
+      </div>
+    </div>
+    <div class="topbar-inner" style="margin-top:10px;">
+      <div class="preset-row" id="presetRow">
+        <button class="preset-btn" data-preset="today">Hoy</button>
+        <button class="preset-btn" data-preset="7d">Últimos 7 días</button>
+        <button class="preset-btn" data-preset="30d">Últimos 30 días</button>
+        <button class="preset-btn" data-preset="month">Mes en curso</button>
+        <button class="preset-btn" data-preset="all">Todo el periodo</button>
+      </div>
+      <div class="sync-note" id="syncNote">Cargando datos…</div>
+    </div>
+  </div>
+  <div class="tab-bar" id="mainTabBar">
+    <button class="main-tab active" data-tab="panel">Panel</button>
+    <button class="main-tab" data-tab="eval">Evaluación del turno</button>
+    <button class="main-tab print-btn no-print" onclick="window.print()">⬇ PDF</button>
+  </div>
+
+  <div id="content">
+    <div class="skeleton"></div>
+  </div>
+
+  <footer>
+    Datos en vivo desde Google Sheets (Table1, Table 2, Table 3, Table 5, Table 6, Ultimos) · Se actualiza automáticamente cada 5 minutos
+  </footer>
+</div>
+
+<script>
+/* ================= CONFIG ================= */
+const SHEET_ID = '10M-nDp0_McsiShRHMHnjccJsb03avGDvPGwdY8cj598';
+const TABS = { t1:'Table1', t2:'Table 2', t3:'Table 3', t5:'Table 5', t6:'Table 6', ult:'Ultimos' };
+const SHOP_ORDER = ['Amorino Sevilla Avenida','Amorino Patio de los Naranjos','Amorino Catedral','Amorino Plaza Nueva','Amorino Alcázar'];
+const FLAVOR_COLORS = ['#C84B5E','#8FA871','#E3A038','#5E6FA3','#5B3A29','#B07AA8','#4D9E96','#D17C3C'];
+const AUTO_REFRESH_MS = 5 * 60 * 1000;
+
+/* ================= UTILS ================= */
+function parseNum(raw){
+  if (raw === null || raw === undefined) return NaN;
+  let s = String(raw).trim();
+  if (s === '' || s === '-') return NaN;
+  if (/\?/.test(s)) return NaN;
+  s = s.replace(/€/g,'').replace(/%/g,'').replace(/Lt\.?/gi,'').trim();
+  if (s === '') return NaN;
+  let neg = false;
+  if (s.startsWith('-')) { neg = true; s = s.slice(1); }
+  const lastComma = s.lastIndexOf(','), lastDot = s.lastIndexOf('.');
+  const lastSep = Math.max(lastComma, lastDot);
+  let intPart, decPart;
+  if (lastSep === -1){ intPart = s; decPart=''; }
+  else {
+    const tail = s.slice(lastSep+1);
+    if (/^\d{1,2}$/.test(tail)){ intPart = s.slice(0,lastSep).replace(/[.,]/g,''); decPart = tail; }
+    else { intPart = s.replace(/[.,]/g,''); decPart=''; }
+  }
+  const numStr = (intPart || '0') + (decPart ? '.'+decPart : '');
+  const num = parseFloat(numStr);
+  return isNaN(num) ? NaN : (neg ? -num : num);
+}
+/* Normalize both sides before comparing shop names — handles Unicode
+   NFC/NFD differences (e.g. á as U+00E1 vs a + combining accent)
+   that would cause exact === to silently fail. */
+function shopEq(a, b){
+  return (a||'').trim().normalize('NFC') === (b||'').trim().normalize('NFC');
+}
+
+function normDate(s){
+  if (!s) return null;
+  const str = String(s).trim();
+  if (!str) return null;
+  // ISO format already: YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+  // dd/MM/yyyy or d/M/yy (slash-separated)
+  if (str.includes('/')) {
+    const parts = str.split('/');
+    if (parts.length !== 3) return null;
+    let [d,m,y] = parts.map(p=>p.trim());
+    if (!d || !m || !y) return null;
+    d = d.padStart(2,'0'); m = m.padStart(2,'0');
+    if (y.length === 2) y = '20'+y;
+    return `${y}-${m}-${d}`;
+  }
+  // Sheets date serial number returned as a number
+  if (/^\d+$/.test(str)) {
+    const serial = parseInt(str, 10);
+    // Sheets epoch: Dec 30 1899
+    const ms = (serial - 25569) * 86400000;
+    const dt = new Date(ms);
+    if (isNaN(dt.getTime())) return null;
+    return dt.getUTCFullYear() + '-' +
+      String(dt.getUTCMonth()+1).padStart(2,'0') + '-' +
+      String(dt.getUTCDate()).padStart(2,'0');
+  }
+  return null;
+}
+function dateLabel(key){
+  if (!key) return '';
+  const [y,m,d] = key.split('-');
+  return `${d}/${m}/${y}`;
+}
+function shiftDate(dkey, days){
+  const [y,m,d] = dkey.split('-').map(Number);
+  const dt = new Date(y, m-1, d);
+  dt.setDate(dt.getDate()+days);
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+}
+function monthStart(dkey){ const [y,m] = dkey.split('-'); return `${y}-${m}-01`; }
+function clampDate(dkey, min, max){ if (dkey < min) return min; if (dkey > max) return max; return dkey; }
+function inRange(dkey, from, to){ return !!dkey && (!from || dkey >= from) && (!to || dkey <= to); }
+function rangeLabel(from, to){ return from === to ? dateLabel(from) : `${dateLabel(from)} → ${dateLabel(to)}`; }
+function fmtEUR(n){ return isNaN(n) ? '—' : n.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'; }
+function fmtInt(n){ return isNaN(n) ? '—' : Math.round(n).toLocaleString('es-ES'); }
+function fmtPct(n,d=1){ return isNaN(n) ? '—' : n.toLocaleString('es-ES',{minimumFractionDigits:d,maximumFractionDigits:d})+' %'; }
+function fmtNum(n,d=2){ return isNaN(n) ? '—' : n.toLocaleString('es-ES',{minimumFractionDigits:d,maximumFractionDigits:d}); }
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function hourOrderKey(h){
+  const start = parseInt(String(h).split('-')[0], 10);
+  if (isNaN(start)) return 999;
+  return start < 11 ? start + 24 : start;
+}
+
+function parseCSV(text){
+  const rows = []; let row = []; let field=''; let inQuotes=false;
+  for (let i=0;i<text.length;i++){
+    const c = text[i];
+    if (inQuotes){
+      if (c === '"'){ if (text[i+1] === '"'){ field+='"'; i++; } else inQuotes=false; }
+      else field += c;
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ',') { row.push(field); field=''; }
+      else if (c === '\n') { row.push(field); rows.push(row); row=[]; field=''; }
+      else if (c === '\r') { /* skip */ }
+      else field += c;
+    }
+  }
+  if (field.length || row.length){ row.push(field); rows.push(row); }
+  return rows;
+}
+function dedupe(rows, keyFn){
+  const map = new Map(); const order = [];
+  rows.forEach(r => { const k = keyFn(r); if (!map.has(k)) order.push(k); map.set(k, r); });
+  return order.map(k => map.get(k));
+}
+let jsonpCounter = 0;
+function loadViaJSONP(sheetName){
+  return new Promise((resolve, reject) => {
+    const cbName = '__gvizCb' + (jsonpCounter++);
+    const scriptEl = document.createElement('script');
+    let settled = false;
+    function cleanup(){
+      delete window[cbName];
+      if (scriptEl.parentNode) scriptEl.parentNode.removeChild(scriptEl);
+      clearTimeout(timer);
+    }
+    window[cbName] = (json) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      if (!json || json.status === 'error'){
+        const msg = (json && json.errors && json.errors[0] && json.errors[0].detailed_message) || 'Respuesta no válida para ' + sheetName;
+        reject(new Error(msg));
+      } else {
+        resolve(json);
+      }
+    };
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error('Tiempo de espera agotado cargando "' + sheetName + '"'));
+    }, 15000);
+    scriptEl.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json;responseHandler:${cbName}&sheet=${encodeURIComponent(sheetName)}&_=${Date.now()}`;
+    scriptEl.onerror = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error('No se pudo cargar la pestaña "' + sheetName + '" (revisa el nombre exacto y los permisos de uso compartido)'));
+    };
+    document.head.appendChild(scriptEl);
+  });
+}
+function gvizJsonToRows(json){
+  const cols = (json.table.cols || []).map(c => c.label || c.id || '');
+  const rows = (json.table.rows || []).map(r => {
+    const cells = r.c || [];
+    return cols.map((_, i) => {
+      const cell = cells[i];
+      if (!cell) return '';
+      const v = (cell.f !== undefined && cell.f !== null) ? cell.f : cell.v;
+      return v === null || v === undefined ? '' : String(v);
+    });
+  });
+  return [cols, ...rows];
+}
+
+const HISTORICAL_SALES_ALL = {
+  "Amorino Sevilla Avenida": {"2025-05-01": 2136.8, "2025-05-02": 1147.4, "2025-05-03": 1433.77, "2025-05-04": 1120.09, "2025-05-05": 1029.49, "2025-05-06": 1113.92, "2025-05-07": 993.5, "2025-05-08": 917.4, "2025-05-09": 1195.37, "2025-05-10": 1589.14, "2025-05-11": 1272.52, "2025-05-12": 943.07, "2025-05-13": 1072.62, "2025-05-14": 1305.54, "2025-05-15": 1199.7, "2025-05-16": 1572.36, "2025-05-17": 1989.74, "2025-05-18": 1472.95, "2025-05-19": 1324.34, "2025-05-20": 1446.32, "2025-05-21": 1561.97, "2025-05-22": 1134.72, "2025-05-23": 1507.47, "2025-05-24": 1978.94, "2025-05-25": 1738.3, "2025-05-26": 1431.3, "2025-05-27": 1372.92, "2025-05-28": 1249.5, "2025-05-29": 1320.19, "2025-05-30": 1684.59, "2025-05-31": 1747.9, "2025-06-01": 1352.67, "2025-06-02": 993.02, "2025-06-03": 1251.2, "2025-06-04": 1356.85, "2025-06-05": 1232.22, "2025-06-06": 1356.4, "2025-06-07": 1757.04, "2025-06-08": 1380.52, "2025-06-09": 1239.7, "2025-06-10": 1010.1, "2025-06-11": 1107.17, "2025-06-12": 1102.4, "2025-06-13": 1440.8, "2025-06-14": 1466.2, "2025-06-15": 1186.3, "2025-06-16": 1281.6, "2025-06-17": 1068.6, "2025-06-18": 1274.9, "2025-06-19": 1168.37, "2025-06-20": 1175.77, "2025-06-21": 1688.6, "2025-06-22": 1081.12, "2025-06-23": 1158.55, "2025-06-24": 1145.1, "2025-06-25": 1172.6, "2025-06-26": 1468.7, "2025-06-27": 1268.6, "2025-06-28": 1327.07, "2025-06-29": 1286.69, "2025-06-30": 1010.42, "2025-07-01": 820.59, "2025-07-02": 743.07, "2025-07-03": 1121.27, "2025-07-04": 1395.26, "2025-07-05": 1533.7, "2025-07-06": 1363.8, "2025-07-07": 867.0, "2025-07-08": 975.7, "2025-07-09": 1109.4, "2025-07-10": 1036.0, "2025-07-11": 1211.22, "2025-07-12": 1800.26, "2025-07-13": 1249.75, "2025-07-14": 974.52, "2025-07-15": 812.37, "2025-07-16": 775.3, "2025-07-17": 1075.69, "2025-07-18": 943.0, "2025-07-19": 1244.5, "2025-07-20": 1286.2, "2025-07-21": 1420.24, "2025-07-22": 1428.8, "2025-07-23": 1349.7, "2025-07-24": 1150.8, "2025-07-25": 1673.17, "2025-07-26": 1286.4, "2025-07-27": 1293.57, "2025-07-28": 1160.27, "2025-07-29": 1315.47, "2025-07-30": 1311.47, "2025-07-31": 1107.0, "2025-08-01": 1318.7, "2025-08-02": 1676.1, "2025-08-03": 1393.9, "2025-08-04": 1643.1, "2025-08-05": 1527.02, "2025-08-06": 1663.3, "2025-08-07": 1631.57, "2025-08-08": 1806.8, "2025-08-09": 1802.37, "2025-08-10": 1566.5, "2025-08-11": 1549.9, "2025-08-12": 1549.8, "2025-08-13": 1539.4, "2025-08-14": 1761.87, "2025-08-15": 1860.0, "2025-08-16": 1654.5, "2025-08-17": 1334.0, "2025-08-18": 1676.37, "2025-08-19": 1731.7, "2025-08-20": 1801.67, "2025-08-21": 1785.27, "2025-08-22": 1944.0, "2025-08-23": 2076.9, "2025-08-24": 1731.1, "2025-08-25": 1918.6, "2025-08-26": 1516.0, "2025-08-27": 1585.9, "2025-08-28": 1653.3, "2025-08-29": 1667.4, "2025-08-30": 1744.16, "2025-08-31": 1597.1, "2025-09-01": 1439.9, "2025-09-02": 1487.1, "2025-09-03": 1428.1, "2025-09-04": 1555.87, "2025-09-05": 1741.3, "2025-09-06": 2035.1, "2025-09-07": 1614.02, "2025-09-08": 1594.9, "2025-09-09": 1469.3, "2025-09-10": 1196.04, "2025-09-11": 1423.1, "2025-09-12": 1792.5, "2025-09-13": 1937.8, "2025-09-14": 1721.5, "2025-09-15": 1446.5, "2025-09-16": 1365.5, "2025-09-17": 1416.3, "2025-09-18": 1199.27, "2025-09-19": 1885.26, "2025-09-20": 1906.02, "2025-09-21": 1795.91, "2025-09-22": 1514.9, "2025-09-23": 1438.6, "2025-09-24": 1521.6, "2025-09-25": 1848.8, "2025-09-26": 2019.6, "2025-09-27": 2199.8, "2025-09-28": 1056.5, "2025-09-29": 1596.1, "2025-09-30": 1564.85, "2025-10-01": 1642.8, "2025-10-02": 1476.6, "2025-10-03": 2546.5, "2025-10-04": 2450.77, "2025-10-05": 1837.22, "2025-10-06": 1641.27, "2025-10-07": 1509.62, "2025-10-08": 1522.7, "2025-10-09": 1526.02, "2025-10-10": 1703.1, "2025-10-11": 2688.0, "2025-10-12": 2536.8, "2025-10-13": 2023.5, "2025-10-14": 1413.15, "2025-10-15": 1519.62, "2025-10-16": 1456.47, "2025-10-17": 1611.4, "2025-10-18": 2323.6, "2025-10-19": 1988.1, "2025-10-20": 1411.6, "2025-10-21": 1531.12, "2025-10-22": 1578.0, "2025-10-23": 1899.8, "2025-10-24": 1871.5, "2025-10-25": 2342.5, "2025-10-26": 1866.2, "2025-10-27": 1413.72, "2025-10-28": 1307.7, "2025-10-29": 562.8, "2025-10-30": 1415.0, "2025-10-31": 1351.12, "2025-11-01": 2030.92, "2025-11-02": 1548.1, "2025-11-03": 1172.2, "2025-11-04": 1350.0, "2025-11-05": 688.3, "2025-11-06": 820.0, "2025-11-07": 1201.2, "2025-11-08": 2037.97, "2025-11-09": 1647.34, "2025-11-10": 1091.8, "2025-11-11": 834.9, "2025-11-12": 1103.1, "2025-11-13": 132.8, "2025-11-14": 464.4, "2025-11-15": 652.4, "2025-11-16": 1487.52, "2025-11-17": 1068.85, "2025-11-18": 884.2, "2025-11-19": 831.1, "2025-11-20": 788.4, "2025-11-21": 910.2, "2025-11-22": 1520.7, "2025-11-23": 1141.1, "2025-11-24": 704.7, "2025-11-25": 734.6, "2025-11-26": 654.9, "2025-11-27": 647.52, "2025-11-28": 1090.6, "2025-11-29": 2968.82, "2025-11-30": 986.72, "2025-12-01": 1051.8, "2025-12-02": 540.4, "2025-12-03": 656.6, "2025-12-04": 558.8, "2025-12-05": 1213.42, "2025-12-06": 2368.1, "2025-12-07": 2679.4, "2025-12-08": 1355.1, "2025-12-09": 761.25, "2025-12-10": 192.1, "2025-12-11": 755.1, "2025-12-12": 773.4, "2025-12-13": 2182.5, "2025-12-14": 1342.3, "2025-12-15": 396.8, "2025-12-16": 325.0, "2025-12-17": 753.9, "2025-12-18": 729.1, "2025-12-19": 454.8, "2025-12-20": 1439.3, "2025-12-21": 942.0, "2025-12-22": 1143.2, "2025-12-23": 1047.5, "2025-12-24": 1626.42, "2025-12-25": 1890.92, "2025-12-26": 2229.4, "2025-12-27": 821.8, "2025-12-28": 2121.8, "2025-12-29": 2486.7, "2025-12-30": 1567.0, "2025-12-31": 2019.12, "2026-01-01": 1755.12, "2026-01-02": 2337.0, "2026-01-03": 1222.2, "2026-01-04": 1219.72, "2026-01-05": 1022.5, "2026-01-06": 1236.9, "2026-01-07": 686.52, "2026-01-08": 522.95, "2026-01-09": 767.05, "2026-01-10": 1310.1, "2026-01-11": 962.6, "2026-01-12": 659.67, "2026-01-13": 309.2, "2026-01-14": 601.02, "2026-01-15": 470.0, "2026-01-16": 562.39, "2026-01-17": 1008.7, "2026-01-18": 1069.4, "2026-01-19": 702.52, "2026-01-20": 714.72, "2026-01-21": 335.02, "2026-01-22": 409.82, "2026-01-23": 474.6, "2026-01-24": 1225.4, "2026-01-25": 645.5, "2026-01-26": 552.9, "2026-01-27": 474.0, "2026-01-28": 630.98, "2026-01-29": 464.7, "2026-01-30": 744.82, "2026-01-31": 1453.05, "2026-02-01": 370.05, "2026-02-02": 679.42, "2026-02-03": 406.55, "2026-02-04": 364.12, "2026-02-05": 677.8, "2026-02-06": 649.3, "2026-02-07": 328.4, "2026-02-08": 958.14, "2026-02-09": 644.1, "2026-02-10": 781.55, "2026-02-11": 580.1, "2026-02-12": 1213.22, "2026-02-13": 914.4, "2026-02-14": 2370.2, "2026-02-15": 2334.67, "2026-02-16": 1843.8, "2026-02-17": 2213.15, "2026-02-18": 1382.15, "2026-02-19": 1621.55, "2026-02-20": 2059.9, "2026-02-21": 2683.2, "2026-02-22": 2430.5, "2026-02-23": 1666.52, "2026-02-24": 1627.4, "2026-02-25": 1322.22, "2026-02-26": 1938.7, "2026-02-27": 2278.42, "2026-02-28": 3606.85, "2026-03-01": 1566.4, "2026-03-02": 1436.3, "2026-03-03": 1041.5, "2026-03-04": 591.79, "2026-03-05": 979.5, "2026-03-06": 840.19, "2026-03-07": 2122.32, "2026-03-08": 1411.4, "2026-03-09": 869.62, "2026-03-10": 1055.94, "2026-03-11": 1459.7, "2026-03-12": 1289.02, "2026-03-13": 2258.8, "2026-03-14": 2336.31, "2026-03-15": 2473.24, "2026-03-16": 1418.8, "2026-03-17": 1683.4, "2026-03-18": 1736.77, "2026-03-19": 1874.7, "2026-03-20": 1391.75, "2026-03-21": 2755.3, "2026-03-22": 2283.82, "2026-03-23": 1056.92, "2026-03-24": 854.97, "2026-03-25": 859.2, "2026-03-26": 972.8, "2026-03-27": 1161.1, "2026-03-28": 1532.52, "2026-03-29": 1040.64, "2026-03-30": 1135.09, "2026-03-31": 1224.19, "2026-04-01": 962.3, "2026-04-02": 1092.6, "2026-04-03": 1180.22, "2026-04-04": 1401.07, "2026-04-05": 1458.4, "2026-04-06": 1593.27, "2026-04-07": 806.39, "2026-04-08": 1774.3, "2026-04-09": 2045.32, "2026-04-10": 2581.5, "2026-04-11": 2219.37, "2026-04-12": 2461.37, "2026-04-13": 1950.47, "2026-04-14": 2308.42, "2026-04-15": 2159.04, "2026-04-16": 1834.5, "2026-04-17": 2241.9, "2026-04-18": 2885.07, "2026-04-19": 2783.0, "2026-04-20": 1908.8, "2026-04-21": 1329.27, "2026-04-22": 1996.14, "2026-04-23": 1980.42, "2026-04-24": 2125.0, "2026-04-25": 2588.82, "2026-04-26": 2835.9, "2026-04-27": 2606.62, "2026-04-28": 1656.5, "2026-04-29": 1174.17, "2026-04-30": 1938.82, "2026-05-01": 2954.77, "2026-05-02": 2947.67, "2026-05-03": 2338.7, "2026-05-04": 1797.52, "2026-05-05": 2187.5, "2026-05-06": 1756.8, "2026-05-07": 1807.5, "2026-05-08": 1945.64, "2026-05-09": 1120.07, "2026-05-10": 1357.3, "2026-05-11": 1815.64, "2026-05-12": 1764.12, "2026-05-13": 1878.6, "2026-05-14": 1952.37, "2026-05-15": 1660.97, "2026-05-16": 2060.07, "2026-05-17": 2232.5, "2026-05-18": 2034.37, "2026-05-19": 1955.74, "2026-05-20": 1621.9, "2026-05-21": 1908.77, "2026-05-22": 2245.22, "2026-05-23": 2467.5, "2026-05-24": 2165.2, "2026-05-25": 2447.97, "2026-05-26": 2135.3, "2026-05-27": 902.55, "2026-05-28": 1740.09, "2026-05-29": 2109.44, "2026-05-30": 2083.57, "2026-05-31": 1707.67},
+  "Amorino Patio de los Naranjos": {"2025-05-01": 3715.95, "2025-05-02": 2041.1, "2025-05-03": 2552.92, "2025-05-04": 2199.7, "2025-05-05": 2295.22, "2025-05-06": 2156.7, "2025-05-07": 2112.2, "2025-05-08": 2072.9, "2025-05-09": 1977.0, "2025-05-10": 2439.14, "2025-05-11": 2340.22, "2025-05-12": 1899.02, "2025-05-13": 2298.8, "2025-05-14": 2247.6, "2025-05-15": 2388.2, "2025-05-16": 2759.12, "2025-05-17": 2894.2, "2025-05-18": 2448.52, "2025-05-19": 2434.89, "2025-05-20": 2601.22, "2025-05-21": 2401.9, "2025-05-22": 2075.5, "2025-05-23": 2253.0, "2025-05-24": 2851.02, "2025-05-25": 2454.4, "2025-05-26": 2864.0, "2025-05-27": 3009.8, "2025-05-28": 3067.3, "2025-05-29": 3057.6, "2025-05-30": 1635.5, "2025-05-31": 2936.66, "2025-06-01": 2238.8, "2025-06-02": 2460.57, "2025-06-03": 2108.7, "2025-06-04": 2378.8, "2025-06-05": 2929.3, "2025-06-06": 2644.8, "2025-06-07": 3103.4, "2025-06-08": 2693.7, "2025-06-09": 2539.1, "2025-06-10": 2173.6, "2025-06-11": 2450.0, "2025-06-12": 2218.15, "2025-06-13": 2539.25, "2025-06-14": 2644.2, "2025-06-15": 2748.49, "2025-06-16": 2303.25, "2025-06-17": 2200.42, "2025-06-18": 2284.5, "2025-06-19": 1623.22, "2025-06-20": 1968.5, "2025-06-21": 2518.74, "2025-06-22": 2048.87, "2025-06-23": 1976.84, "2025-06-24": 1965.0, "2025-06-25": 2160.77, "2025-06-26": 2361.4, "2025-06-27": 2720.7, "2025-06-28": 2716.0, "2025-06-29": 2349.3, "2025-06-30": 1879.95, "2025-07-01": 2207.52, "2025-07-02": 2145.0, "2025-07-03": 2386.87, "2025-07-04": 2270.89, "2025-07-05": 2075.89, "2025-07-06": 2219.44, "2025-07-07": 2093.92, "2025-07-08": 2089.4, "2025-07-09": 2066.5, "2025-07-10": 1750.74, "2025-07-11": 1725.7, "2025-07-12": 2260.82, "2025-07-13": 2596.3, "2025-07-14": 2152.8, "2025-07-15": 1937.0, "2025-07-16": 1551.6, "2025-07-17": 2097.2, "2025-07-18": 2016.0, "2025-07-19": 2262.9, "2025-07-20": 1958.27, "2025-07-21": 1936.05, "2025-07-22": 1680.8, "2025-07-23": 2086.49, "2025-07-24": 1963.8, "2025-07-25": 2462.87, "2025-07-26": 1974.74, "2025-07-27": 1862.9, "2025-07-28": 1833.3, "2025-07-29": 1824.25, "2025-07-30": 1829.32, "2025-07-31": 2124.27, "2025-08-01": 1895.1, "2025-08-02": 2405.3, "2025-08-03": 2240.6, "2025-08-04": 2054.55, "2025-08-05": 2246.2, "2025-08-06": 2040.8, "2025-08-07": 2198.8, "2025-08-08": 2259.82, "2025-08-09": 2010.92, "2025-08-10": 2258.1, "2025-08-11": 1913.7, "2025-08-12": 2148.38, "2025-08-13": 2270.3, "2025-08-14": 2082.82, "2025-08-15": 2180.6, "2025-08-16": 2186.0, "2025-08-17": 2385.8, "2025-08-18": 2306.85, "2025-08-19": 2160.3, "2025-08-20": 2200.7, "2025-08-21": 1891.3, "2025-08-22": 1901.7, "2025-08-23": 2318.3, "2025-08-24": 1857.6, "2025-08-25": 2086.1, "2025-08-26": 2129.3, "2025-08-27": 1655.4, "2025-08-28": 1866.1, "2025-08-29": 1911.22, "2025-08-30": 1830.32, "2025-08-31": 1938.1, "2025-09-01": 1772.2, "2025-09-02": 1745.22, "2025-09-03": 1740.2, "2025-09-04": 2129.8, "2025-09-05": 2239.75, "2025-09-06": 2375.57, "2025-09-07": 2392.22, "2025-09-08": 1939.64, "2025-09-09": 1984.87, "2025-09-10": 2016.1, "2025-09-11": 2629.92, "2025-09-12": 2459.02, "2025-09-13": 2381.5, "2025-09-14": 2594.5, "2025-09-15": 2545.12, "2025-09-16": 2638.23, "2025-09-17": 2387.99, "2025-09-18": 2405.27, "2025-09-19": 2948.8, "2025-09-20": 2562.55, "2025-09-21": 2623.5, "2025-09-22": 2340.7, "2025-09-23": 2329.84, "2025-09-24": 2269.8, "2025-09-25": 2323.5, "2025-09-26": 2750.65, "2025-09-27": 2785.6, "2025-09-28": 1775.5, "2025-09-29": 2688.68, "2025-09-30": 2948.6, "2025-10-01": 3042.45, "2025-10-02": 2570.77, "2025-10-03": 3258.5, "2025-10-04": 3270.0, "2025-10-05": 2698.8, "2025-10-06": 2505.62, "2025-10-07": 2639.8, "2025-10-08": 2771.2, "2025-10-09": 2262.2, "2025-10-10": 2721.0, "2025-10-11": 2790.1, "2025-10-12": 2653.1, "2025-10-13": 2729.77, "2025-10-14": 2563.21, "2025-10-15": 2574.97, "2025-10-16": 2526.8, "2025-10-17": 2797.05, "2025-10-18": 3050.85, "2025-10-19": 2650.35, "2025-10-20": 2419.65, "2025-10-21": 2808.4, "2025-10-22": 2786.7, "2025-10-23": 2714.6, "2025-10-24": 2932.65, "2025-10-25": 2213.02, "2025-10-26": 2289.5, "2025-10-27": 2896.57, "2025-10-28": 2292.5, "2025-10-29": 1199.02, "2025-10-30": 2631.9, "2025-10-31": 2422.35, "2025-11-01": 2152.82, "2025-11-02": 2401.8, "2025-11-03": 2324.38, "2025-11-04": 1991.57, "2025-11-05": 1528.8, "2025-11-06": 2079.4, "2025-11-07": 1724.05, "2025-11-08": 2012.36, "2025-11-09": 2011.62, "2025-11-10": 1880.9, "2025-11-11": 1923.5, "2025-11-12": 1996.42, "2025-11-13": 655.3, "2025-11-14": 936.0, "2025-11-15": 1022.92, "2025-11-16": 1709.8, "2025-11-17": 1084.3, "2025-11-18": 1151.27, "2025-11-19": 1159.78, "2025-11-20": 1048.74, "2025-11-21": 1297.1, "2025-11-22": 1496.52, "2025-11-23": 1188.5, "2025-11-24": 1534.97, "2025-11-25": 1174.24, "2025-11-26": 1098.2, "2025-11-27": 872.9, "2025-11-28": 1541.32, "2025-11-29": 1947.66, "2025-11-30": 2631.9, "2025-12-01": 1062.6, "2025-12-02": 501.02, "2025-12-03": 607.4, "2025-12-04": 510.8, "2025-12-05": 1095.7, "2025-12-06": 1938.69, "2025-12-07": 2384.0, "2025-12-08": 1006.47, "2025-12-09": 785.06, "2025-12-10": 328.9, "2025-12-11": 638.02, "2025-12-12": 639.2, "2025-12-13": 1307.1, "2025-12-14": 991.56, "2025-12-15": 485.6, "2025-12-16": 612.8, "2025-12-17": 795.67, "2025-12-18": 753.6, "2025-12-19": 604.9, "2025-12-20": 1468.87, "2025-12-21": 895.52, "2025-12-22": 1129.86, "2025-12-23": 1372.99, "2025-12-24": 1679.32, "2025-12-25": 1468.6, "2025-12-26": 1951.4, "2025-12-27": 1134.3, "2025-12-28": 2094.1, "2025-12-29": 2304.8, "2025-12-30": 1855.5, "2025-12-31": 1587.9, "2026-01-01": 2016.79, "2026-01-02": 2358.22, "2026-01-03": 1645.19, "2026-01-04": 1238.05, "2026-01-05": 812.0, "2026-01-06": 565.9, "2026-01-07": 688.55, "2026-01-08": 867.32, "2026-01-09": 935.17, "2026-01-10": 1206.8, "2026-01-11": 946.0, "2026-01-12": 797.42, "2026-01-13": 610.72, "2026-01-14": 685.2, "2026-01-15": 609.02, "2026-01-16": 821.1, "2026-01-17": 1029.2, "2026-01-18": 1080.8, "2026-01-19": 870.15, "2026-01-20": 928.55, "2026-01-21": 755.1, "2026-01-22": 656.9, "2026-01-23": 845.3, "2026-01-24": 1215.2, "2026-01-25": 1176.8, "2026-01-26": 1126.3, "2026-01-27": 674.17, "2026-01-28": 777.04, "2026-01-29": 944.1, "2026-01-30": 1041.1, "2026-01-31": 1803.9, "2026-02-01": 599.9, "2026-02-02": 954.27, "2026-02-03": 909.8, "2026-02-04": 847.6, "2026-02-05": 1449.0, "2026-02-06": 1291.97, "2026-02-07": 1007.5, "2026-02-08": 1291.75, "2026-02-09": 1338.6, "2026-02-10": 1476.0, "2026-02-11": 1103.17, "2026-02-12": 1630.4, "2026-02-13": 1329.8, "2026-02-14": 2186.27, "2026-02-15": 2543.85, "2026-02-16": 2257.0, "2026-02-17": 2665.8, "2026-02-18": 2117.4, "2026-02-19": 2127.2, "2026-02-20": 2393.77, "2026-02-21": 2800.24, "2026-02-22": 2501.22, "2026-02-23": 2209.38, "2026-02-24": 2298.4, "2026-02-25": 2208.5, "2026-02-26": 2186.1, "2026-02-27": 2427.01, "2026-02-28": 3122.4, "2026-03-01": 2600.6, "2026-03-02": 1869.09, "2026-03-03": 1903.0, "2026-03-04": 975.85, "2026-03-05": 1397.5, "2026-03-06": 1332.59, "2026-03-07": 2148.8, "2026-03-08": 1837.46, "2026-03-09": 1233.4, "2026-03-10": 1381.3, "2026-03-11": 2149.56, "2026-03-12": 2223.7, "2026-03-13": 2544.7, "2026-03-14": 2662.4, "2026-03-15": 2360.7, "2026-03-16": 2100.75, "2026-03-17": 2141.3, "2026-03-18": 1953.77, "2026-03-19": 2161.87, "2026-03-20": 2033.17, "2026-03-21": 2951.32, "2026-03-22": 2447.87, "2026-03-23": 2063.4, "2026-03-24": 2485.62, "2026-03-25": 2086.5, "2026-03-26": 2461.1, "2026-03-27": 2552.47, "2026-03-28": 2703.37, "2026-03-29": 3363.4, "2026-03-30": 3566.14, "2026-03-31": 3675.84, "2026-04-01": 4042.57, "2026-04-02": 4904.5, "2026-04-03": 4206.2, "2026-04-04": 4723.6, "2026-04-05": 3812.9, "2026-04-06": 3031.9, "2026-04-07": 2041.27, "2026-04-08": 2600.17, "2026-04-09": 2734.49, "2026-04-10": 2654.27, "2026-04-11": 2020.3, "2026-04-12": 2321.6, "2026-04-13": 2119.98, "2026-04-14": 2771.6, "2026-04-15": 2464.2, "2026-04-16": 2579.1, "2026-04-17": 2952.0, "2026-04-18": 2706.2, "2026-04-19": 2649.85, "2026-04-20": 2480.05, "2026-04-21": 2052.7, "2026-04-22": 2802.1, "2026-04-23": 1990.4, "2026-04-24": 2549.37, "2026-04-25": 2593.02, "2026-04-26": 2628.27, "2026-04-27": 2551.07, "2026-04-28": 2021.86, "2026-04-29": 2022.3, "2026-04-30": 2599.47, "2026-05-01": 2753.6, "2026-05-02": 2597.0, "2026-05-03": 2466.9, "2026-05-04": 1952.1, "2026-05-05": 1833.62, "2026-05-06": 1646.6, "2026-05-07": 1576.2, "2026-05-08": 1586.72, "2026-05-09": 1635.7, "2026-05-10": 1415.3, "2026-05-11": 1617.42, "2026-05-12": 1982.22, "2026-05-13": 1872.99, "2026-05-14": 2606.6, "2026-05-15": 2772.0, "2026-05-16": 2986.2, "2026-05-17": 2597.6, "2026-05-18": 2624.4, "2026-05-19": 2583.22, "2026-05-20": 2473.42, "2026-05-21": 2414.4, "2026-05-22": 2519.0, "2026-05-23": 2482.95, "2026-05-24": 2534.79, "2026-05-25": 1622.6, "2026-05-26": 2672.2, "2026-05-27": 2538.6, "2026-05-28": 1842.9, "2026-05-29": 2651.9, "2026-05-30": 2550.9, "2026-05-31": 2220.97},
+  "Amorino Plaza Nueva": {"2025-05-01": 1932.6, "2025-05-02": 1832.66, "2025-05-03": 2496.29, "2025-05-04": 1251.19, "2025-05-05": 1471.96, "2025-05-06": 479.89, "2025-05-07": 468.45, "2025-05-08": 1075.54, "2025-05-09": 1273.13, "2025-05-10": 1651.18, "2025-05-11": 1385.27, "2025-05-12": 1081.82, "2025-05-13": 937.47, "2025-05-14": 1759.54, "2025-05-15": 1443.22, "2025-05-16": 2029.2, "2025-05-17": 2325.54, "2025-05-18": 1617.9, "2025-05-19": 1687.12, "2025-05-20": 1312.12, "2025-05-21": 1216.56, "2025-05-22": 1509.66, "2025-05-23": 1538.64, "2025-05-24": 2102.65, "2025-05-25": 1349.87, "2025-05-26": 1738.75, "2025-05-27": 1547.32, "2025-05-28": 1706.72, "2025-05-29": 1254.94, "2025-05-30": 1793.3, "2025-05-31": 1817.07, "2025-06-01": 1555.63, "2025-06-02": 1073.21, "2025-06-03": 1002.22, "2025-06-04": 1154.3, "2025-06-05": 1282.71, "2025-06-06": 1869.94, "2025-06-07": 2150.59, "2025-06-08": 1330.64, "2025-06-09": 1647.94, "2025-06-10": 1064.32, "2025-06-11": 1467.99, "2025-06-12": 1286.6, "2025-06-13": 1302.06, "2025-06-14": 1731.72, "2025-06-15": 1174.87, "2025-06-16": 1526.62, "2025-06-17": 1195.29, "2025-06-18": 1871.3, "2025-06-19": 1639.82, "2025-06-20": 1180.93, "2025-06-21": 1412.9, "2025-06-22": 1016.32, "2025-06-23": 1310.9, "2025-06-24": 1320.2, "2025-06-25": 1393.1, "2025-06-26": 994.2, "2025-06-27": 1074.5, "2025-06-28": 1245.7, "2025-06-29": 682.4, "2025-06-30": 955.02, "2025-07-01": 1835.4, "2025-07-02": 917.82, "2025-07-03": 1178.03, "2025-07-04": 1210.59, "2025-07-05": 1747.29, "2025-07-06": 881.96, "2025-07-07": 1367.54, "2025-07-08": 1314.02, "2025-07-09": 1028.72, "2025-07-10": 1046.74, "2025-07-11": 1203.47, "2025-07-12": 1808.5, "2025-07-13": 1273.14, "2025-07-14": 1045.0, "2025-07-15": 881.65, "2025-07-16": 1045.07, "2025-07-17": 982.69, "2025-07-18": 1122.82, "2025-07-19": 1435.37, "2025-07-20": 860.72, "2025-07-21": 1082.2, "2025-07-22": 892.36, "2025-07-23": 1190.47, "2025-07-24": 786.57, "2025-07-25": 1142.59, "2025-07-26": 1059.9, "2025-07-27": 900.09, "2025-07-28": 956.97, "2025-07-29": 991.17, "2025-07-30": 1169.39, "2025-07-31": 971.32, "2025-08-01": 1206.34, "2025-08-02": 1001.63, "2025-08-03": 772.37, "2025-08-04": 915.29, "2025-08-05": 829.59, "2025-08-06": 1266.22, "2025-08-07": 1108.05, "2025-08-08": 948.37, "2025-08-09": 1473.3, "2025-08-10": 1177.2, "2025-08-11": 1528.0, "2025-08-12": 1085.6, "2025-08-13": 1225.7, "2025-08-14": 1370.5, "2025-08-15": 1311.5, "2025-08-16": 1532.9, "2025-08-17": 996.6, "2025-08-18": 1362.1, "2025-08-19": 1543.37, "2025-08-20": 1263.1, "2025-08-21": 1350.97, "2025-08-22": 1268.22, "2025-08-23": 1472.4, "2025-08-24": 1057.52, "2025-08-25": 1306.3, "2025-08-26": 1200.07, "2025-08-27": 1227.2, "2025-08-28": 1174.1, "2025-08-29": 1253.29, "2025-08-30": 1409.0, "2025-08-31": 1006.92, "2025-09-01": 833.42, "2025-09-02": 1180.52, "2025-09-03": 1215.47, "2025-09-04": 1218.12, "2025-09-05": 1148.92, "2025-09-06": 1872.42, "2025-09-07": 1132.1, "2025-09-08": 1195.89, "2025-09-09": 1125.92, "2025-09-10": 1030.52, "2025-09-11": 1089.4, "2025-09-12": 1378.22, "2025-09-13": 1618.0, "2025-09-14": 1110.6, "2025-09-15": 805.15, "2025-09-16": 1196.57, "2025-09-17": 1143.8, "2025-09-18": 793.3, "2025-09-19": 1438.45, "2025-09-20": 1768.72, "2025-09-21": 1119.09, "2025-09-22": 1084.52, "2025-09-23": 1002.62, "2025-09-24": 1323.4, "2025-09-25": 1215.4, "2025-09-26": 1548.56, "2025-09-27": 2116.82, "2025-09-28": 909.72, "2025-09-29": 982.77, "2025-09-30": 1001.5, "2025-10-01": 1162.7, "2025-10-02": 1186.22, "2025-10-03": 2264.02, "2025-10-04": 2636.52, "2025-10-05": 1703.02, "2025-10-06": 1241.6, "2025-10-07": 1093.5, "2025-10-08": 1157.4, "2025-10-09": 975.07, "2025-10-10": 1756.92, "2025-10-11": 2205.07, "2025-10-12": 2306.92, "2025-10-13": 1672.77, "2025-10-14": 1109.3, "2025-10-15": 1236.82, "2025-10-16": 1289.4, "2025-10-17": 1789.1, "2025-10-18": 2160.1, "2025-10-19": 1592.44, "2025-10-20": 1032.3, "2025-10-21": 1367.3, "2025-10-22": 1229.12, "2025-10-23": 1454.69, "2025-10-24": 1446.12, "2025-10-25": 2261.27, "2025-10-26": 1362.9, "2025-10-27": 1467.3, "2025-10-28": 970.7, "2025-10-29": 646.44, "2025-10-30": 1379.42, "2025-10-31": 1221.2, "2025-11-01": 1972.02, "2025-11-02": 1396.02, "2025-11-03": 1042.02, "2025-11-04": 853.62, "2025-11-05": 676.42, "2025-11-06": 969.0, "2025-11-07": 1364.17, "2025-11-08": 1995.37, "2025-11-09": 1386.5, "2025-11-10": 1065.2, "2025-11-11": 902.42, "2025-11-12": 993.09, "2025-11-13": 373.5, "2025-11-14": 584.29, "2025-11-15": 700.4, "2025-11-16": 879.5, "2025-11-17": 538.3, "2025-11-18": 790.8, "2025-11-19": 677.3, "2025-11-20": 641.1, "2025-11-21": 860.22, "2025-11-22": 1741.42, "2025-11-23": 1022.82, "2025-11-24": 654.0, "2025-11-25": 839.6, "2025-11-26": 659.42, "2025-11-27": 666.92, "2025-11-28": 1135.22, "2025-11-29": 3017.78, "2025-11-30": 1204.96, "2025-12-01": 765.9, "2025-12-02": 520.82, "2025-12-03": 419.6, "2025-12-04": 392.82, "2025-12-05": 1345.82, "2025-12-06": 3100.42, "2025-12-07": 3718.14, "2025-12-08": 1597.42, "2025-12-09": 732.92, "2025-12-10": 181.05, "2025-12-11": 795.85, "2025-12-12": 1143.97, "2025-12-13": 2490.02, "2025-12-14": 1713.3, "2025-12-15": 433.4, "2025-12-16": 470.7, "2025-12-17": 698.02, "2025-12-18": 877.92, "2025-12-19": 569.5, "2025-12-20": 1979.19, "2025-12-21": 1158.8, "2025-12-22": 1690.8, "2025-12-23": 1184.34, "2025-12-24": 1629.7, "2025-12-25": 1643.12, "2025-12-26": 2548.12, "2025-12-27": 1354.02, "2025-12-28": 2595.24, "2025-12-29": 2453.42, "2025-12-30": 1965.82, "2025-12-31": 2133.12, "2026-01-01": 1998.9, "2026-01-02": 2375.55, "2026-01-03": 1375.17, "2026-01-04": 1352.52, "2026-01-05": 1024.0, "2026-01-06": 682.82, "2026-01-07": 656.12, "2026-01-08": 566.12, "2026-01-09": 762.82, "2026-01-10": 1337.64, "2026-01-11": 919.14, "2026-01-12": 502.02, "2026-01-13": 377.5, "2026-01-14": 516.92, "2026-01-15": 441.22, "2026-01-16": 562.39, "2026-01-17": 1171.79, "2026-01-18": 694.36, "2026-01-19": 492.74, "2026-01-20": 481.72, "2026-01-21": 256.3, "2026-01-22": 330.4, "2026-01-23": 432.22, "2026-01-24": 1369.32, "2026-01-25": 602.82, "2026-01-26": 585.37, "2026-01-27": 414.1, "2026-01-28": 760.87, "2026-01-29": 461.94, "2026-01-30": 683.32, "2026-01-31": 1497.29, "2026-02-01": 482.5, "2026-02-02": 528.15, "2026-02-03": 258.2, "2026-02-04": 291.0, "2026-02-05": 630.04, "2026-02-06": 801.47, "2026-02-07": 625.7, "2026-02-08": 758.8, "2026-02-09": 580.9, "2026-02-10": 861.22, "2026-02-11": 544.4, "2026-02-12": 906.3, "2026-02-13": 643.62, "2026-02-14": 1868.02, "2026-02-15": 1648.17, "2026-02-16": 1398.62, "2026-02-17": 1514.12, "2026-02-18": 957.12, "2026-02-19": 977.42, "2026-02-20": 1326.2, "2026-02-21": 2364.5, "2026-02-22": 1413.97, "2026-02-23": 1235.65, "2026-02-24": 1301.4, "2026-02-25": 1024.5, "2026-02-26": 1136.0, "2026-02-27": 1767.37, "2026-02-28": 3061.7, "2026-03-01": 1397.9, "2026-03-02": 1154.62, "2026-03-03": 1001.7, "2026-03-04": 536.4, "2026-03-05": 776.37, "2026-03-06": 956.82, "2026-03-07": 2029.87, "2026-03-08": 1212.89, "2026-03-09": 553.4, "2026-03-10": 843.34, "2026-03-11": 1196.17, "2026-03-12": 1381.55, "2026-03-13": 1671.92, "2026-03-14": 2244.8, "2026-03-15": 2151.47, "2026-03-16": 1274.54, "2026-03-17": 1463.77, "2026-03-18": 1347.27, "2026-03-19": 1419.1, "2026-03-20": 1466.3, "2026-03-21": 2896.26, "2026-03-22": 2088.06, "2026-03-23": 1459.97, "2026-03-24": 1472.46, "2026-03-25": 1652.17, "2026-03-26": 1506.87, "2026-03-27": 1894.0, "2026-03-28": 2371.94, "2026-03-29": 4957.11, "2026-03-30": 3920.59, "2026-03-31": 3752.97, "2026-04-01": 4287.69, "2026-04-02": 4317.18, "2026-04-03": 4699.19, "2026-04-04": 4306.74, "2026-04-05": 1941.87, "2026-04-06": 1547.67, "2026-04-07": 1112.7, "2026-04-08": 1553.46, "2026-04-09": 1731.13, "2026-04-10": 1867.97, "2026-04-11": 2122.27, "2026-04-12": 1389.24, "2026-04-13": 1162.57, "2026-04-14": 1360.34, "2026-04-15": 1834.77, "2026-04-16": 1286.42, "2026-04-17": 1916.02, "2026-04-18": 2561.06, "2026-04-19": 1712.57, "2026-04-20": 1364.33, "2026-04-21": 839.75, "2026-04-22": 1179.7, "2026-04-23": 1221.17, "2026-04-24": 1464.77, "2026-04-25": 1755.8, "2026-04-26": 1400.3, "2026-04-27": 1491.64, "2026-04-28": 1021.51, "2026-04-29": 928.27, "2026-04-30": 1327.92, "2026-05-01": 2253.84, "2026-05-02": 2568.87, "2026-05-03": 1573.47, "2026-05-04": 1286.57, "2026-05-05": 1165.87, "2026-05-06": 1166.6, "2026-05-07": 1299.1, "2026-05-08": 1389.57, "2026-05-09": 1340.97, "2026-05-10": 924.07, "2026-05-11": 1085.54, "2026-05-12": 1164.6, "2026-05-13": 1165.24, "2026-05-14": 1382.27, "2026-05-15": 1678.72, "2026-05-16": 2286.67, "2026-05-17": 1242.34, "2026-05-18": 1210.97, "2026-05-19": 1259.21, "2026-05-20": 1221.21, "2026-05-21": 1342.96, "2026-05-22": 1779.75, "2026-05-23": 1840.24, "2026-05-24": 1608.72, "2026-05-25": 1379.2, "2026-05-26": 1469.08, "2026-05-27": 1126.34, "2026-05-28": 1413.87, "2026-05-29": 1475.92, "2026-05-30": 1475.77, "2026-05-31": 1048.32},
+  "Amorino Alc\u00e1zar": {"2025-05-01": 4283.42, "2025-05-02": 2870.85, "2025-05-03": 3256.02, "2025-05-04": 2743.39, "2025-05-05": 2054.64, "2025-05-06": 2674.5, "2025-05-07": 2651.52, "2025-05-08": 2303.42, "2025-05-09": 2947.8, "2025-05-10": 3187.47, "2025-05-11": 3353.07, "2025-05-12": 2184.32, "2025-05-13": 2318.3, "2025-05-14": 2469.2, "2025-05-15": 2725.22, "2025-05-16": 3150.54, "2025-05-17": 3823.39, "2025-05-18": 3197.7, "2025-05-19": 2639.7, "2025-05-20": 2746.85, "2025-05-21": 2349.17, "2025-05-22": 2789.12, "2025-05-23": 3313.24, "2025-05-24": 3530.9, "2025-05-25": 3410.2, "2025-05-26": 2640.2, "2025-05-27": 2297.06, "2025-05-28": 2450.09, "2025-05-29": 2696.69, "2025-05-30": 3241.89, "2025-05-31": 3455.57, "2025-06-01": 2814.82, "2025-06-02": 2170.7, "2025-06-03": 2314.05, "2025-06-04": 2291.7, "2025-06-05": 2511.32, "2025-06-06": 2759.04, "2025-06-07": 3069.6, "2025-06-08": 2827.57, "2025-06-09": 2934.79, "2025-06-10": 2187.4, "2025-06-11": 2942.8, "2025-06-12": 2031.47, "2025-06-13": 3090.47, "2025-06-14": 3189.16, "2025-06-15": 2837.42, "2025-06-16": 1633.37, "2025-06-17": 2448.29, "2025-06-18": 2408.6, "2025-06-19": 2332.95, "2025-06-20": 2243.11, "2025-06-21": 3020.72, "2025-06-22": 2812.19, "2025-06-23": 2437.67, "2025-06-24": 2228.6, "2025-06-25": 2312.6, "2025-06-26": 2651.59, "2025-06-27": 2349.88, "2025-06-28": 2397.32, "2025-06-29": 1915.0, "2025-06-30": 1523.87, "2025-07-01": 1866.85, "2025-07-02": 2552.32, "2025-07-03": 2189.12, "2025-07-04": 2576.87, "2025-07-05": 2527.42, "2025-07-06": 2371.97, "2025-07-07": 2189.2, "2025-07-08": 2489.9, "2025-07-09": 2011.1, "2025-07-10": 2302.3, "2025-07-11": 2405.48, "2025-07-12": 3028.64, "2025-07-13": 2508.81, "2025-07-14": 2204.05, "2025-07-15": 1789.69, "2025-07-16": 2079.47, "2025-07-17": 1782.77, "2025-07-18": 2211.72, "2025-07-19": 2393.0, "2025-07-20": 2248.69, "2025-07-21": 2221.97, "2025-07-22": 2191.76, "2025-07-23": 2162.89, "2025-07-24": 2262.9, "2025-07-25": 2070.25, "2025-07-26": 2184.6, "2025-07-27": 2788.88, "2025-07-28": 1793.79, "2025-07-29": 2090.6, "2025-07-30": 2038.22, "2025-07-31": 1906.9, "2025-08-01": 1910.12, "2025-08-02": 2262.32, "2025-08-03": 2021.6, "2025-08-04": 1856.7, "2025-08-05": 1703.9, "2025-08-06": 2138.2, "2025-08-07": 2517.17, "2025-08-08": 2882.5, "2025-08-09": 2669.77, "2025-08-10": 2572.27, "2025-08-11": 2287.15, "2025-08-12": 2246.65, "2025-08-13": 2335.6, "2025-08-14": 2094.17, "2025-08-15": 2630.32, "2025-08-16": 2522.61, "2025-08-17": 2097.94, "2025-08-18": 2181.74, "2025-08-19": 2314.94, "2025-08-20": 2395.9, "2025-08-21": 2402.02, "2025-08-22": 2273.9, "2025-08-23": 2801.35, "2025-08-24": 2689.54, "2025-08-25": 2458.25, "2025-08-26": 2308.17, "2025-08-27": 2031.4, "2025-08-28": 1139.7, "2025-08-29": 2262.15, "2025-08-30": 2127.4, "2025-08-31": 2316.52, "2025-09-01": 1990.0, "2025-09-02": 1968.52, "2025-09-03": 2204.4, "2025-09-04": 2343.12, "2025-09-05": 2903.67, "2025-09-06": 2908.17, "2025-09-07": 2563.72, "2025-09-08": 2044.47, "2025-09-09": 2394.7, "2025-09-10": 2159.2, "2025-09-11": 2307.6, "2025-09-12": 2473.22, "2025-09-13": 3083.7, "2025-09-14": 2643.1, "2025-09-15": 2285.76, "2025-09-16": 1943.62, "2025-09-17": 2425.65, "2025-09-18": 2205.3, "2025-09-19": 2839.92, "2025-09-20": 3581.52, "2025-09-21": 3100.5, "2025-09-22": 2000.8, "2025-09-23": 2535.49, "2025-09-24": 2611.1, "2025-09-25": 2407.9, "2025-09-26": 2528.52, "2025-09-27": 3574.7, "2025-09-28": 1808.45, "2025-09-29": 2406.9, "2025-09-30": 2439.3, "2025-10-01": 2312.9, "2025-10-02": 2422.5, "2025-10-03": 3418.19, "2025-10-04": 3381.92, "2025-10-05": 3366.6, "2025-10-06": 2488.2, "2025-10-07": 1119.12, "2025-10-08": 2147.4, "2025-10-09": 2210.8, "2025-10-10": 2705.4, "2025-10-11": 3717.8, "2025-10-12": 3967.47, "2025-10-13": 2879.0, "2025-10-14": 2275.8, "2025-10-15": 2370.8, "2025-10-16": 2530.69, "2025-10-17": 2857.0, "2025-10-18": 3785.52, "2025-10-19": 3572.12, "2025-10-20": 2512.15, "2025-10-21": 2756.1, "2025-10-22": 2796.3, "2025-10-23": 2626.1, "2025-10-24": 3080.57, "2025-10-25": 3664.57, "2025-10-26": 2904.29, "2025-10-27": 2712.8, "2025-10-28": 2163.8, "2025-10-29": 1318.87, "2025-10-30": 2807.0, "2025-10-31": 2405.75, "2025-11-01": 3477.4, "2025-11-02": 2925.91, "2025-11-03": 1959.9, "2025-11-04": 1932.7, "2025-11-05": 1586.77, "2025-11-06": 1646.89, "2025-11-07": 1924.4, "2025-11-08": 2909.2, "2025-11-09": 2578.1, "2025-11-10": 1679.0, "2025-11-11": 1942.1, "2025-11-12": 2040.0, "2025-11-13": 513.7, "2025-11-14": 830.47, "2025-11-15": 968.24, "2025-11-16": 2064.24, "2025-11-17": 1209.52, "2025-11-18": 1486.36, "2025-11-19": 1318.8, "2025-11-20": 1395.87, "2025-11-21": 1427.3, "2025-11-22": 2162.07, "2025-11-23": 2114.55, "2025-11-24": 1214.82, "2025-11-25": 1250.22, "2025-11-26": 1032.32, "2025-11-27": 901.72, "2025-11-28": 1533.62, "2025-11-29": 2903.17, "2025-11-30": 1018.6, "2025-12-01": 1590.3, "2025-12-02": 585.7, "2025-12-03": 787.18, "2025-12-04": 795.53, "2025-12-05": 1539.82, "2025-12-06": 3206.65, "2025-12-07": 4279.11, "2025-12-08": 2163.66, "2025-12-09": 1021.9, "2025-12-10": 471.2, "2025-12-11": 1304.76, "2025-12-12": 1132.8, "2025-12-13": 2515.4, "2025-12-14": 1784.57, "2025-12-15": 495.32, "2025-12-16": 648.63, "2025-12-17": 1325.1, "2025-12-18": 1094.0, "2025-12-19": 658.6, "2025-12-20": 1849.91, "2025-12-21": 984.81, "2025-12-22": 1538.7, "2025-12-23": 1251.42, "2025-12-24": 2141.0, "2025-12-25": 2214.3, "2025-12-26": 2650.52, "2025-12-27": 1154.42, "2025-12-28": 3083.4, "2025-12-29": 3157.59, "2025-12-30": 2118.77, "2025-12-31": 2110.1, "2026-01-01": 2379.17, "2026-01-02": 3169.5, "2026-01-03": 1510.59, "2026-01-04": 1766.17, "2026-01-05": 1414.1, "2026-01-06": 1271.2, "2026-01-07": 685.2, "2026-01-08": 784.6, "2026-01-09": 872.9, "2026-01-10": 1587.7, "2026-01-11": 1650.92, "2026-01-12": 986.7, "2026-01-13": 400.42, "2026-01-14": 918.9, "2026-01-15": 760.7, "2026-01-16": 900.8, "2026-01-17": 1571.1, "2026-01-18": 1559.12, "2026-01-19": 1190.6, "2026-01-20": 1256.2, "2026-01-21": 469.5, "2026-01-22": 613.14, "2026-01-23": 742.47, "2026-01-24": 1622.05, "2026-01-25": 1100.9, "2026-01-26": 770.6, "2026-01-27": 505.1, "2026-01-28": 721.3, "2026-01-29": 633.64, "2026-01-30": 1025.0, "2026-01-31": 1981.3, "2026-02-01": 872.0, "2026-02-02": 628.8, "2026-02-03": 673.1, "2026-02-04": 385.35, "2026-02-05": 1066.02, "2026-02-06": 839.34, "2026-02-07": 508.4, "2026-02-08": 1499.2, "2026-02-09": 770.0, "2026-02-10": 1398.4, "2026-02-11": 977.4, "2026-02-12": 1931.77, "2026-02-13": 1516.7, "2026-02-14": 2619.9, "2026-02-15": 3691.9, "2026-02-16": 2186.4, "2026-02-17": 412.7, "2026-02-18": 1966.0, "2026-02-19": 2442.97, "2026-02-20": 3061.82, "2026-02-21": 3779.92, "2026-02-22": 3528.6, "2026-02-23": 2513.2, "2026-02-24": 2481.0, "2026-02-25": 2189.6, "2026-02-26": 2199.54, "2026-02-27": 2352.2, "2026-02-28": 4246.0, "2026-03-01": 2965.77, "2026-03-02": 2226.8, "2026-03-03": 1666.0, "2026-03-04": 817.4, "2026-03-05": 1402.9, "2026-03-06": 1132.3, "2026-03-07": 3146.7, "2026-03-08": 2221.3, "2026-03-09": 1134.39, "2026-03-10": 1556.6, "2026-03-11": 2593.9, "2026-03-12": 2265.45, "2026-03-13": 3062.07, "2026-03-14": 2661.64, "2026-03-15": 4033.72, "2026-03-16": 2410.3, "2026-03-17": 2478.7, "2026-03-18": 2383.9, "2026-03-19": 2159.8, "2026-03-20": 2425.1, "2026-03-21": 3663.65, "2026-03-22": 4078.2, "2026-03-23": 2481.9, "2026-03-24": 2555.2, "2026-03-25": 2483.55, "2026-03-26": 2837.8, "2026-03-27": 2316.07, "2026-03-28": 3298.3, "2026-03-29": 6321.93, "2026-03-30": 5648.55, "2026-03-31": 6481.54, "2026-04-01": 6029.06, "2026-04-02": 5987.82, "2026-04-03": 7132.49, "2026-04-04": 6648.4, "2026-04-05": 4618.2, "2026-04-06": 3133.1, "2026-04-07": 1701.8, "2026-04-08": 2715.7, "2026-04-09": 3171.6, "2026-04-10": 3484.02, "2026-04-11": 2897.5, "2026-04-12": 3671.12, "2026-04-13": 2326.87, "2026-04-14": 2879.7, "2026-04-15": 3067.82, "2026-04-16": 3141.2, "2026-04-17": 3310.9, "2026-04-18": 3770.5, "2026-04-19": 3345.82, "2026-04-20": 2407.5, "2026-04-21": 2154.1, "2026-04-22": 2793.3, "2026-04-23": 2703.4, "2026-04-24": 3166.6, "2026-04-25": 3672.32, "2026-04-26": 4087.1, "2026-04-27": 2814.17, "2026-04-28": 2476.2, "2026-04-29": 1814.7, "2026-04-30": 3352.54, "2026-05-01": 4367.9, "2026-05-02": 4146.57, "2026-05-03": 3626.0, "2026-05-04": 2855.3, "2026-05-05": 2563.82, "2026-05-06": 2385.5, "2026-05-07": 2342.54, "2026-05-08": 3117.1, "2026-05-09": 2078.37, "2026-05-10": 2055.72, "2026-05-11": 2894.9, "2026-05-12": 2529.5, "2026-05-13": 2734.3, "2026-05-14": 2882.9, "2026-05-15": 3283.37, "2026-05-16": 3588.3, "2026-05-17": 3522.8, "2026-05-18": 2588.92, "2026-05-19": 2836.17, "2026-05-20": 2551.8, "2026-05-21": 2532.19, "2026-05-22": 2999.0, "2026-05-23": 3590.4, "2026-05-24": 3450.74, "2026-05-25": 3137.7, "2026-05-26": 2831.97, "2026-05-27": 2933.07, "2026-05-28": 2470.12, "2026-05-29": 2898.71, "2026-05-30": 2615.26, "2026-05-31": 2269.22},
+  "Amorino Catedral": {"2025-05-01": 4668.0, "2025-05-02": 3029.97, "2025-05-03": 3633.01, "2025-05-04": 2992.88, "2025-05-05": 2198.95, "2025-05-06": 2956.23, "2025-05-07": 2819.92, "2025-05-08": 2589.55, "2025-05-09": 2827.22, "2025-05-10": 3525.13, "2025-05-11": 3622.02, "2025-05-12": 2710.86, "2025-05-13": 2706.47, "2025-05-14": 2985.81, "2025-05-15": 2959.83, "2025-05-16": 4003.73, "2025-05-17": 4292.75, "2025-05-18": 3495.26, "2025-05-19": 3301.04, "2025-05-20": 2962.46, "2025-05-21": 3108.02, "2025-05-22": 3216.06, "2025-05-23": 3419.6, "2025-05-24": 3979.44, "2025-05-25": 3678.04, "2025-05-26": 3565.02, "2025-05-27": 3535.73, "2025-05-28": 3501.67, "2025-05-29": 3867.81, "2025-05-30": 4779.56, "2025-05-31": 5008.43, "2025-06-01": 3790.65, "2025-06-02": 2774.84, "2025-06-03": 2575.64, "2025-06-04": 3151.48, "2025-06-05": 3253.67, "2025-06-06": 3425.08, "2025-06-07": 4827.6, "2025-06-08": 3733.08, "2025-06-09": 3566.83, "2025-06-10": 2816.62, "2025-06-11": 2595.29, "2025-06-12": 2877.27, "2025-06-13": 3294.4, "2025-06-14": 4017.61, "2025-06-15": 3705.46, "2025-06-16": 3286.44, "2025-06-17": 3148.23, "2025-06-18": 3348.26, "2025-06-19": 2919.24, "2025-06-20": 3477.97, "2025-06-21": 3685.52, "2025-06-22": 3613.44, "2025-06-23": 2751.37, "2025-06-24": 2829.07, "2025-06-25": 2605.9, "2025-06-26": 2839.52, "2025-06-27": 3390.0, "2025-06-28": 3291.54, "2025-06-29": 2634.96, "2025-06-30": 2758.58, "2025-07-01": 2552.88, "2025-07-02": 2712.76, "2025-07-03": 2371.06, "2025-07-04": 2528.28, "2025-07-05": 3343.37, "2025-07-06": 3282.24, "2025-07-07": 2633.57, "2025-07-08": 2699.87, "2025-07-09": 2623.02, "2025-07-10": 2322.28, "2025-07-11": 3032.17, "2025-07-12": 3113.6, "2025-07-13": 3132.51, "2025-07-14": 2776.31, "2025-07-15": 2756.69, "2025-07-16": 2794.92, "2025-07-17": 2632.57, "2025-07-18": 3067.49, "2025-07-19": 3160.72, "2025-07-20": 2997.62, "2025-07-21": 2581.96, "2025-07-22": 2876.45, "2025-07-23": 2481.28, "2025-07-24": 3019.88, "2025-07-25": 3409.83, "2025-07-26": 3474.97, "2025-07-27": 3683.78, "2025-07-28": 2666.18, "2025-07-29": 2723.67, "2025-07-30": 2816.94, "2025-07-31": 2642.72, "2025-08-01": 2896.53, "2025-08-02": 3049.56, "2025-08-03": 3220.02, "2025-08-04": 3518.13, "2025-08-05": 3002.07, "2025-08-06": 3418.34, "2025-08-07": 3078.85, "2025-08-08": 3235.44, "2025-08-09": 3973.09, "2025-08-10": 3497.7, "2025-08-11": 3693.77, "2025-08-12": 3297.97, "2025-08-13": 3196.98, "2025-08-14": 3372.13, "2025-08-15": 3749.15, "2025-08-16": 3654.34, "2025-08-17": 3339.21, "2025-08-18": 3557.55, "2025-08-19": 2816.06, "2025-08-20": 3388.68, "2025-08-21": 3220.81, "2025-08-22": 2925.56, "2025-08-23": 3569.54, "2025-08-24": 3384.76, "2025-08-25": 3410.52, "2025-08-26": 2522.88, "2025-08-27": 2650.9, "2025-08-28": 3299.11, "2025-08-29": 2665.02, "2025-08-30": 3102.35, "2025-08-31": 3091.03, "2025-09-01": 2498.91, "2025-09-02": 2804.92, "2025-09-03": 2996.91, "2025-09-04": 2618.42, "2025-09-05": 3220.65, "2025-09-06": 3350.24, "2025-09-07": 3265.55, "2025-09-08": 2934.97, "2025-09-09": 2653.86, "2025-09-10": 2588.93, "2025-09-11": 2741.07, "2025-09-12": 3737.19, "2025-09-13": 3658.42, "2025-09-14": 3664.31, "2025-09-15": 2802.81, "2025-09-16": 2698.11, "2025-09-17": 3050.36, "2025-09-18": 2950.16, "2025-09-19": 3595.51, "2025-09-20": 3918.02, "2025-09-21": 4083.19, "2025-09-22": 2731.08, "2025-09-23": 2806.66, "2025-09-24": 3248.91, "2025-09-25": 3027.01, "2025-09-26": 3460.43, "2025-09-27": 3932.36, "2025-09-28": 2616.84, "2025-09-29": 2480.72, "2025-09-30": 3000.0, "2025-10-01": 2785.96, "2025-10-02": 3368.45, "2025-10-03": 4287.02, "2025-10-04": 4766.2, "2025-10-05": 3748.04, "2025-10-06": 3288.82, "2025-10-07": 3401.29, "2025-10-08": 2604.21, "2025-10-09": 2614.43, "2025-10-10": 3539.72, "2025-10-11": 5057.0, "2025-10-12": 4527.42, "2025-10-13": 3537.12, "2025-10-14": 2768.18, "2025-10-15": 2739.47, "2025-10-16": 3132.86, "2025-10-17": 3586.96, "2025-10-18": 4305.38, "2025-10-19": 4376.97, "2025-10-20": 2739.09, "2025-10-21": 2646.59, "2025-10-22": 2889.56, "2025-10-23": 2993.05, "2025-10-24": 3410.53, "2025-10-25": 4329.1, "2025-10-26": 3479.32, "2025-10-27": 3008.6, "2025-10-28": 2571.94, "2025-10-29": 1699.09, "2025-10-30": 2766.48, "2025-10-31": 2615.71, "2025-11-01": 3923.9, "2025-11-02": 3206.25, "2025-11-03": 1965.32, "2025-11-04": 2258.86, "2025-11-05": 1773.44, "2025-11-06": 1923.41, "2025-11-07": 2694.95, "2025-11-08": 4234.5, "2025-11-09": 3226.6, "2025-11-10": 2281.19, "2025-11-11": 2462.87, "2025-11-12": 2250.34, "2025-11-13": 1213.53, "2025-11-14": 1576.05, "2025-11-15": 1768.91, "2025-11-16": 2995.29, "2025-11-17": 1378.48, "2025-11-18": 2092.85, "2025-11-19": 2027.97, "2025-11-20": 1826.74, "2025-11-21": 2502.06, "2025-11-22": 3520.15, "2025-11-23": 3278.24, "2025-11-24": 1371.74, "2025-11-25": 1617.67, "2025-11-26": 1790.05, "2025-11-27": 1295.12, "2025-11-28": 2895.41, "2025-11-29": 4637.32, "2025-11-30": 3252.09, "2025-12-01": 2278.51, "2025-12-02": 1533.2, "2025-12-03": 1533.27, "2025-12-04": 1344.7, "2025-12-05": 2063.22, "2025-12-06": 4430.08, "2025-12-07": 5588.43, "2025-12-08": 2918.3, "2025-12-09": 1911.2, "2025-12-10": 1106.99, "2025-12-11": 1732.01, "2025-12-12": 1771.85, "2025-12-13": 4128.86, "2025-12-14": 3094.99, "2025-12-15": 1219.11, "2025-12-16": 1363.45, "2025-12-17": 2126.75, "2025-12-18": 1843.03, "2025-12-19": 1751.61, "2025-12-20": 3505.44, "2025-12-21": 2687.55, "2025-12-22": 3162.89, "2025-12-23": 2097.14, "2025-12-24": 3333.24, "2025-12-25": 3703.7, "2025-12-26": 4553.1, "2025-12-27": 2943.72, "2025-12-28": 4533.0, "2025-12-29": 5013.5, "2025-12-30": 3760.1, "2025-12-31": 3647.95, "2026-01-01": 3588.99, "2026-01-02": 4035.07, "2026-01-03": 3087.07, "2026-01-04": 2911.2, "2026-01-05": 2584.89, "2026-01-06": 2496.28, "2026-01-07": 1350.39, "2026-01-08": 1430.56, "2026-01-09": 1804.67, "2026-01-10": 2414.61, "2026-01-11": 2312.34, "2026-01-12": 1311.91, "2026-01-13": 939.6, "2026-01-14": 1077.42, "2026-01-15": 926.99, "2026-01-16": 1360.27, "2026-01-17": 2328.54, "2026-01-18": 2100.29, "2026-01-19": 1328.78, "2026-01-20": 1403.94, "2026-01-21": 757.78, "2026-01-22": 918.81, "2026-01-23": 1297.36, "2026-01-24": 2692.92, "2026-01-25": 1871.52, "2026-01-26": 1148.11, "2026-01-27": 916.13, "2026-01-28": 1096.42, "2026-01-29": 917.37, "2026-01-30": 1489.79, "2026-01-31": 2817.4, "2026-02-01": 1376.59, "2026-02-02": 1347.86, "2026-02-03": 1036.14, "2026-02-04": 1110.4, "2026-02-05": 1505.96, "2026-02-06": 1753.95, "2026-02-07": 1548.54, "2026-02-08": 2459.27, "2026-02-09": 1238.79, "2026-02-10": 1911.72, "2026-02-11": 1159.8, "2026-02-12": 2138.44, "2026-02-13": 2075.05, "2026-02-14": 4471.64, "2026-02-15": 6091.49, "2026-02-16": 5244.41, "2026-02-17": 3385.76, "2026-02-18": 2762.25, "2026-02-19": 2776.86, "2026-02-20": 3284.76, "2026-02-21": 4388.72, "2026-02-22": 4063.08, "2026-02-23": 3057.8, "2026-02-24": 2562.99, "2026-02-25": 2335.91, "2026-02-26": 2968.58, "2026-02-27": 3576.67, "2026-02-28": 5911.16, "2026-03-01": 3962.87, "2026-03-02": 2821.93, "2026-03-03": 2342.58, "2026-03-04": 1489.39, "2026-03-05": 2157.89, "2026-03-06": 2199.36, "2026-03-07": 4024.34, "2026-03-08": 3251.94, "2026-03-09": 1919.59, "2026-03-10": 2501.69, "2026-03-11": 2364.57, "2026-03-12": 3034.29, "2026-03-13": 3529.55, "2026-03-14": 4182.5, "2026-03-15": 4173.82, "2026-03-16": 3050.46, "2026-03-17": 3300.2, "2026-03-18": 2711.23, "2026-03-19": 2715.32, "2026-03-20": 3083.47, "2026-03-21": 4025.02, "2026-03-22": 4035.5, "2026-03-23": 3108.46, "2026-03-24": 3163.3, "2026-03-25": 1733.67, "2026-03-26": 2706.6, "2026-03-27": 2668.67, "2026-03-28": 3503.42, "2026-03-29": 2199.66, "2026-03-30": 2122.34, "2026-03-31": 2417.74, "2026-04-01": 2482.54, "2026-04-02": 2396.78, "2026-04-03": 3204.1, "2026-04-04": 2976.01, "2026-04-05": 4089.87, "2026-04-06": 3274.77, "2026-04-07": 2350.29, "2026-04-08": 3293.77, "2026-04-09": 3748.19, "2026-04-10": 4084.5, "2026-04-11": 3603.17, "2026-04-12": 4427.7, "2026-04-13": 2773.87, "2026-04-14": 3414.99, "2026-04-15": 3349.47, "2026-04-16": 3202.79, "2026-04-17": 4262.3, "2026-04-18": 4331.27, "2026-04-19": 4153.75, "2026-04-20": 3433.06, "2026-04-21": 2453.97, "2026-04-22": 3536.67, "2026-04-23": 3332.8, "2026-04-24": 3533.47, "2026-04-25": 4441.27, "2026-04-26": 4881.8, "2026-04-27": 3892.74, "2026-04-28": 2931.94, "2026-04-29": 2340.92, "2026-04-30": 3922.34, "2026-05-01": 5848.24, "2026-05-02": 4773.36, "2026-05-03": 4515.73, "2026-05-04": 3133.13, "2026-05-05": 3342.08, "2026-05-06": 3513.07, "2026-05-07": 3331.56, "2026-05-08": 3757.2, "2026-05-09": 2966.17, "2026-05-10": 3351.27, "2026-05-11": 3316.71, "2026-05-12": 3317.26, "2026-05-13": 3954.22, "2026-05-14": 3446.0, "2026-05-15": 4274.4, "2026-05-16": 4932.87, "2026-05-17": 4214.59, "2026-05-18": 3565.77, "2026-05-19": 3939.43, "2026-05-20": 3687.94, "2026-05-21": 3409.34, "2026-05-22": 4233.39, "2026-05-23": 4990.2, "2026-05-24": 4376.57, "2026-05-25": 3093.66, "2026-05-26": 3687.02, "2026-05-27": 4266.2, "2026-05-28": 4091.47, "2026-05-29": 4829.49, "2026-05-30": 3989.24, "2026-05-31": 3911.2},
+};
+
+/* Lookup historical previous-year sales for a given shop+date */
+const HIST_SHOP_KEY = {
+  'Amorino Sevilla Avenida'      : 'Amorino Sevilla Avenida',
+  'Amorino Patio de los Naranjos': 'Amorino Patio de los Naranjos',
+  'Amorino Plaza Nueva'          : 'Amorino Plaza Nueva',
+  'Amorino Alcázar'              : 'Amorino Alcázar',
+  'Amorino Catedral'             : 'Amorino Catedral',
+};
+
+/* ================= STATE ================= */
+const State = {
+  shop:'all', from:null, to:null, raw:null, loading:false, error:null, lastSync:null,
+  weather:{}, weatherFetching:false,
+  radiografia:{},
+  activeTab: 'panel',
+  productividadByShop: {
+    'Amorino Sevilla Avenida':       110,
+    'Amorino Patio de los Naranjos': 110,
+    'Amorino Plaza Nueva':           110,
+    'Amorino Alcázar':               110,
+    'Amorino Catedral':              110,
+  },
+  costeBruto: 10.95,
+  seguridadSocial: 32,
+};
+
+/* Sevilla coordinates for weather */
+const WEATHER_LAT = 37.39, WEATHER_LON = -5.98;
+const RAIN_THRESHOLD = 0;
+
+/* ================= DATA LOADING ================= */
+async function fetchTab(name){
+  const json = await loadViaJSONP(name);
+  return gvizJsonToRows(json);
+}
+
+async function loadData(){
+  State.loading = true; State.error = null;
+  document.getElementById('statusDot').classList.add('busy');
+  document.getElementById('syncNote').textContent = 'Actualizando…';
+  try {
+    const entries = Object.entries(TABS);
+    const results = await Promise.all(entries.map(([k,name]) => fetchTab(name).then(rows => [k, rows])));
+    const rowsByKey = Object.fromEntries(results);
+
+    const t1 = dedupe(
+      rowsByKey.t1.slice(1).filter(r => r[0] && r[0] !== 'Shop').map(r => ({
+        shop:(r[0]||"").trim().normalize("NFC"), dkey:normDate(r[1]), horario:r[2], ventas:parseNum(r[3]), tickets:parseNum(r[4]), vt:parseNum(r[5])
+      })),
+      r => `${r.shop}|${r.dkey}|${r.horario}`
+    );
+
+    const t2 = dedupe(
+      rowsByKey.t2.slice(1).filter(r => r[0] && r[0] !== 'Shop').map(r => ({
+        shop:(r[0]||"").trim().normalize("NFC"), dkey:normDate(r[1]),
+        ticketsKioskoMes:parseNum(r[2]), totalMesKiosko:parseNum(r[3]),
+        ticketsKioskoDia:parseNum(r[4]), totalDiaKiosko:parseNum(r[5]),
+        ticketsTotal:parseNum(r[6]), ticketMedio:parseNum(r[7]), ticketMedioGelato:parseNum(r[8]),
+        clienteMedio:parseNum(r[9]), litrosDia:parseNum(r[10]), sugerenciasPct:parseNum(r[11]),
+        totalMesEnCurso:parseNum(r[12]), totalMesAnoAnterior:parseNum(r[13]), diferenciaPct:parseNum(r[14]),
+        totalAno:parseNum(r[15]), totalAnoAnterior:parseNum(r[16])
+      })),
+      r => `${r.shop}|${r.dkey}`
+    );
+
+    const t3 = dedupe(
+      rowsByKey.t3.slice(1).filter(r => r[0] && r[0] !== 'Shop').map(r => ({
+        shop:(r[0]||"").trim().normalize("NFC"), dkey:normDate(r[1]), empleado:(r[2]||'').trim(),
+        ticketMedio:parseNum(r[3]), tickets:parseNum(r[4]), sugerencias:parseNum(r[5]),
+        anulaciones:parseNum(r[6]), descuentos:parseNum(r[7]), medHel:parseNum(r[8]), sugerenciasPct:parseNum(r[9])
+      })),
+      r => `${r.shop}|${r.dkey}|${r.empleado}`
+    );
+
+    const t5 = dedupe(
+      rowsByKey.t5.slice(1).filter(r => r[0] && r[0] !== 'Shop').map(r => ({
+        shop:(r[0]||"").trim().normalize("NFC"), dkey:normDate(r[1]), sabor:(r[2]||'').trim(), unidades:parseNum(r[3])
+      })),
+      r => `${r.shop}|${r.dkey}|${r.sabor}`
+    );
+
+    const t6 = dedupe(
+      rowsByKey.t6.slice(1).filter(r => r[0] && r[0] !== 'Shop').map(r => ({
+        shop:(r[0]||"").trim().normalize("NFC"), dkey:normDate(r[1]), forma:(r[2]||'').trim(), pct:parseNum(r[3]),
+        base:parseNum(r[4]), iva:parseNum(r[5]), total:parseNum(r[6]), pctTotal:parseNum(r[7])
+      })),
+      r => `${r.shop}|${r.dkey}|${r.forma}`
+    );
+
+    const ult = dedupe(
+      rowsByKey.ult.slice(1).filter(r => r[0] && r[0] !== 'Shop').map(r => ({
+        shop:(r[0]||"").trim().normalize("NFC"), dkey:normDate(r[1]), tickets:[r[2],r[3],r[4],r[5],r[6],r[7],r[8],r[9],r[10],r[11]].map(x => (x||'').trim()).filter(Boolean)
+      })),
+      r => `${r.shop}|${r.dkey}`
+    );
+
+    State.raw = { t1, t2, t3, t5, t6, ult };
+    State.lastSync = new Date();
+
+    const shopsFound = Array.from(new Set(t2.map(r => r.shop)));
+    const orderedShops = SHOP_ORDER.filter(s => shopsFound.includes(s)).concat(shopsFound.filter(s => !SHOP_ORDER.includes(s)));
+    State.shops = orderedShops;
+
+    populateShopSelect();
+    syncDateBounds(true);
+    renderAll();
+    document.getElementById('syncNote').textContent = 'Última sincronización: ' + State.lastSync.toLocaleTimeString('es-ES');
+  } catch (err) {
+    State.error = err;
+    renderError(err);
+    document.getElementById('syncNote').textContent = 'Error de sincronización';
+  } finally {
+    State.loading = false;
+    document.getElementById('statusDot').classList.remove('busy');
+  }
+}
+
+function getDatesForShop(shop){
+  if (!State.raw) return [];
+  // Use both t1 and t2 so manually-entered rows (which only write to t1)
+  // are included in the date bounds — otherwise syncDateBounds clamps them out.
+  const t1pool = shop === 'all' ? State.raw.t1 : State.raw.t1.filter(r => shopEq(r.shop, shop));
+  const t2pool = shop === 'all' ? State.raw.t2 : State.raw.t2.filter(r => shopEq(r.shop, shop));
+  const allKeys = [...t1pool.map(r => r.dkey), ...t2pool.map(r => r.dkey)].filter(Boolean);
+  const keys = Array.from(new Set(allKeys));
+  keys.sort((a,b) => b.localeCompare(a));
+  return keys;
+}
+
+/* ================= UI: selects ================= */
+function populateShopSelect(){
+  const sel = document.getElementById('shopSelect');
+  const prev = State.shop;
+  sel.innerHTML = '<option value="all">Todas las tiendas</option>' +
+    State.shops.map(s => `<option value="${esc(s)}">${esc(s.replace('Amorino ',''))}</option>`).join('');
+  sel.value = State.shops.some(s => shopEq(s, prev)) || prev === 'all' ? prev : 'all';
+  State.shop = sel.value;
+}
+
+function dateBoundsForShop(shop){
+  const dates = getDatesForShop(shop);
+  if (!dates.length) return null;
+  return { min: dates[dates.length-1], max: dates[0] };
+}
+
+function syncDateBounds(resetToLatest){
+  const bounds = dateBoundsForShop(State.shop);
+  const fromEl = document.getElementById('dateFrom'), toEl = document.getElementById('dateTo');
+  if (!bounds){
+    State.from = State.to = null;
+    fromEl.value = toEl.value = '';
+    return;
+  }
+  fromEl.min = toEl.min = bounds.min;
+  fromEl.max = toEl.max = bounds.max;
+  if (resetToLatest || !State.from || !State.to){
+    State.from = bounds.max;
+    State.to = bounds.max;
+  } else {
+    State.from = clampDate(State.from, bounds.min, bounds.max);
+    State.to = clampDate(State.to, bounds.min, bounds.max);
+  }
+  fromEl.value = State.from;
+  toEl.value = State.to;
+  updatePresetHighlight(bounds);
+}
+
+function updatePresetHighlight(bounds){
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  if (!bounds) return;
+  let match = null;
+  if (State.from === bounds.max && State.to === bounds.max) match = 'today';
+  else if (State.from === bounds.min && State.to === bounds.max) match = 'all';
+  else if (State.to === bounds.max && State.from === clampDate(shiftDate(bounds.max,-6), bounds.min, bounds.max)) match = '7d';
+  else if (State.to === bounds.max && State.from === clampDate(shiftDate(bounds.max,-29), bounds.min, bounds.max)) match = '30d';
+  else if (State.to === bounds.max && State.from === clampDate(monthStart(bounds.max), bounds.min, bounds.max)) match = 'month';
+  if (match){
+    const btn = document.querySelector(`.preset-btn[data-preset="${match}"]`);
+    if (btn) btn.classList.add('active');
+  }
+}
+
+document.getElementById('shopSelect').addEventListener('change', e => {
+  State.shop = e.target.value;
+  syncDateBounds(false);
+  renderAll();
+});
+document.getElementById('dateFrom').addEventListener('change', e => {
+  const bounds = dateBoundsForShop(State.shop);
+  if (!bounds) return;
+  State.from = clampDate(e.target.value, bounds.min, bounds.max);
+  if (State.from > State.to) State.to = State.from;
+  document.getElementById('dateFrom').value = State.from;
+  document.getElementById('dateTo').value = State.to;
+  updatePresetHighlight(bounds);
+  renderAll();
+});
+document.getElementById('dateTo').addEventListener('change', e => {
+  const bounds = dateBoundsForShop(State.shop);
+  if (!bounds) return;
+  State.to = clampDate(e.target.value, bounds.min, bounds.max);
+  if (State.to < State.from) State.from = State.to;
+  document.getElementById('dateFrom').value = State.from;
+  document.getElementById('dateTo').value = State.to;
+  updatePresetHighlight(bounds);
+  renderAll();
+});
+document.getElementById('presetRow').addEventListener('click', e => {
+  const btn = e.target.closest('.preset-btn');
+  if (!btn) return;
+  const bounds = dateBoundsForShop(State.shop);
+  if (!bounds) return;
+  const preset = btn.dataset.preset;
+  if (preset === 'today'){ State.from = bounds.max; State.to = bounds.max; }
+  else if (preset === '7d'){ State.from = clampDate(shiftDate(bounds.max,-6), bounds.min, bounds.max); State.to = bounds.max; }
+  else if (preset === '30d'){ State.from = clampDate(shiftDate(bounds.max,-29), bounds.min, bounds.max); State.to = bounds.max; }
+  else if (preset === 'month'){ State.from = clampDate(monthStart(bounds.max), bounds.min, bounds.max); State.to = bounds.max; }
+  else if (preset === 'all'){ State.from = bounds.min; State.to = bounds.max; }
+  document.getElementById('dateFrom').value = State.from;
+  document.getElementById('dateTo').value = State.to;
+  updatePresetHighlight(bounds);
+  renderAll();
+});
+document.getElementById('refreshBtn').addEventListener('click', loadData);
+
+/* ================= RENDER ================= */
+function renderError(err){
+  document.getElementById('content').innerHTML = `
+    <div class="banner error">
+      <h3>No se han podido cargar los datos del Google Sheet</h3>
+      <p>${esc(err.message || String(err))}</p>
+      <p>Comprueba lo siguiente y pulsa "Actualizar":</p>
+      <ul>
+        <li>La hoja debe compartirse como <code>Cualquier persona con el enlace · Lector</code>.</li>
+        <li>Las pestañas deben llamarse exactamente: <code>Table1</code>, <code>Table 2</code>, <code>Table 3</code>, <code>Table 5</code>, <code>Table 6</code>, <code>Ultimos</code>.</li>
+        <li>Si el enlace cambió, dime la nueva URL del Google Sheet.</li>
+      </ul>
+    </div>`;
+}
+
+/* ================= PREVIOUS YEAR (sheet data only) ================= */
+function prevYearKey(dkey){
+  const [y,m,d] = dkey.split('-');
+  return `${parseInt(y,10)-1}-${m}-${d}`;
+}
+function getPrevYearTotalForShop(dkey, shop){
+  const pkey = prevYearKey(dkey);
+  // 1. Try Google Sheet data (covers 2026+ for future comparison years)
+  if (State.raw){
+    if (shop === 'all'){
+      const rows = State.raw.t1.filter(r => r.dkey === pkey);
+      if (rows.length){
+        const s = rows.reduce((a,r) => a+(isNaN(r.ventas)?0:r.ventas), 0);
+        if (s > 0) return s;
+      }
+    } else {
+      const rows = State.raw.t1.filter(r => r.dkey === pkey && shopEq(r.shop, shop));
+      if (rows.length){
+        const s = rows.reduce((a,r) => a+(isNaN(r.ventas)?0:r.ventas), 0);
+        if (s > 0) return s;
+      }
+    }
+  }
+  // 2. Fall back to historical constants (May 2025 – May 2026)
+  if (shop === 'all'){
+    let total = 0, found = 0;
+    for (const fullName of Object.keys(HISTORICAL_SALES_ALL)){
+      const v = HISTORICAL_SALES_ALL[fullName][pkey];
+      if (v !== undefined){ total += v; found++; }
+    }
+    return found > 0 ? total : NaN;
+  } else {
+    const hist = HISTORICAL_SALES_ALL[shop];
+    if (hist && hist[pkey] !== undefined) return hist[pkey];
+    return NaN;
+  }
+}
+
+/* ================= WEATHER ================= */
+async function fetchWeatherIfNeeded(from, to){
+  if (!from || !to || State.weatherFetching) return;
+  const days = []; let d = from; while(d<=to){ days.push(d); d=shiftDate(d,1); }
+  const missing = days.filter(d => !State.weather[d]);
+  if (!missing.length) return;
+  State.weatherFetching = true;
+  const wFrom = missing[0], wTo = missing[missing.length-1];
+  function parseW(data){
+    if (!data.daily) return;
+    data.daily.time.forEach((dkey,i) => {
+      const tempMax = data.daily.temperature_2m_max[i];
+      const precip  = data.daily.precipitation_sum[i];
+      if (!State.weather[dkey]) State.weather[dkey] = { tempMax, precip, rain: precip > RAIN_THRESHOLD };
+    });
+  }
+  try { const r = await fetch(`https://archive-api.open-meteo.com/v1/archive?latitude=${WEATHER_LAT}&longitude=${WEATHER_LON}&start_date=${wFrom}&end_date=${wTo}&daily=temperature_2m_max,precipitation_sum&timezone=Europe%2FMadrid`); if(r.ok) parseW(await r.json()); } catch(e){}
+  try {
+    const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${WEATHER_LAT}&longitude=${WEATHER_LON}&daily=temperature_2m_max,precipitation_sum&timezone=Europe%2FMadrid&past_days=92&forecast_days=1`);
+    if(r.ok){ const data = await r.json(); if(data.daily) data.daily.time.forEach((dkey,i) => {
+      if(dkey<wFrom||dkey>wTo) return;
+      State.weather[dkey] = { tempMax:data.daily.temperature_2m_max[i], precip:data.daily.precipitation_sum[i], rain:data.daily.precipitation_sum[i]>RAIN_THRESHOLD };
+    }); }
+  } catch(e){}
+  State.weatherFetching = false;
+  const el = document.getElementById('weatherKPIs');
+  if (el) el.innerHTML = buildWeatherKPIsHTML(State.from, State.to);
+}
+
+function buildWeatherKPIsHTML(from, to){
+  if (!from || !to) return '';
+  const isRange = from !== to;
+  const days = []; let d = from; while(d<=to){ days.push(d); d=shiftDate(d,1); }
+  const wDays = days.map(d => State.weather[d]).filter(w => w && w.tempMax !== null && w.tempMax !== undefined);
+  if (!wDays.length) return `<div style="font-size:12px;color:var(--ink-soft);padding:8px 0;">Cargando datos meteorológicos…</div>`;
+  let rainVal, tempVal;
+  if (isRange){
+    const rainy = wDays.filter(w=>w.rain).length;
+    const avgT = wDays.reduce((a,w)=>a+w.tempMax,0)/wDays.length;
+    const maxT = Math.max(...wDays.map(w=>w.tempMax));
+    rainVal = `${rainy} día${rainy!==1?'s':''} de ${days.length}`;
+    tempVal = `Media ${avgT.toFixed(1)}° · Máx ${maxT.toFixed(1)}°`;
+  } else {
+    const w = State.weather[from];
+    if (!w) return `<div style="font-size:12px;color:var(--ink-soft);padding:8px 0;">Sin datos meteorológicos</div>`;
+    rainVal = w.rain ? `Sí · ${w.precip.toFixed(1)} mm` : 'No';
+    tempVal = w.tempMax !== null ? `${w.tempMax.toFixed(1)} °C` : '—';
+  }
+  const rainColor = wDays.some(w=>w.rain) ? '#5E6FA3' : '#E3A038';
+  return `<div class="kpi-section-label" style="margin-top:18px;">Meteorología · Sevilla</div>
+  <div class="kpi-row" style="grid-template-columns:repeat(2,1fr);max-width:420px;">
+    <div class="kpi"><div class="kpi-scoop" style="background:${rainColor}"></div><div class="kpi-body"><div class="kpi-label">${isRange?'Días de lluvia':'Lluvia'}</div><div class="kpi-value small">${esc(rainVal)}</div></div></div>
+    <div class="kpi"><div class="kpi-scoop" style="background:var(--raspberry)"></div><div class="kpi-body"><div class="kpi-label">${isRange?'Temperatura máx.':'Temp. máx. del día'}</div><div class="kpi-value small">${esc(tempVal)}</div></div></div>
+  </div>`;
+}
+
+/* ================= EVALUACIÓN DEL TURNO ================= */
+const RADIOGRAFIAS_SHEET_ID = '1b2QhZCIKoMWwNFG051O-Hj0zx4y5Zi3sxPdM9_68ozo';
+const MONTH_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const SHOP_RAD_KEY = {
+  'Amorino Sevilla Avenida':       'AVENIDA',
+  'Amorino Patio de los Naranjos': 'NARANJOS',
+  'Amorino Plaza Nueva':           'PLAZA NUEVA',
+  'Amorino Alcázar':               'ALCÁZAR',
+  'Amorino Catedral':              'CATEDRAL'
+};
+const RAD_DAYS    = ['LUNES','MARTES','MIÉRCOLES','JUEVES','VIERNES','SÁBADO','DOMINGO'];
+const RAD_DAYS_JS = [1, 2, 3, 4, 5, 6, 0]; // JS getDay() Mon–Sun
+
+function getRadiografiaTab(dkey){
+  const [y,m,d] = dkey.split('-').map(Number);
+  if (y >= 2026) return MONTH_ES[m-1] + ' ' + y;
+  if (y === 2025){
+    if (m === 10){ return d <= 19 ? '6 y 13 Octubre 2025' : '20 Octubre 2025'; }
+    if (m === 11){ return d <= 16 ? '3 y 10 Noviembre 2025' : '17 y 24 Noviembre 2025'; }
+    if (m === 12){
+      if (d <= 7)  return '1 Diciembre 2025';
+      if (d <= 14) return '8 Diciembre 2025';
+      if (d <= 21) return '15 Diciembre 2025';
+      return '22 Diciembre 2025';
+    }
+  }
+  return null;
+}
+
+/* Convert a slot label like "10-11", "10:30-11:00", "00-01" → {start, end} minutes
+   Hours < 7 are treated as 24+ to handle post-midnight slots. */
+function slotToMins(s){
+  s = String(s).trim().replace(/\s/g,'');
+  const parts = s.split('-');
+  if (parts.length !== 2) return null;
+  const parseT = t => {
+    let h, m = 0;
+    if (t.includes(':')){ const [a,b]=t.split(':'); h=parseInt(a,10); m=parseInt(b,10)||0; }
+    else h = parseInt(t, 10);
+    if (isNaN(h)) return null;
+    if (h < 7) h += 24;
+    return h*60 + m;
+  };
+  const s2 = parseT(parts[0]), e2 = parseT(parts[1]);
+  if (s2===null || e2===null) return null;
+  return {start:s2, end: e2 <= s2 ? e2+1440 : e2};
+}
+
+/* Parse the 2D rows from a radiografía sheet into:
+   { SHOP_KEY: { jsDay: [{slot, staff}] } } */
+function parseRadiografiaRows(rows){
+  const result = {};
+  const SHOP_KEYS = Object.values(SHOP_RAD_KEY);
+  let currentShop = null, dayColMap = null, inData = false;
+  for (const row of rows){
+    const shopFound = SHOP_KEYS.find(k => row.some(c => String(c).trim() === k));
+    if (shopFound){
+      currentShop = shopFound;
+      result[currentShop] = {0:[],1:[],2:[],3:[],4:[],5:[],6:[]};
+      inData = false; dayColMap = null;
+      continue;
+    }
+    if (!inData && row.some(c => String(c).trim() === 'LUNES')){
+      dayColMap = {};
+      row.forEach((cell,i) => {
+        const di = RAD_DAYS.indexOf(String(cell).trim());
+        if (di !== -1) dayColMap[RAD_DAYS_JS[di]] = i + 1;
+      });
+      inData = true;
+      continue;
+    }
+    if (!currentShop || !inData || !dayColMap) continue;
+    const timeLabel = String(row[1]||'').trim();
+    if (!timeLabel || !timeLabel.match(/[\-:]/)) continue;
+    for (const [jsDay, colIdx] of Object.entries(dayColMap)){
+      const rawVal = String(row[colIdx]||'').trim().replace(',','.');
+      const staff = parseFloat(rawVal);
+      if (!isNaN(staff)) result[currentShop][parseInt(jsDay)].push({slot:timeLabel, staff});
+    }
+  }
+  return result;
+}
+
+/* Load a tab from a different sheet using JSONP */
+function loadViaJSONP_2(sheetId, sheetName){
+  return new Promise((resolve, reject) => {
+    const cbName = '__gvizCb' + (jsonpCounter++);
+    const scriptEl = document.createElement('script');
+    let settled = false;
+    function cleanup(){ delete window[cbName]; if(scriptEl.parentNode) scriptEl.parentNode.removeChild(scriptEl); clearTimeout(timer); }
+    window[cbName] = json => {
+      if(settled) return; settled=true; cleanup();
+      if(!json || json.status==='error') reject(new Error('Error: '+sheetName)); else resolve(json);
+    };
+    const timer = setTimeout(()=>{ if(settled) return; settled=true; cleanup(); reject(new Error('Timeout: '+sheetName)); }, 15000);
+    scriptEl.src = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json;responseHandler:${cbName}&sheet=${encodeURIComponent(sheetName)}&headers=0&_=${Date.now()}`;
+    scriptEl.onerror = ()=>{ if(settled) return; settled=true; cleanup(); reject(new Error('Load error: '+sheetName)); };
+    document.head.appendChild(scriptEl);
+  });
+}
+
+async function fetchRadiografiaIfNeeded(dkey){
+  if (!dkey) return;
+  const tabName = getRadiografiaTab(dkey);
+  if (!tabName || State.radiografia[tabName] !== undefined) return;
+  State.radiografia[tabName] = null; // mark as loading
+  try {
+    const json = await loadViaJSONP_2(RADIOGRAFIAS_SHEET_ID, tabName);
+    const rows = gvizJsonToRows(json);
+    State.radiografia[tabName] = parseRadiografiaRows(rows);
+  } catch(e){
+    State.radiografia[tabName] = null;
+  }
+  const el = document.getElementById('evalTurnoSection');
+  if (el) el.innerHTML = buildEvalTurnoHTML(State.shop, State.from);
+}
+
+function getStaffForSlot(shopKey, jsDay, t1Slot, radData){
+  if (!radData || !radData[shopKey]) return NaN;
+  const slots = radData[shopKey][jsDay];
+  if (!slots || !slots.length) return NaN;
+  const target = slotToMins(t1Slot);
+  if (!target) return NaN;
+  const overlapping = slots.filter(r => {
+    const rm = slotToMins(r.slot);
+    return rm && rm.start < target.end && rm.end > target.start;
+  });
+  if (!overlapping.length) return NaN;
+  return overlapping.reduce((a,r)=>a+r.staff, 0) / overlapping.length;
+}
+
+function slotDurationHours(slot){
+  const mins = slotToMins(slot);
+  return mins ? (mins.end - mins.start) / 60 : 0;
+}
+
+function calcPersonnelCostForShop(shopKey, jsDay, radData){
+  if (!radData || !radData[shopKey] || !radData[shopKey][jsDay]) return NaN;
+  const slots = radData[shopKey][jsDay];
+  let totalHours = 0;
+  for (const s of slots) totalHours += s.staff * slotDurationHours(s.slot);
+  return totalHours;
+}
+
+function buildEvalTurnoHTML(shop, dkey){
+  if (!dkey) return '<div class="empty-note">Selecciona un día para ver la evaluación del turno.</div>';
+  const tabName = getRadiografiaTab(dkey);
+  if (!tabName) return '<div class="empty-note">Sin radiografía disponible para esta fecha.</div>';
+  const radData = State.radiografia[tabName];
+  if (!radData) return '<div class="empty-note" style="padding:16px;">Cargando radiografía…</div>';
+  const [y,m,d] = dkey.split('-').map(Number);
+  const jsDay = new Date(y, m-1, d).getDay();
+  const shopsToShow = shop === 'all' ? SHOP_ORDER : [shop];
+  const costeHora = State.costeBruto * (1 + State.seguridadSocial / 100);
+  const totalHourlyDisplay = fmtNum(costeHora, 2);
+
+  // Global controls row
+  let html = `<div class="eval-global-controls">
+    <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
+      <div class="prod-control">
+        <label>Coste bruto:</label>
+        <input type="number" id="costeBrutoInput" value="${State.costeBruto}" min="0.01" max="999" step="0.05"> €/h
+      </div>
+      <div class="prod-control">
+        <label>Seg. Social:</label>
+        <input type="number" id="ssInput" value="${State.seguridadSocial}" min="0" max="100" step="1"> %
+      </div>
+      <div class="prod-control" style="color:var(--ink);font-weight:700;">
+        → Total: ${totalHourlyDisplay} €/h
+      </div>
+    </div>
+    <button class="btn no-print" style="background:var(--cocoa);font-size:12px;padding:7px 14px;" onclick="window.print()">⬇ Exportar PDF</button>
+  </div>`;
+
+  let grandTotalHours = 0, grandTotalCost = 0, grandVentas = 0;
+  let grandHasData = false;
+
+  for (const shopFull of shopsToShow){
+    const shopKey = SHOP_RAD_KEY[shopFull];
+    if (!shopKey) continue;
+    const prod = State.productividadByShop[shopFull] || 110;
+    const t1rows = (State.raw.t1||[]).filter(r => r.dkey === dkey && shopEq(r.shop, shopFull));
+    const ventasDia = t1rows.reduce((a,r)=>a+(isNaN(r.ventas)?0:r.ventas),0);
+    const ventasNetas = ventasDia / 1.1;
+    const totalHours = calcPersonnelCostForShop(shopKey, jsDay, radData);
+    const totalCost = isNaN(totalHours) ? NaN : totalHours * costeHora;
+    const costRatio = (!isNaN(totalCost) && ventasNetas > 0) ? totalCost / ventasNetas : NaN;
+
+    if (!isNaN(totalHours)) { grandTotalHours += totalHours; grandTotalCost += totalCost; grandHasData = true; }
+    if (ventasDia > 0) grandVentas += ventasDia;
+
+    const sorted = [...t1rows].sort((a,b)=>hourOrderKey(a.horario)-hourOrderKey(b.horario));
+
+    html += `<div class="eval-shop-block">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+        <div class="eval-shop-title" style="margin:0;">${esc(shopFull.replace('Amorino ',''))}</div>
+        <div class="prod-control" style="margin:0;">
+          <label>Productividad:</label>
+          <input type="number" class="prod-shop-input" data-shop="${esc(shopFull)}" value="${prod}" min="1" max="9999" step="5"> €/p/h
+        </div>
+      </div>`;
+
+    if (sorted.length){
+      html += `<div class="eval-table-wrap"><table class="eval-table">
+        <thead><tr>
+          <th>Franja</th><th class="num">Ventas</th><th class="num">P. nec.</th>
+          <th class="num">P. rad.</th><th class="num">Ev</th>
+        </tr></thead><tbody>
+        ${sorted.map(row => {
+          const staff  = getStaffForSlot(shopKey, jsDay, row.horario, radData);
+          const needed = isNaN(row.ventas) ? NaN : row.ventas / prod;
+          const ev     = (!isNaN(needed) && !isNaN(staff)) ? staff - needed : NaN;
+          const cls    = isNaN(ev) ? '' : (ev >= 0 ? 'ev-pos' : 'ev-neg');
+          const evStr  = isNaN(ev) ? '—' : (ev >= 0 ? '+' : '') + ev.toFixed(2);
+          return `<tr class="${cls}"><td>${esc(row.horario)}</td><td class="num">${fmtEUR(row.ventas)}</td>
+            <td class="num">${isNaN(needed)?'—':needed.toFixed(2)}</td>
+            <td class="num">${isNaN(staff)?'—':staff.toFixed(1)}</td>
+            <td class="num"><strong>${evStr}</strong></td></tr>`;
+        }).join('')}
+        </tbody></table></div>`;
+    } else {
+      html += `<div class="empty-note">Sin datos de ventas para este día.</div>`;
+    }
+
+    // Personnel cost summary for this shop
+    html += `<div class="eval-cost-row">
+      <span>Horas según rad.: <strong>${isNaN(totalHours)?'—':totalHours.toFixed(1)}</strong></span>
+      <span>Coste personal: <strong>${isNaN(totalCost)?'—':fmtEUR(totalCost)}</strong></span>
+      <span>Ventas netas: <strong>${fmtEUR(ventasNetas)}</strong></span>
+      <span>Ratio: <strong>${isNaN(costRatio)?'—':(costRatio*100).toFixed(1)+' %'}</strong></span>
+    </div></div>`;
+  }
+
+  // Grand total (only when showing all shops)
+  if (shop === 'all' && grandHasData){
+    const grandNetas = grandVentas / 1.1;
+    const grandRatio = grandNetas > 0 ? grandTotalCost / grandNetas : NaN;
+    html += `<div class="eval-grand-total">
+      <strong>Total 5 tiendas</strong>
+      <span>Horas: <strong>${grandTotalHours.toFixed(1)}</strong></span>
+      <span>Coste personal: <strong>${fmtEUR(grandTotalCost)}</strong></span>
+      <span>Ventas netas: <strong>${fmtEUR(grandNetas)}</strong></span>
+      <span>Ratio: <strong>${isNaN(grandRatio)?'—':(grandRatio*100).toFixed(1)+' %'}</strong></span>
+    </div>`;
+  }
+  return html || '<div class="empty-note">Sin datos para mostrar.</div>';
+}
+
+function renderAll(){
+  if (!State.raw) return;
+  const shop = State.shop, from = State.from, to = State.to;
+  const isRange = from !== to;
+
+  if (State.activeTab === 'eval'){
+    const html = isRange
+      ? '<div class="card"><div class="empty-note">La Evaluación del Turno sólo está disponible para un día concreto. Usa el selector "Hoy" o elige la misma fecha en "Desde" y "Hasta".</div></div>'
+      : `<div class="card" style="padding-bottom:24px;" id="evalCard"><div id="evalTurnoSection">${buildEvalTurnoHTML(shop, from)}</div></div>`;
+    document.getElementById('content').innerHTML = html;
+    attachEvalHandlers();
+    if (!isRange) fetchRadiografiaIfNeeded(from);
+    return;
+  }
+
+  // Panel tab (default)
+  const html = `
+    ${renderKPIs(shop, from, to)}
+    <div id="weatherKPIs">${buildWeatherKPIsHTML(from, to)}</div>
+    <div class="section-title"><span class="swatch" style="background:var(--raspberry)"></span>Evolución diaria de ventas</div>
+    ${renderDailySeriesCard(shop, from, to)}
+    <div class="section-title"><span class="swatch" style="background:var(--raspberry)"></span>Ventas por hora</div>
+    <div class="grid-2">
+      ${renderHourlyCard(shop, from, to)}
+      ${renderPaymentCard(shop, from, to)}
+    </div>
+    <div class="section-title"><span class="swatch" style="background:var(--pistachio)"></span>Equipo y sabores</div>
+    <div class="grid-2">
+      ${renderEmployeesCard(shop, from, to)}
+      ${renderFlavorsCard(shop, from, to)}
+    </div>
+    <div class="section-title"><span class="swatch" style="background:var(--mango)"></span>Últimos tickets</div>
+    ${renderUltimosCard(shop, from, to)}
+  `;
+  document.getElementById('content').innerHTML = html;
+  attachSortHandler();
+  fetchWeatherIfNeeded(from, to);
+}
+
+/* ---- Evolución diaria (serie temporal) ---- */
+function renderDailySeriesCard(shop, from, to){
+  if (!from || !to) return `<div class="card"><div class="empty-note">Sin fechas seleccionadas</div></div>`;
+
+  const days = [];
+  let d = from;
+  while (d <= to) { days.push(d); d = shiftDate(d, 1); }
+
+  if (days.length < 2){
+    return `<div class="card">
+      <div class="hint">${shop==='all'?'Todas las tiendas':esc(shop)} · ${rangeLabel(from,to)}</div>
+      <div class="empty-note">Selecciona un rango de varios días para ver la evolución.</div>
+    </div>`;
+  }
+
+  const rows = State.raw.t1.filter(r => inRange(r.dkey, from, to) && (shop === 'all' || shopEq(r.shop, shop)));
+  const byDay = new Map();
+  days.forEach(dd => byDay.set(dd, 0));
+  rows.forEach(r => { if (!isNaN(r.ventas)) byDay.set(r.dkey, (byDay.get(r.dkey) || 0) + r.ventas); });
+  const values = days.map(dd => byDay.get(dd) || 0);
+
+  // Previous year: same calendar dates, -1 year, from Google Sheet only
+  const prevValues = days.map(dd => getPrevYearTotalForShop(dd, shop));
+  const hasPrev = prevValues.some(v => !isNaN(v));
+
+  const allVals = values.concat(prevValues.filter(v => !isNaN(v)));
+  const max = Math.max(...allVals, 1);
+  const W = 760, H = 260, padL = 14, padR = 14, padT = 18, padB = 50;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+  const stepX = days.length > 1 ? innerW / (days.length - 1) : 0;
+  const toY = v => padT + innerH - (isNaN(v) || !max ? 0 : (v / max) * innerH);
+
+  const pts = values.map((v, i) => [padL + i * stepX, toY(v)]);
+  const prevPts = prevValues.map((v, i) => [padL + i * stepX, isNaN(v) ? null : toY(v)]);
+
+  const linePath = pts.map((p, i) => (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+  const baseline = (padT + innerH).toFixed(1);
+  const areaPath = linePath + ` L${pts[pts.length-1][0].toFixed(1)},${baseline} L${pts[0][0].toFixed(1)},${baseline} Z`;
+
+  let prevPath = '';
+  prevPts.forEach((p, i) => {
+    if (p[1] === null) return;
+    const pp = prevPts[i-1];
+    prevPath += (i === 0 || pp === null || pp[1] === null ? 'M' : 'L') + p[0].toFixed(1) + ',' + p[1].toFixed(1) + ' ';
+  });
+
+  const labelEvery = days.length <= 8 ? 1 : Math.ceil(days.length / 8);
+  const dots = pts.map((p, i) => `<circle class="series-dot" cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3.5" fill="#C84B5E" stroke="#FFF" stroke-width="1.5"><title>${dateLabel(days[i])}: ${fmtEUR(values[i])}</title></circle>`).join('');
+  const prevDots = hasPrev ? prevPts.map((p, i) => p[1] === null ? '' :
+    `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.5" fill="#5E6FA3" stroke="#FFF" stroke-width="1"><title>${dateLabel(prevYearKey(days[i]))}: ${fmtEUR(prevValues[i])}</title></circle>`
+  ).join('') : '';
+  const xLabels = pts.map((p, i) => (i % labelEvery === 0 || i === pts.length - 1)
+    ? `<text x="${p[0].toFixed(1)}" y="${H - 28}" font-size="10" fill="#766955" text-anchor="middle">${dateLabel(days[i]).slice(0, 5)}</text>`
+    : '').join('');
+
+  const total = values.reduce((a,b)=>a+b,0);
+  const avg = total / values.length;
+  const best = Math.max(...values);
+  const bestDay = days[values.indexOf(best)];
+
+  const legend = `<g transform="translate(${padL}, ${H - 16})">
+    <line x1="0" y1="-4" x2="18" y2="-4" stroke="#C84B5E" stroke-width="2.5"/>
+    <circle cx="9" cy="-4" r="3" fill="#C84B5E"/>
+    <text x="22" y="0" font-size="11" fill="#766955">Este año</text>
+    ${hasPrev ? `<line x1="80" y1="-4" x2="98" y2="-4" stroke="#5E6FA3" stroke-width="1.8" stroke-dasharray="4 3"/>
+    <circle cx="89" cy="-4" r="2.5" fill="#5E6FA3"/>
+    <text x="102" y="0" font-size="11" fill="#766955">Año anterior</text>` : ''}
+  </g>`;
+
+  return `<div class="card">
+    <div class="hint">${shop==='all'?'Todas las tiendas':esc(shop)} · ${rangeLabel(from,to)} · media diaria ${fmtEUR(avg)} · mejor día ${dateLabel(bestDay)} (${fmtEUR(best)})</div>
+    <svg viewBox="0 0 ${W} ${H}" class="series-svg" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="seriesFill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#C84B5E" stop-opacity="0.22"/>
+          <stop offset="100%" stop-color="#C84B5E" stop-opacity="0.02"/>
+        </linearGradient>
+      </defs>
+      <path d="${areaPath}" fill="url(#seriesFill)" stroke="none"/>
+      ${hasPrev && prevPath ? `<path d="${prevPath.trim()}" fill="none" stroke="#5E6FA3" stroke-width="1.8" stroke-dasharray="5 3" stroke-linejoin="round" stroke-linecap="round" opacity="0.8"/>` : ''}
+      <path d="${linePath}" fill="none" stroke="#C84B5E" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+      ${hasPrev ? prevDots : ''}
+      ${dots}
+      ${xLabels}
+      ${legend}
+    </svg>
+  </div>`;
+}
+
+/* ---- KPIs ---- */
+function renderKPIs(shop, from, to){
+  if (!from || !to) return `<div class="banner">No hay fechas seleccionadas todavía.</div>`;
+  const inScope = r => inRange(r.dkey, from, to) && (shop === 'all' || shopEq(r.shop, shop));
+  const t1rows = State.raw.t1.filter(inScope);
+  const t2rows = State.raw.t2.filter(inScope);
+  const t3rows = State.raw.t3.filter(inScope);
+
+  const ventasPeriodo = sum(t1rows.map(r => r.ventas));
+  const ticketsTotal = sum(t2rows.map(r => r.ticketsTotal));
+  const litros = sum(t2rows.map(r => r.litrosDia));
+  const ticketMedio = ticketsTotal ? ventasPeriodo / ticketsTotal : NaN;
+  const sgTotal = sum(t3rows.map(r => r.sugerencias));
+  const ticketsConT3 = sum(t3rows.map(r => r.tickets));
+  const sugPct = ticketsConT3 ? (sgTotal / ticketsConT3) * 100 : NaN;
+
+  // "Diferencia vs año anterior" es una comparación mensual acumulada, no se puede sumar
+  // día a día sin distorsionar: se toma la foto del último día del rango seleccionado.
+  const snapRows = State.raw.t2.filter(r => r.dkey === to && (shop === 'all' || shopEq(r.shop, shop)));
+  let difPct = NaN;
+  if (snapRows.length){
+    const mesActual = sum(snapRows.map(r => r.totalMesEnCurso));
+    const mesAnt = sum(snapRows.map(r => r.totalMesAnoAnterior));
+    difPct = mesAnt ? ((mesActual - mesAnt) / mesAnt) * 100 : NaN;
+  }
+
+  const isRange = from !== to;
+  const cards = [
+    { label: isRange ? 'Ventas del periodo' : 'Ventas del día', value:fmtEUR(ventasPeriodo), color:'var(--raspberry)' },
+    { label:'Tickets totales', value:fmtInt(ticketsTotal), color:'var(--mango)' },
+    { label:'Ticket medio', value:fmtEUR(ticketMedio), color:'var(--pistachio)' },
+    { label:'Litros de helado', value:fmtNum(litros,1)+' Lt.', color:'var(--blueberry)' },
+    { label:'% Sugerencias/ticket', value:fmtPct(sugPct), color:'var(--cocoa)' },
+    { label:'Var. mes vs año anterior', value:fmtPct(difPct), color: (difPct>=0?'#4D7A3F':'var(--raspberry)'), note: isRange ? ('a '+dateLabel(to)) : null },
+  ];
+
+  // True period-vs-period YoY: sum same calendar dates last year
+  const prevDays = [];
+  { let dp = from; while(dp <= to){ prevDays.push(dp); dp = shiftDate(dp,1); } }
+  const prevValues = prevDays.map(dp => getPrevYearTotalForShop(dp, shop));
+  const validPrev = prevValues.filter(v => !isNaN(v));
+  const ventasPrevPeriodo = validPrev.length ? validPrev.reduce((a,b)=>a+b,0) : NaN;
+  const yoyPct = (!isNaN(ventasPeriodo) && !isNaN(ventasPrevPeriodo) && ventasPrevPeriodo > 0)
+    ? ((ventasPeriodo - ventasPrevPeriodo) / ventasPrevPeriodo) * 100 : NaN;
+  const yoyColor = isNaN(yoyPct) ? 'var(--blueberry)' : (yoyPct >= 0 ? '#4D7A3F' : 'var(--raspberry)');
+  const yoyCards = [
+    { label: isRange ? 'Mismo periodo año anterior' : 'Mismo día año anterior',
+      value: fmtEUR(ventasPrevPeriodo),
+      color: '#5E6FA3',
+      note: validPrev.length < prevDays.length ? `${validPrev.length}/${prevDays.length} días con datos` : null },
+    { label: 'Variación interanual', value: fmtPct(yoyPct), color: yoyColor },
+  ];
+
+  // Update print header meta
+  const metaEl = document.getElementById('printMeta');
+  if (metaEl){
+    const shopLabel = shop === 'all' ? 'Todas las tiendas' : shop.replace('Amorino ','');
+    metaEl.textContent = `${shopLabel} · ${rangeLabel(from, to)} · Generado el ${new Date().toLocaleDateString('es-ES', {day:'2-digit',month:'long',year:'numeric'})}`;
+  }
+
+  return `<div class="kpi-section-label">${isRange ? 'Rendimiento del periodo' : 'Rendimiento del día'}</div>
+  <div class="kpi-row">${cards.map(c => `
+    <div class="kpi">
+      <div class="kpi-scoop" style="background:${c.color}"></div>
+      <div class="kpi-body">
+        <div class="kpi-label">${esc(c.label)}</div>
+        <div class="kpi-value ${c.value.length>8?'small':''}">${c.value}</div>
+        ${c.note ? `<div class="kpi-sub">${esc(c.note)}</div>` : ''}
+      </div>
+    </div>`).join('')}</div>
+  <div class="kpi-section-label" style="margin-top:18px;">Comparación interanual · mismo periodo</div>
+  <div class="kpi-row" style="grid-template-columns:repeat(2,1fr);max-width:420px;">${yoyCards.map(c => `
+    <div class="kpi">
+      <div class="kpi-scoop" style="background:${c.color}"></div>
+      <div class="kpi-body">
+        <div class="kpi-label">${esc(c.label)}</div>
+        <div class="kpi-value ${c.value.length>8?'small':''}">${c.value}</div>
+        ${c.note ? `<div class="kpi-sub">${esc(c.note)}</div>` : ''}
+      </div>
+    </div>`).join('')}</div>`;
+}
+function sum(arr){ const v = arr.filter(n => !isNaN(n)); return v.length ? v.reduce((a,b)=>a+b,0) : NaN; }
+
+/* ---- Hourly chart ---- */
+function renderHourlyCard(shop, from, to){
+  if (!from || !to) return `<div class="card"><div class="empty-note">Sin fechas seleccionadas</div></div>`;
+  const rows = State.raw.t1.filter(r => inRange(r.dkey, from, to) && (shop === 'all' || shopEq(r.shop, shop)));
+  if (!rows.length) return `<div class="card"><h3>Ventas por hora</h3><div class="empty-note">Sin datos para esta selección</div></div>`;
+  const map = new Map();
+  rows.forEach(r => map.set(r.horario, (map.get(r.horario)||0) + (isNaN(r.ventas)?0:r.ventas)));
+  const horas = Array.from(map.keys()).sort((a,b) => hourOrderKey(a) - hourOrderKey(b));
+  const max = Math.max(...horas.map(h => map.get(h)), 1);
+  const bars = horas.map(h => {
+    const v = map.get(h);
+    const pct = Math.max((v/max)*100, 2);
+    return `<div class="hbar-col">
+        <div class="hbar" style="height:${pct}%" title="${esc(h)}h · ${fmtEUR(v)}"></div>
+        <div class="hbar-axis">${esc(h)}</div>
+      </div>`;
+  }).join('');
+  return `<div class="card">
+    <h3>Ventas por hora</h3>
+    <div class="hint">${shop==='all'?'Todas las tiendas':esc(shop)} · ${rangeLabel(from,to)}${from!==to?' (suma del periodo)':''}</div>
+    <div class="hbars">${bars}</div>
+  </div>`;
+}
+
+/* ---- Payment donut ---- */
+function renderPaymentCard(shop, from, to){
+  if (!from || !to) return `<div class="card"><div class="empty-note">Sin fechas seleccionadas</div></div>`;
+  const rows = State.raw.t6.filter(r => inRange(r.dkey, from, to) && (shop === 'all' || shopEq(r.shop, shop)));
+  if (!rows.length) return `<div class="card"><h3>Formas de pago</h3><div class="empty-note">Sin datos para esta selección</div></div>`;
+  const map = new Map();
+  rows.forEach(r => map.set(r.forma, (map.get(r.forma)||0) + (isNaN(r.total)?0:r.total)));
+  const entries = Array.from(map.entries()).sort((a,b) => b[1]-a[1]);
+  const total = sum(entries.map(e => e[1])) || 1;
+  let acc = 0;
+  const stops = entries.map((e,i) => {
+    const pct = (e[1]/total)*100;
+    const pctFrom = acc; acc += pct;
+    return `${FLAVOR_COLORS[i % FLAVOR_COLORS.length]} ${pctFrom}% ${acc}%`;
+  }).join(', ');
+  const legend = entries.map((e,i) => `
+    <div class="legend-row">
+      <span class="legend-sw" style="background:${FLAVOR_COLORS[i % FLAVOR_COLORS.length]}"></span>
+      <span>${esc(e[0])}</span>
+      <span class="pct">${fmtPct((e[1]/total)*100)}</span>
+    </div>`).join('');
+  return `<div class="card">
+    <h3>Formas de pago</h3>
+    <div class="hint">${shop==='all'?'Todas las tiendas':esc(shop)} · ${rangeLabel(from,to)}</div>
+    <div class="donut-wrap">
+      <div style="position:relative;">
+        <div class="donut" style="background:conic-gradient(${stops})"></div>
+        <div class="donut-center"><div class="v">${fmtEUR(total)}</div><div class="l">Total</div></div>
+      </div>
+      <div class="legend">${legend}</div>
+    </div>
+  </div>`;
+}
+
+/* ---- Employees ---- */
+let empSortKey = 'tickets';
+function renderEmployeesCard(shop, from, to){
+  if (!from || !to) return `<div class="card"><div class="empty-note">Sin fechas seleccionadas</div></div>`;
+  const rows = State.raw.t3.filter(r => inRange(r.dkey, from, to) && (shop === 'all' || shopEq(r.shop, shop)) && r.empleado);
+  if (!rows.length) return `<div class="card"><h3>Empleados</h3><div class="empty-note">Sin datos para esta selección</div></div>`;
+
+  const groups = new Map();
+  rows.forEach(r => {
+    const key = `${r.shop}|${r.empleado}`;
+    if (!groups.has(key)) groups.set(key, { shop:r.shop, empleado:r.empleado, dias:0, ticketsSum:0, sgSum:0, ticketMedioSum:0, ticketMedioN:0, medHelSum:0, medHelN:0 });
+    const g = groups.get(key);
+    g.dias += 1;
+    if (!isNaN(r.tickets))    g.ticketsSum    += r.tickets;
+    if (!isNaN(r.sugerencias)) g.sgSum         += r.sugerencias;
+    if (!isNaN(r.ticketMedio)){ g.ticketMedioSum += r.ticketMedio; g.ticketMedioN += 1; }
+    if (!isNaN(r.medHel))     { g.medHelSum    += r.medHel;    g.medHelN    += 1; }
+  });
+  const agg = Array.from(groups.values()).map(g => ({
+    shop: g.shop, empleado: g.empleado, dias: g.dias,
+    tickets:       g.ticketsSum,
+    ticketMedio:   g.ticketMedioN ? g.ticketMedioSum / g.ticketMedioN : NaN,
+    medHel:        g.medHelN      ? g.medHelSum      / g.medHelN      : NaN,
+    sugerenciasPct: g.ticketsSum  ? (g.sgSum / g.ticketsSum) * 100    : NaN
+  }));
+
+  const sorted = agg.sort((a,b) => (b[empSortKey]||0) - (a[empSortKey]||0));
+  const showShop = shop === 'all';
+  const isRange = from !== to;
+  return `<div class="card">
+    <h3>Rendimiento del equipo</h3>
+    <div class="hint">${shop==='all'?'Todas las tiendas':esc(shop)} · ${rangeLabel(from,to)} · ${sorted.length} persona${sorted.length!==1?'s':''}</div>
+    <select class="sort-select" id="empSortSelect">
+      <option value="tickets"       ${empSortKey==='tickets'?'selected':''}>Ordenar por Nº de tickets</option>
+      <option value="ticketMedio"   ${empSortKey==='ticketMedio'?'selected':''}>Ordenar por ticket medio</option>
+      <option value="medHel"        ${empSortKey==='medHel'?'selected':''}>Ordenar por media helado</option>
+      <option value="sugerenciasPct"${empSortKey==='sugerenciasPct'?'selected':''}>Ordenar por % sugerencias</option>
+    </select>
+    <div style="overflow-x:auto;">
+    <table>
+      <thead><tr>
+        <th>Empleado${showShop?' / Tienda':''}</th>
+        ${isRange?'<th class="num">Días</th>':''}
+        <th class="num">Tickets</th>
+        <th class="num">Ticket medio</th>
+        <th class="num">Med. Hel.</th>
+        <th class="num">% Sug.</th>
+      </tr></thead>
+      <tbody>
+        ${sorted.map(r => {
+            const sugClass = isNaN(r.sugerenciasPct) ? '' : (r.sugerenciasPct >= 20 ? 'cell-good' : 'cell-bad');
+            const helClass = isNaN(r.medHel)         ? '' : (r.medHel >= 5.20        ? 'cell-good' : 'cell-bad');
+            return `<tr>
+            <td><div class="emp-name">${esc(r.empleado)}</div>${showShop?`<div class="shop-tag">${esc(r.shop.replace('Amorino ',''))}</div>`:''}</td>
+            ${isRange?`<td class="num">${fmtInt(r.dias)}</td>`:''}
+            <td class="num">${fmtInt(r.tickets)}</td>
+            <td class="num">${fmtEUR(r.ticketMedio)}</td>
+            <td class="num ${helClass}">${isNaN(r.medHel)?'—':fmtNum(r.medHel,2)+' €'}</td>
+            <td class="num ${sugClass}">${fmtPct(r.sugerenciasPct)}</td>
+          </tr>`;}).join('')}
+      </tbody>
+    </table>
+    </div>
+    ${isRange?'<div class="hint" style="margin:10px 0 0;">Ticket medio y Med. Hel.: media diaria del vendedor en el periodo · % Sug.: Sg totales ÷ tickets totales</div>':''}
+  </div>`;
+}
+function attachSortHandler(){
+  const el = document.getElementById('empSortSelect');
+  if (el) el.addEventListener('change', e => { empSortKey = e.target.value; renderAll(); });
+}
+
+function attachEvalHandlers(){
+  // Per-shop productivity inputs
+  document.querySelectorAll('.prod-shop-input').forEach(inp => {
+    inp.addEventListener('change', e => {
+      const v = parseFloat(e.target.value);
+      const shopFull = e.target.dataset.shop;
+      if (!isNaN(v) && v > 0 && shopFull) {
+        State.productividadByShop[shopFull] = v;
+        refreshEval();
+      }
+    });
+  });
+  // Hourly cost inputs (costeBruto + seguridadSocial)
+  const costeBrutoEl = document.getElementById('costeBrutoInput');
+  if (costeBrutoEl) costeBrutoEl.addEventListener('change', e => {
+    const v = parseFloat(e.target.value);
+    if (!isNaN(v) && v > 0) { State.costeBruto = v; refreshEval(); }
+  });
+  const ssEl = document.getElementById('ssInput');
+  if (ssEl) ssEl.addEventListener('change', e => {
+    const v = parseFloat(e.target.value);
+    if (!isNaN(v) && v >= 0) { State.seguridadSocial = v; refreshEval(); }
+  });
+}
+function refreshEval(){
+  const sec = document.getElementById('evalTurnoSection');
+  if (sec) { sec.innerHTML = buildEvalTurnoHTML(State.shop, State.from); attachEvalHandlers(); }
+}
+
+/* ---- Flavors ---- */
+function renderFlavorsCard(shop, from, to){
+  if (!from || !to) return `<div class="card"><div class="empty-note">Sin fechas seleccionadas</div></div>`;
+  const rows = State.raw.t5.filter(r => inRange(r.dkey, from, to) && (shop === 'all' || shopEq(r.shop, shop)) && r.sabor);
+  if (!rows.length) return `<div class="card"><h3>Sabores más vendidos</h3><div class="empty-note">Sin datos para esta selección</div></div>`;
+  const map = new Map();
+  rows.forEach(r => map.set(r.sabor, (map.get(r.sabor)||0) + (isNaN(r.unidades)?0:r.unidades)));
+  const top = Array.from(map.entries()).sort((a,b) => b[1]-a[1]).slice(0,10);
+  const max = Math.max(...top.map(t => t[1]), 1);
+  return `<div class="card">
+    <h3>Sabores más vendidos</h3>
+    <div class="hint">${shop==='all'?'Todas las tiendas':esc(shop)} · ${rangeLabel(from,to)}</div>
+    <div class="rank-list">
+      ${top.map((t,i) => `
+        <div class="rank-row">
+          <div class="rank-num">${i+1}</div>
+          <div class="rank-item">
+            <div class="rank-name">${esc(t[0])}</div>
+            <div class="rank-bar-wrap"><div class="rank-bar" style="width:${(t[1]/max)*100}%"></div></div>
+          </div>
+          <div class="rank-val">${fmtInt(t[1])} ud.</div>
+        </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+/* ---- Ultimos ---- */
+function latestUltRow(shop, from, to){
+  const candidates = State.raw.ult.filter(r => shopEq(r.shop, shop) && inRange(r.dkey, from, to));
+  if (!candidates.length) return null;
+  return candidates.reduce((best, r) => (!best || r.dkey > best.dkey) ? r : best, null);
+}
+function renderUltimosCard(shop, from, to){
+  if (!from || !to) return `<div class="card"><div class="empty-note">Sin fechas seleccionadas</div></div>`;
+  const isRange = from !== to;
+  if (shop !== 'all'){
+    const row = latestUltRow(shop, from, to);
+    if (!row || !row.tickets.length) return `<div class="card"><div class="empty-note">Sin datos para esta selección</div></div>`;
+    return `<div class="card">
+      <h3>${esc(shop)}</h3>
+      <div class="hint">Horas de los últimos 10 tickets · ${dateLabel(row.dkey)}${isRange?' (fecha más reciente con datos dentro del rango)':''}</div>
+      <div class="tape-list">
+        ${row.tickets.map((t,i) => `<div class="ticket-row ${i===0?'latest':''}"><span class="t-idx">Ticket ${i+1}</span><span>${esc(t)}</span></div>`).join('')}
+      </div>
+    </div>`;
+  }
+  const cards = State.shops.map(s => {
+    const row = latestUltRow(s, from, to);
+    const tickets = row ? row.tickets.slice(0,5) : [];
+    return `<div class="ticket-card">
+      <h4>${esc(s.replace('Amorino ',''))}</h4>
+      ${row ? `<div class="hint" style="margin-bottom:8px;">${dateLabel(row.dkey)}</div>` : ''}
+      ${tickets.length ? tickets.map((t,i) => `<div class="ticket-row ${i===0?'latest':''}"><span class="t-idx">#${i+1}</span><span>${esc(t)}</span></div>`).join('') : '<div class="empty-note" style="padding:10px 0;">Sin datos</div>'}
+    </div>`;
+  }).join('');
+  return `<div class="tickets-grid">${cards}</div>`;
+}
+
+/* ================= INIT ================= */
+document.getElementById('mainTabBar').addEventListener('click', e => {
+  const btn = e.target.closest('.main-tab[data-tab]');
+  if (!btn) return;
+  const tab = btn.dataset.tab;
+  State.activeTab = tab;
+  document.querySelectorAll('.main-tab[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  renderAll();
+});
+
+loadData();
+setInterval(() => { if (!State.loading) loadData(); }, AUTO_REFRESH_MS);
+</script>
+</body>
+</html>
