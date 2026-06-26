@@ -487,6 +487,13 @@ function parseNum(raw){
   const num = parseFloat(numStr);
   return isNaN(num) ? NaN : (neg ? -num : num);
 }
+/* Normalize both sides before comparing shop names — handles Unicode
+   NFC/NFD differences (e.g. á as U+00E1 vs a + combining accent)
+   that would cause exact === to silently fail. */
+function shopEq(a, b){
+  return (a||'').trim().normalize('NFC') === (b||'').trim().normalize('NFC');
+}
+
 function normDate(s){
   if (!s) return null;
   const str = String(s).trim();
@@ -672,14 +679,14 @@ async function loadData(){
 
     const t1 = dedupe(
       rowsByKey.t1.slice(1).filter(r => r[0] && r[0] !== 'Shop').map(r => ({
-        shop:r[0], dkey:normDate(r[1]), horario:r[2], ventas:parseNum(r[3]), tickets:parseNum(r[4]), vt:parseNum(r[5])
+        shop:(r[0]||"").trim().normalize("NFC"), dkey:normDate(r[1]), horario:r[2], ventas:parseNum(r[3]), tickets:parseNum(r[4]), vt:parseNum(r[5])
       })),
       r => `${r.shop}|${r.dkey}|${r.horario}`
     );
 
     const t2 = dedupe(
       rowsByKey.t2.slice(1).filter(r => r[0] && r[0] !== 'Shop').map(r => ({
-        shop:r[0], dkey:normDate(r[1]),
+        shop:(r[0]||"").trim().normalize("NFC"), dkey:normDate(r[1]),
         ticketsKioskoMes:parseNum(r[2]), totalMesKiosko:parseNum(r[3]),
         ticketsKioskoDia:parseNum(r[4]), totalDiaKiosko:parseNum(r[5]),
         ticketsTotal:parseNum(r[6]), ticketMedio:parseNum(r[7]), ticketMedioGelato:parseNum(r[8]),
@@ -692,7 +699,7 @@ async function loadData(){
 
     const t3 = dedupe(
       rowsByKey.t3.slice(1).filter(r => r[0] && r[0] !== 'Shop').map(r => ({
-        shop:r[0], dkey:normDate(r[1]), empleado:(r[2]||'').trim(),
+        shop:(r[0]||"").trim().normalize("NFC"), dkey:normDate(r[1]), empleado:(r[2]||'').trim(),
         ticketMedio:parseNum(r[3]), tickets:parseNum(r[4]), sugerencias:parseNum(r[5]),
         anulaciones:parseNum(r[6]), descuentos:parseNum(r[7]), medHel:parseNum(r[8]), sugerenciasPct:parseNum(r[9])
       })),
@@ -701,14 +708,14 @@ async function loadData(){
 
     const t5 = dedupe(
       rowsByKey.t5.slice(1).filter(r => r[0] && r[0] !== 'Shop').map(r => ({
-        shop:r[0], dkey:normDate(r[1]), sabor:(r[2]||'').trim(), unidades:parseNum(r[3])
+        shop:(r[0]||"").trim().normalize("NFC"), dkey:normDate(r[1]), sabor:(r[2]||'').trim(), unidades:parseNum(r[3])
       })),
       r => `${r.shop}|${r.dkey}|${r.sabor}`
     );
 
     const t6 = dedupe(
       rowsByKey.t6.slice(1).filter(r => r[0] && r[0] !== 'Shop').map(r => ({
-        shop:r[0], dkey:normDate(r[1]), forma:(r[2]||'').trim(), pct:parseNum(r[3]),
+        shop:(r[0]||"").trim().normalize("NFC"), dkey:normDate(r[1]), forma:(r[2]||'').trim(), pct:parseNum(r[3]),
         base:parseNum(r[4]), iva:parseNum(r[5]), total:parseNum(r[6]), pctTotal:parseNum(r[7])
       })),
       r => `${r.shop}|${r.dkey}|${r.forma}`
@@ -716,7 +723,7 @@ async function loadData(){
 
     const ult = dedupe(
       rowsByKey.ult.slice(1).filter(r => r[0] && r[0] !== 'Shop').map(r => ({
-        shop:r[0], dkey:normDate(r[1]), tickets:[r[2],r[3],r[4],r[5],r[6],r[7],r[8],r[9],r[10],r[11]].map(x => (x||'').trim()).filter(Boolean)
+        shop:(r[0]||"").trim().normalize("NFC"), dkey:normDate(r[1]), tickets:[r[2],r[3],r[4],r[5],r[6],r[7],r[8],r[9],r[10],r[11]].map(x => (x||'').trim()).filter(Boolean)
       })),
       r => `${r.shop}|${r.dkey}`
     );
@@ -746,8 +753,8 @@ function getDatesForShop(shop){
   if (!State.raw) return [];
   // Use both t1 and t2 so manually-entered rows (which only write to t1)
   // are included in the date bounds — otherwise syncDateBounds clamps them out.
-  const t1pool = shop === 'all' ? State.raw.t1 : State.raw.t1.filter(r => r.shop === shop);
-  const t2pool = shop === 'all' ? State.raw.t2 : State.raw.t2.filter(r => r.shop === shop);
+  const t1pool = shop === 'all' ? State.raw.t1 : State.raw.t1.filter(r => shopEq(r.shop, shop));
+  const t2pool = shop === 'all' ? State.raw.t2 : State.raw.t2.filter(r => shopEq(r.shop, shop));
   const allKeys = [...t1pool.map(r => r.dkey), ...t2pool.map(r => r.dkey)].filter(Boolean);
   const keys = Array.from(new Set(allKeys));
   keys.sort((a,b) => b.localeCompare(a));
@@ -760,7 +767,7 @@ function populateShopSelect(){
   const prev = State.shop;
   sel.innerHTML = '<option value="all">Todas las tiendas</option>' +
     State.shops.map(s => `<option value="${esc(s)}">${esc(s.replace('Amorino ',''))}</option>`).join('');
-  sel.value = State.shops.includes(prev) || prev === 'all' ? prev : 'all';
+  sel.value = State.shops.some(s => shopEq(s, prev)) || prev === 'all' ? prev : 'all';
   State.shop = sel.value;
 }
 
@@ -881,7 +888,7 @@ function getPrevYearTotalForShop(dkey, shop){
         if (s > 0) return s;
       }
     } else {
-      const rows = State.raw.t1.filter(r => r.dkey === pkey && r.shop === shop);
+      const rows = State.raw.t1.filter(r => r.dkey === pkey && shopEq(r.shop, shop));
       if (rows.length){
         const s = rows.reduce((a,r) => a+(isNaN(r.ventas)?0:r.ventas), 0);
         if (s > 0) return s;
@@ -1140,7 +1147,7 @@ function buildEvalTurnoHTML(shop, dkey){
     const shopKey = SHOP_RAD_KEY[shopFull];
     if (!shopKey) continue;
     const prod = State.productividadByShop[shopFull] || 110;
-    const t1rows = (State.raw.t1||[]).filter(r => r.dkey === dkey && r.shop === shopFull);
+    const t1rows = (State.raw.t1||[]).filter(r => r.dkey === dkey && shopEq(r.shop, shopFull));
     const ventasDia = t1rows.reduce((a,r)=>a+(isNaN(r.ventas)?0:r.ventas),0);
     const ventasNetas = ventasDia / 1.1;
     const totalHours = calcPersonnelCostForShop(shopKey, jsDay, radData);
@@ -1261,7 +1268,7 @@ function renderDailySeriesCard(shop, from, to){
     </div>`;
   }
 
-  const rows = State.raw.t1.filter(r => inRange(r.dkey, from, to) && (shop === 'all' || r.shop === shop));
+  const rows = State.raw.t1.filter(r => inRange(r.dkey, from, to) && (shop === 'all' || shopEq(r.shop, shop)));
   const byDay = new Map();
   days.forEach(dd => byDay.set(dd, 0));
   rows.forEach(r => { if (!isNaN(r.ventas)) byDay.set(r.dkey, (byDay.get(r.dkey) || 0) + r.ventas); });
@@ -1338,7 +1345,7 @@ function renderDailySeriesCard(shop, from, to){
 /* ---- KPIs ---- */
 function renderKPIs(shop, from, to){
   if (!from || !to) return `<div class="banner">No hay fechas seleccionadas todavía.</div>`;
-  const inScope = r => inRange(r.dkey, from, to) && (shop === 'all' || r.shop === shop);
+  const inScope = r => inRange(r.dkey, from, to) && (shop === 'all' || shopEq(r.shop, shop));
   const t1rows = State.raw.t1.filter(inScope);
   const t2rows = State.raw.t2.filter(inScope);
   const t3rows = State.raw.t3.filter(inScope);
@@ -1353,7 +1360,7 @@ function renderKPIs(shop, from, to){
 
   // "Diferencia vs año anterior" es una comparación mensual acumulada, no se puede sumar
   // día a día sin distorsionar: se toma la foto del último día del rango seleccionado.
-  const snapRows = State.raw.t2.filter(r => r.dkey === to && (shop === 'all' || r.shop === shop));
+  const snapRows = State.raw.t2.filter(r => r.dkey === to && (shop === 'all' || shopEq(r.shop, shop)));
   let difPct = NaN;
   if (snapRows.length){
     const mesActual = sum(snapRows.map(r => r.totalMesEnCurso));
@@ -1421,7 +1428,7 @@ function sum(arr){ const v = arr.filter(n => !isNaN(n)); return v.length ? v.red
 /* ---- Hourly chart ---- */
 function renderHourlyCard(shop, from, to){
   if (!from || !to) return `<div class="card"><div class="empty-note">Sin fechas seleccionadas</div></div>`;
-  const rows = State.raw.t1.filter(r => inRange(r.dkey, from, to) && (shop === 'all' || r.shop === shop));
+  const rows = State.raw.t1.filter(r => inRange(r.dkey, from, to) && (shop === 'all' || shopEq(r.shop, shop)));
   if (!rows.length) return `<div class="card"><h3>Ventas por hora</h3><div class="empty-note">Sin datos para esta selección</div></div>`;
   const map = new Map();
   rows.forEach(r => map.set(r.horario, (map.get(r.horario)||0) + (isNaN(r.ventas)?0:r.ventas)));
@@ -1445,7 +1452,7 @@ function renderHourlyCard(shop, from, to){
 /* ---- Payment donut ---- */
 function renderPaymentCard(shop, from, to){
   if (!from || !to) return `<div class="card"><div class="empty-note">Sin fechas seleccionadas</div></div>`;
-  const rows = State.raw.t6.filter(r => inRange(r.dkey, from, to) && (shop === 'all' || r.shop === shop));
+  const rows = State.raw.t6.filter(r => inRange(r.dkey, from, to) && (shop === 'all' || shopEq(r.shop, shop)));
   if (!rows.length) return `<div class="card"><h3>Formas de pago</h3><div class="empty-note">Sin datos para esta selección</div></div>`;
   const map = new Map();
   rows.forEach(r => map.set(r.forma, (map.get(r.forma)||0) + (isNaN(r.total)?0:r.total)));
@@ -1480,7 +1487,7 @@ function renderPaymentCard(shop, from, to){
 let empSortKey = 'tickets';
 function renderEmployeesCard(shop, from, to){
   if (!from || !to) return `<div class="card"><div class="empty-note">Sin fechas seleccionadas</div></div>`;
-  const rows = State.raw.t3.filter(r => inRange(r.dkey, from, to) && (shop === 'all' || r.shop === shop) && r.empleado);
+  const rows = State.raw.t3.filter(r => inRange(r.dkey, from, to) && (shop === 'all' || shopEq(r.shop, shop)) && r.empleado);
   if (!rows.length) return `<div class="card"><h3>Empleados</h3><div class="empty-note">Sin datos para esta selección</div></div>`;
 
   const groups = new Map();
@@ -1579,7 +1586,7 @@ function refreshEval(){
 /* ---- Flavors ---- */
 function renderFlavorsCard(shop, from, to){
   if (!from || !to) return `<div class="card"><div class="empty-note">Sin fechas seleccionadas</div></div>`;
-  const rows = State.raw.t5.filter(r => inRange(r.dkey, from, to) && (shop === 'all' || r.shop === shop) && r.sabor);
+  const rows = State.raw.t5.filter(r => inRange(r.dkey, from, to) && (shop === 'all' || shopEq(r.shop, shop)) && r.sabor);
   if (!rows.length) return `<div class="card"><h3>Sabores más vendidos</h3><div class="empty-note">Sin datos para esta selección</div></div>`;
   const map = new Map();
   rows.forEach(r => map.set(r.sabor, (map.get(r.sabor)||0) + (isNaN(r.unidades)?0:r.unidades)));
@@ -1604,7 +1611,7 @@ function renderFlavorsCard(shop, from, to){
 
 /* ---- Ultimos ---- */
 function latestUltRow(shop, from, to){
-  const candidates = State.raw.ult.filter(r => r.shop === shop && inRange(r.dkey, from, to));
+  const candidates = State.raw.ult.filter(r => shopEq(r.shop, shop) && inRange(r.dkey, from, to));
   if (!candidates.length) return null;
   return candidates.reduce((best, r) => (!best || r.dkey > best.dkey) ? r : best, null);
 }
