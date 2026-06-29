@@ -1133,8 +1133,24 @@ function buildEvalTurnoHTML(shop, dkey){
   const [y,m,d] = dkey.split('-').map(Number);
   const jsDay = new Date(y, m-1, d).getDay();
   const shopsToShow = shop === 'all' ? SHOP_ORDER : [shop];
+  // Pre-calculate grand totals so we can render them at the top
+  let grandTotalHours = 0, grandTotalCost = 0, grandVentas = 0, grandHasData = false;
   const costeHora = State.costeBruto * (1 + State.seguridadSocial / 100);
   const totalHourlyDisplay = fmtNum(costeHora, 2);
+
+  for (const shopFull of shopsToShow){
+    const shopKey = SHOP_RAD_KEY[shopFull];
+    if (!shopKey) continue;
+    const t1rows = (State.raw.t1||[]).filter(r => r.dkey === dkey && shopEq(r.shop, shopFull));
+    const ventasDia = t1rows.reduce((a,r)=>a+(isNaN(r.ventas)?0:r.ventas),0);
+    const totalHours = calcPersonnelCostForShop(shopKey, jsDay, radData);
+    const totalCost = isNaN(totalHours) ? NaN : totalHours * costeHora;
+    if (!isNaN(totalHours)) { grandTotalHours += totalHours; grandTotalCost += totalCost; grandHasData = true; }
+    if (ventasDia > 0) grandVentas += ventasDia;
+  }
+
+  const grandNetas = grandVentas / 1.1;
+  const grandRatio = grandNetas > 0 ? grandTotalCost / grandNetas : NaN;
 
   // Global controls row
   let html = `<div class="eval-global-controls">
@@ -1154,9 +1170,18 @@ function buildEvalTurnoHTML(shop, dkey){
     <button class="btn no-print" style="background:var(--cocoa);font-size:12px;padding:7px 14px;" onclick="window.print()">⬇ Exportar PDF</button>
   </div>`;
 
-  let grandTotalHours = 0, grandTotalCost = 0, grandVentas = 0;
-  let grandHasData = false;
+  // Grand total at the TOP
+  if (shop === 'all' && grandHasData){
+    html += `<div class="eval-grand-total" style="margin-bottom:24px;">
+      <strong>Total 5 tiendas</strong>
+      <span>Horas: <strong>${grandTotalHours.toFixed(1)}</strong></span>
+      <span>Coste personal: <strong>${fmtEUR(grandTotalCost)}</strong></span>
+      <span>Ventas netas: <strong>${fmtEUR(grandNetas)}</strong></span>
+      <span>Ratio: <strong>${isNaN(grandRatio)?'—':(grandRatio*100).toFixed(1)+' %'}</strong></span>
+    </div>`;
+  }
 
+  // Per-shop blocks
   for (const shopFull of shopsToShow){
     const shopKey = SHOP_RAD_KEY[shopFull];
     if (!shopKey) continue;
@@ -1167,9 +1192,6 @@ function buildEvalTurnoHTML(shop, dkey){
     const totalHours = calcPersonnelCostForShop(shopKey, jsDay, radData);
     const totalCost = isNaN(totalHours) ? NaN : totalHours * costeHora;
     const costRatio = (!isNaN(totalCost) && ventasNetas > 0) ? totalCost / ventasNetas : NaN;
-
-    if (!isNaN(totalHours)) { grandTotalHours += totalHours; grandTotalCost += totalCost; grandHasData = true; }
-    if (ventasDia > 0) grandVentas += ventasDia;
 
     const sorted = [...t1rows].sort((a,b)=>hourOrderKey(a.horario)-hourOrderKey(b.horario));
 
@@ -1204,7 +1226,6 @@ function buildEvalTurnoHTML(shop, dkey){
       html += `<div class="empty-note">Sin datos de ventas para este día.</div>`;
     }
 
-    // Personnel cost summary for this shop
     html += `<div class="eval-cost-row">
       <span>Horas según rad.: <strong>${isNaN(totalHours)?'—':totalHours.toFixed(1)}</strong></span>
       <span>Coste personal: <strong>${isNaN(totalCost)?'—':fmtEUR(totalCost)}</strong></span>
@@ -1213,18 +1234,6 @@ function buildEvalTurnoHTML(shop, dkey){
     </div></div>`;
   }
 
-  // Grand total (only when showing all shops)
-  if (shop === 'all' && grandHasData){
-    const grandNetas = grandVentas / 1.1;
-    const grandRatio = grandNetas > 0 ? grandTotalCost / grandNetas : NaN;
-    html += `<div class="eval-grand-total">
-      <strong>Total 5 tiendas</strong>
-      <span>Horas: <strong>${grandTotalHours.toFixed(1)}</strong></span>
-      <span>Coste personal: <strong>${fmtEUR(grandTotalCost)}</strong></span>
-      <span>Ventas netas: <strong>${fmtEUR(grandNetas)}</strong></span>
-      <span>Ratio: <strong>${isNaN(grandRatio)?'—':(grandRatio*100).toFixed(1)+' %'}</strong></span>
-    </div>`;
-  }
   return html || '<div class="empty-note">Sin datos para mostrar.</div>';
 }
 
