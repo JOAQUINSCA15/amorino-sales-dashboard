@@ -1081,11 +1081,14 @@ function loadViaJSONP_2(sheetId, sheetName){
   });
 }
 
-async function fetchRadiografiaIfNeeded(dkey){
+async function fetchRadiografiaIfNeeded(dkey, updatePanel){
   if (!dkey) return;
   const tabName = getRadiografiaTab(dkey);
-  if (!tabName || State.radiografia[tabName] !== undefined) return;
-  State.radiografia[tabName] = null; // mark as loading
+  if (!tabName || State.radiografia[tabName] !== undefined) {
+    if (updatePanel) updateCostePersonalKPI(dkey);
+    return;
+  }
+  State.radiografia[tabName] = null;
   try {
     const json = await loadViaJSONP_2(RADIOGRAFIAS_SHEET_ID, tabName);
     const rows = gvizJsonToRows(json);
@@ -1095,6 +1098,35 @@ async function fetchRadiografiaIfNeeded(dkey){
   }
   const el = document.getElementById('evalTurnoSection');
   if (el) el.innerHTML = buildEvalTurnoHTML(State.shop, State.from);
+  if (updatePanel) updateCostePersonalKPI(dkey);
+}
+
+function calcTotalPersonnelCostForDay(shop, dkey){
+  const tabName = getRadiografiaTab(dkey);
+  if (!tabName) return NaN;
+  const radData = State.radiografia[tabName];
+  if (!radData) return NaN;
+  const parts = dkey.split('-').map(Number);
+  const jsDay = new Date(parts[0], parts[1]-1, parts[2]).getDay();
+  const shopsToCalc = shop === 'all' ? SHOP_ORDER : [shop];
+  const costeHora = State.costeBruto * (1 + State.seguridadSocial / 100);
+  let total = 0, found = false;
+  for (const shopFull of shopsToCalc){
+    const shopKey = SHOP_RAD_KEY[shopFull];
+    if (!shopKey) continue;
+    const h = calcPersonnelCostForShop(shopKey, jsDay, radData);
+    if (!isNaN(h)){ total += h * costeHora; found = true; }
+  }
+  return found ? total : NaN;
+}
+
+function updateCostePersonalKPI(dkey){
+  const el = document.getElementById('costePersonalKPI');
+  if (!el) return;
+  const cost = calcTotalPersonnelCostForDay(State.shop, dkey);
+  el.innerHTML = isNaN(cost)
+    ? '<div class="kpi-value small">—</div>'
+    : `<div class="kpi-value small">${fmtEUR(cost)}</div>`;
 }
 
 function getStaffForSlot(shopKey, jsDay, t1Slot, radData){
@@ -1274,6 +1306,7 @@ function renderAll(){
   document.getElementById('content').innerHTML = html;
   attachSortHandler();
   fetchWeatherIfNeeded(from, to);
+  if (!isRange) fetchRadiografiaIfNeeded(from, true); // true = also update panel KPI
 }
 
 /* ---- Evolución diaria (serie temporal) ---- */
@@ -1444,7 +1477,20 @@ function renderKPIs(shop, from, to){
         <div class="kpi-value ${c.value.length>8?'small':''}">${c.value}</div>
         ${c.note ? `<div class="kpi-sub">${esc(c.note)}</div>` : ''}
       </div>
-    </div>`).join('')}</div>`;
+    </div>`).join('')}</div>
+  ${!isRange ? (() => {
+    const cost = calcTotalPersonnelCostForDay(shop, from);
+    return `<div class="kpi-section-label" style="margin-top:18px;">Coste de personal (teórico)</div>
+    <div class="kpi-row" style="grid-template-columns:repeat(1,1fr);max-width:210px;">
+      <div class="kpi">
+        <div class="kpi-scoop" style="background:var(--cocoa)"></div>
+        <div class="kpi-body">
+          <div class="kpi-label">Total 5 tiendas · ${fmtNum(State.costeBruto*(1+State.seguridadSocial/100),2)} €/h</div>
+          <div id="costePersonalKPI">${isNaN(cost) ? '<div class="kpi-value small">—</div>' : `<div class="kpi-value small">${fmtEUR(cost)}</div>`}</div>
+        </div>
+      </div>
+    </div>`;
+  })() : ''}`;
 }
 function sum(arr){ const v = arr.filter(n => !isNaN(n)); return v.length ? v.reduce((a,b)=>a+b,0) : NaN; }
 
