@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Amorino · Panel de Ventas</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><!-- v2 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -744,7 +744,22 @@ async function loadData(){
       r => `${r.shop}|${r.dkey}`
     );
 
-    State.raw = { t1, t2, t3, t5, t6, ult };
+    // ---- Historical cutover: use Excel data up to and including 2026-05-30 ----
+    const HIST_CUTOVER = '2026-05-30';
+    // Remove sheet rows for dates within historical coverage (avoid double-counting)
+    const t1Live = t1.filter(r => !r.dkey || r.dkey > HIST_CUTOVER);
+    // Synthesise one row per shop per day from embedded historical
+    const t1Hist = [];
+    for (const [shop, days] of Object.entries(HISTORICAL_SALES_ALL)){
+      for (const [dkey, ventas] of Object.entries(days)){
+        if (dkey <= HIST_CUTOVER){
+          t1Hist.push({shop:(shop||'').trim().normalize('NFC'), dkey, horario:'Total diario', ventas, tickets:NaN, vt:NaN});
+        }
+      }
+    }
+    const t1Final = [...t1Hist, ...t1Live];
+
+    State.raw = { t1:t1Final, t2, t3, t5, t6, ult };
     State.lastSync = new Date();
 
     const shopsFound = Array.from(new Set(t2.map(r => r.shop)));
