@@ -214,7 +214,7 @@
   .tape-list{display:flex;flex-direction:column;gap:0;max-width:340px;}
 
   footer{margin-top:48px;font-size:12px;color:var(--ink-soft);text-align:center;border-top:1px solid var(--line);padding-top:18px;}
-  footer a{color:var(--blueberry);} /* v3 */
+  footer a{color:var(--blueberry);}
 
   .skeleton{height:120px;border-radius:14px;background:linear-gradient(90deg,var(--cream-2) 25%,var(--white) 37%,var(--cream-2) 63%);background-size:400% 100%;animation:shimmer 1.4s infinite;}
   /* ===== DEBUG (temporary) ===== */
@@ -1045,10 +1045,14 @@ function getMatchedMedHelComparison(from, to, shop){
 
 async function fetchWeatherIfNeeded(from, to){
   if (!from || !to || State.weatherFetching) return;
+  // Build list of dates needed: current period + same period last year
   const days = []; let d = from; while(d<=to){ days.push(d); d=shiftDate(d,1); }
-  const missing = days.filter(d => !State.weather[d]);
+  const prevDays = days.map(d => prevYearKey(d));
+  const allNeeded = [...days, ...prevDays];
+  const missing = allNeeded.filter(d => !State.weather[d]);
   if (!missing.length) return;
   State.weatherFetching = true;
+  missing.sort();
   const wFrom = missing[0], wTo = missing[missing.length-1];
   function parseW(data){
     if (!data.daily) return;
@@ -1075,26 +1079,43 @@ function buildWeatherKPIsHTML(from, to){
   if (!from || !to) return '';
   const isRange = from !== to;
   const days = []; let d = from; while(d<=to){ days.push(d); d=shiftDate(d,1); }
-  const wDays = days.map(d => State.weather[d]).filter(w => w && w.tempMax !== null && w.tempMax !== undefined);
+  const prevDays = days.map(d => prevYearKey(d));
+
+  const wDays     = days.map(d => State.weather[d]).filter(w => w && w.tempMax !== null && w.tempMax !== undefined);
+  const wPrevDays = prevDays.map(d => State.weather[d]).filter(w => w && w.tempMax !== null && w.tempMax !== undefined);
+
   if (!wDays.length) return `<div style="font-size:12px;color:var(--ink-soft);padding:8px 0;">Cargando datos meteorológicos…</div>`;
-  let rainVal, tempVal;
-  if (isRange){
-    const rainy = wDays.filter(w=>w.rain).length;
-    const avgT = wDays.reduce((a,w)=>a+w.tempMax,0)/wDays.length;
-    const maxT = Math.max(...wDays.map(w=>w.tempMax));
-    rainVal = `${rainy} día${rainy!==1?'s':''} de ${days.length}`;
-    tempVal = `Media ${avgT.toFixed(1)}° · Máx ${maxT.toFixed(1)}°`;
-  } else {
-    const w = State.weather[from];
-    if (!w) return `<div style="font-size:12px;color:var(--ink-soft);padding:8px 0;">Sin datos meteorológicos</div>`;
-    rainVal = w.rain ? `Sí · ${w.precip.toFixed(1)} mm` : 'No';
-    tempVal = w.tempMax !== null ? `${w.tempMax.toFixed(1)} °C` : '—';
+
+  function weatherStats(wArr, dArr){
+    if (!wArr.length) return null;
+    if (isRange){
+      const rainy = wArr.filter(w=>w.rain).length;
+      const avgT  = wArr.reduce((a,w)=>a+w.tempMax,0)/wArr.length;
+      const maxT  = Math.max(...wArr.map(w=>w.tempMax));
+      return { rainVal:`${rainy} día${rainy!==1?'s':''} de ${dArr.length}`, tempVal:`Media ${avgT.toFixed(1)}° · Máx ${maxT.toFixed(1)}°`, rainy };
+    } else {
+      const w = wArr[0];
+      return { rainVal: w.rain ? `Sí · ${w.precip.toFixed(1)} mm` : 'No', tempVal:`${w.tempMax.toFixed(1)} °C`, rainy: w.rain ? 1 : 0 };
+    }
   }
-  const rainColor = wDays.some(w=>w.rain) ? '#5E6FA3' : '#E3A038';
+
+  const cur  = weatherStats(wDays, days);
+  const prev = wPrevDays.length ? weatherStats(wPrevDays, prevDays) : null;
+
+  const rainColor = cur.rainy > 0 ? '#5E6FA3' : '#E3A038';
+
+  function card(label, curVal, prevVal, scoop){
+    return `<div class="kpi"><div class="kpi-scoop" style="background:${scoop}"></div><div class="kpi-body">
+      <div class="kpi-label">${label}</div>
+      <div class="kpi-value small">${esc(curVal)}</div>
+      ${prevVal ? `<div class="kpi-sub">Año ant.: ${esc(prevVal)}</div>` : ''}
+    </div></div>`;
+  }
+
   return `<div class="kpi-section-label" style="margin-top:18px;">Meteorología · Sevilla</div>
   <div class="kpi-row" style="grid-template-columns:repeat(2,1fr);max-width:420px;">
-    <div class="kpi"><div class="kpi-scoop" style="background:${rainColor}"></div><div class="kpi-body"><div class="kpi-label">${isRange?'Días de lluvia':'Lluvia'}</div><div class="kpi-value small">${esc(rainVal)}</div></div></div>
-    <div class="kpi"><div class="kpi-scoop" style="background:var(--raspberry)"></div><div class="kpi-body"><div class="kpi-label">${isRange?'Temperatura máx.':'Temp. máx. del día'}</div><div class="kpi-value small">${esc(tempVal)}</div></div></div>
+    ${card(isRange?'Días de lluvia':'Lluvia', cur.rainVal, prev?.rainVal, rainColor)}
+    ${card(isRange?'Temperatura máx.':'Temp. máx. del día', cur.tempVal, prev?.tempVal, 'var(--raspberry)')}
   </div>`;
 }
 
