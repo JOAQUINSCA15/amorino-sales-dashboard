@@ -21,7 +21,7 @@
     --line:#E6D8BB;
     --white:#FFFFFF;
     --shadow: 0 2px 14px rgba(91,58,41,0.07);
-   }
+  }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
   body{
@@ -213,7 +213,7 @@
   .ticket-row.latest{font-weight:700;color:var(--raspberry);}
   .tape-list{display:flex;flex-direction:column;gap:0;max-width:340px;}
 
-  footer{margin-top:48px;font-size:12px;color:var(--ink-soft);text-align:center;border-top:1px solid var(--line);padding-top:18px;} /* v4 */
+  footer{margin-top:48px;font-size:12px;color:var(--ink-soft);text-align:center;border-top:1px solid var(--line);padding-top:18px;}
   footer a{color:var(--blueberry);}
 
   .skeleton{height:120px;border-radius:14px;background:linear-gradient(90deg,var(--cream-2) 25%,var(--white) 37%,var(--cream-2) 63%);background-size:400% 100%;animation:shimmer 1.4s infinite;}
@@ -662,6 +662,7 @@ const State = {
   shop:'all', from:null, to:null, raw:null, loading:false, error:null, lastSync:null,
   weather:{}, weatherFetching:false,
   radiografia:{},
+  degustaciones:{ _loaded: false },
   activeTab: 'panel',
   productividadByShop: {
     'Amorino Sevilla Avenida':       110,
@@ -1121,6 +1122,65 @@ function buildWeatherKPIsHTML(from, to){
 
 /* ================= EVALUACIÓN DEL TURNO ================= */
 const RADIOGRAFIAS_SHEET_ID = '1b2QhZCIKoMWwNFG051O-Hj0zx4y5Zi3sxPdM9_68ozo';
+const DEGU_SHEET_ID = '13y3fRZCYUG722bhRwsNziRw5O1gXClSqqIV14EEyyPs';
+const DEGU_SHOP_MAP = {
+  // Names as they appear in the actual sheet
+  'amorino avenida':              'Amorino Sevilla Avenida',
+  'avenida tienda':               'Amorino Sevilla Avenida', // fallback
+  'amorino naranjos':             'Amorino Patio de los Naranjos',
+  'amorino sevilla plaza nueva':  'Amorino Plaza Nueva',
+  'amorino alcázar':              'Amorino Alcázar',
+  'amorino sevilla catedral':     'Amorino Catedral',
+  'amorino catedral':             'Amorino Catedral',
+};
+function normDeguShop(raw){
+  return DEGU_SHOP_MAP[(raw||'').trim().toLowerCase().normalize('NFC')] || null;
+}
+function parseMarcaTemporal(s){
+  if (!s) return null;
+  const str = String(s).trim();
+  // ISO format: YYYY-MM-DD HH:MM:SS  (Google Forms with ISO locale)
+  let m = str.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2}):/);
+  if (m) return { dkey:`${m[1]}-${m[2]}-${m[3]}`, hour:parseInt(m[4],10) };
+  // Fallback: DD/MM/YYYY HH:MM:SS
+  m = str.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):/);
+  if (m) return { dkey:`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`, hour:parseInt(m[4],10) };
+  return null;
+}
+async function loadDegustacionesIfNeeded(){
+  if (State.degustaciones._loaded) return;
+  State.degustaciones._loaded = 'loading';
+  try {
+    const json = await loadViaJSONP_2(DEGU_SHEET_ID, 'Data');
+    const rows = gvizJsonToRows(json).slice(1); // skip header row
+    // cols: 0=Marca temporal, 1=TIENDA, 2=FOTO, 3=PRODUCTO UTILIZADO
+    for (const row of rows){
+      const shop = normDeguShop(row[1]);
+      if (!shop) continue;
+      const p = parseMarcaTemporal(row[0]);
+      if (!p) continue;
+      if (!State.degustaciones[shop]) State.degustaciones[shop] = {};
+      if (!State.degustaciones[shop][p.dkey]) State.degustaciones[shop][p.dkey] = {};
+      State.degustaciones[shop][p.dkey][p.hour] = (State.degustaciones[shop][p.dkey][p.hour]||0) + 1;
+    }
+    State.degustaciones._loaded = true;
+  } catch(e){
+    State.degustaciones._loaded = 'error';
+  }
+  // Re-render eval section if open
+  const el = document.getElementById('evalTurnoSection');
+  if (el) { el.innerHTML = buildEvalTurnoHTML(State.shop, State.from); attachEvalHandlers(); }
+}
+function getDeguCount(shopFull, dkey, horario){
+  if (State.degustaciones._loaded !== true) return 0;
+  const day = (State.degustaciones[shopFull]||{})[dkey];
+  if (!day) return 0;
+  const mins = slotToMins(horario);
+  if (!mins) return 0;
+  let h = Math.floor(mins.start / 60);
+  if (h >= 24) h -= 24;
+  return day[h] || 0;
+}
 const MONTH_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const SHOP_RAD_KEY = {
   'Amorino Sevilla Avenida':       'AVENIDA',
@@ -1394,7 +1454,7 @@ function buildEvalTurnoHTML(shop, dkey){
       html += `<div class="eval-table-wrap"><table class="eval-table">
         <thead><tr>
           <th>Franja</th><th class="num">Ventas</th><th class="num">P. nec.</th>
-          <th class="num">P. rad.</th><th class="num">Ev</th>
+          <th class="num">P. rad.</th><th class="num">Ev</th><th class="num">Deg.</th>
         </tr></thead><tbody>
         ${sorted.map(row => {
           const staff  = getStaffForSlot(shopKey, jsDay, row.horario, radData);
@@ -1402,10 +1462,12 @@ function buildEvalTurnoHTML(shop, dkey){
           const ev     = (!isNaN(needed) && !isNaN(staff)) ? staff - needed : NaN;
           const cls    = isNaN(ev) ? '' : (ev >= 0 ? 'ev-pos' : 'ev-neg');
           const evStr  = isNaN(ev) ? '—' : (ev >= 0 ? '+' : '') + ev.toFixed(2);
+          const degu   = getDeguCount(shopFull, dkey, row.horario);
           return `<tr class="${cls}"><td>${esc(row.horario)}</td><td class="num">${fmtEUR(row.ventas)}</td>
             <td class="num">${isNaN(needed)?'—':needed.toFixed(2)}</td>
             <td class="num">${isNaN(staff)?'—':staff.toFixed(1)}</td>
-            <td class="num"><strong>${evStr}</strong></td></tr>`;
+            <td class="num"><strong>${evStr}</strong></td>
+            <td class="num">${degu > 0 ? `<strong style="color:var(--pistachio)">${degu}</strong>` : '—'}</td></tr>`;
         }).join('')}
         </tbody></table></div>`;
     } else {
@@ -1435,6 +1497,7 @@ function renderAll(){
     document.getElementById('content').innerHTML = html;
     attachEvalHandlers();
     if (!isRange) fetchRadiografiaIfNeeded(from);
+    if (!isRange) loadDegustacionesIfNeeded();
     return;
   }
 
@@ -1461,6 +1524,7 @@ function renderAll(){
   attachSortHandler();
   fetchWeatherIfNeeded(from, to);
   if (!isRange) fetchRadiografiaIfNeeded(from, true); // true = also update panel KPI
+  if (!isRange) loadDegustacionesIfNeeded();
 }
 
 /* ---- Evolución diaria (serie temporal) ---- */
