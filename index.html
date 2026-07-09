@@ -918,19 +918,20 @@ const FEEDBACK_GID      = '1693008984';
 
 /* Map messy form shop names → canonical shop names (may return multiple) */
 function normFeedbackShop(raw){
-  const s = (raw||'').trim().toLowerCase().normalize('NFC');
-  // Skip non-shop entries
-  if (/andy\s*semanal|mantenimiento|ruslan|dimitr|prevenci/i.test(s)) return [];
+  const strip = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const s = strip((raw||'').trim().toLowerCase());
+  if (!s || s === 'p') return [];
+  if (/andy.semanal|mantenimiento|prevenci|ruslan|cucinella|penarand/i.test(s)) return [];
   const results = [];
-  const parts = s.split(/\s+y\s+|\s*[\/&]\s*/);
-  for (const part of parts){
-    const p = part.trim();
-    if (!p) continue;
-    if (/alcaz|^alc$/.test(p))                       results.push('Amorino Alcázar');
-    else if (/^pn$|plaza/.test(p))                    results.push('Amorino Plaza Nueva');
-    else if (/catedral/.test(p))                      results.push('Amorino Catedral');
-    else if (/naranjo|^narq/.test(p))                 results.push('Amorino Patio de los Naranjos');
-    else if (/avenida|^aven|^avda/.test(p))           results.push('Amorino Sevilla Avenida');
+  const parts = s.split(/\s+y\s+|\s*[,\/&]\s*/);
+  for (let part of parts){
+    part = part.trim().replace(/\s*[\(\[].*[\)\]]\s*$/, '').trim();
+    if (!part || part === 'p') continue;
+    if      (/^al[cgxzbqd]/.test(part) || /alc[ao]?[sz]?ar/.test(part))  results.push('Amorino Alcázar');
+    else if (/^pn/.test(part) || /plaza\s*nuev/.test(part))               results.push('Amorino Plaza Nueva');
+    else if (/^c[ao]?[ta]e?dr/.test(part) || /ctae/.test(part))           results.push('Amorino Catedral');
+    else if (/n[as]ranjo|naran/.test(part))                                results.push('Amorino Patio de los Naranjos');
+    else if (/aven/.test(part) || /^avei/.test(part))                      results.push('Amorino Sevilla Avenida');
   }
   return [...new Set(results)];
 }
