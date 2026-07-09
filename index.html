@@ -388,6 +388,72 @@
 <script src="historical_medh.js"></script>
 </head>
 <body>
+
+<!-- ===== LOGIN ===== -->
+<div id="loginScreen" style="
+  position:fixed;inset:0;z-index:9999;
+  background:var(--cream);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;
+">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+    <div style="width:36px;height:36px;border-radius:50% 50% 50% 4px;flex:none;
+      background:conic-gradient(#C84B5E 0deg 90deg,#E3A038 90deg 180deg,#8FA871 180deg 270deg,#5E6FA3 270deg 360deg);"></div>
+    <div style="font-family:'Fraunces',serif;font-style:italic;font-size:32px;font-weight:600;">Amorino</div>
+  </div>
+  <div style="font-size:13px;color:var(--ink-soft);letter-spacing:0.06em;text-transform:uppercase;font-weight:600;">Panel de ventas · Sevilla</div>
+  <div style="display:flex;flex-direction:column;gap:10px;width:280px;">
+    <input id="pwInput" type="password" placeholder="Contraseña" autocomplete="current-password"
+      style="font-family:'Inter',sans-serif;font-size:15px;padding:12px 16px;border:1.5px solid var(--line);
+      border-radius:10px;background:var(--white);color:var(--ink);outline:none;text-align:center;letter-spacing:0.1em;"
+      onkeydown="if(event.key==='Enter') checkPw()">
+    <button onclick="checkPw()" style="
+      font-family:'Inter',sans-serif;font-weight:700;font-size:14px;color:var(--white);
+      background:var(--cocoa);border:none;border-radius:10px;padding:12px;cursor:pointer;">
+      Entrar
+    </button>
+    <div id="pwError" style="font-size:12px;color:var(--raspberry);text-align:center;min-height:16px;"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const PW = 'amorino2025';
+  const KEY = 'am_auth';
+  function checkPw(){
+    const val = document.getElementById('pwInput').value;
+    if (val === PW){
+      sessionStorage.setItem(KEY, '1');
+      document.getElementById('loginScreen').style.display = 'none';
+    } else {
+      document.getElementById('pwError').textContent = 'Contraseña incorrecta';
+      document.getElementById('pwInput').value = '';
+      document.getElementById('pwInput').focus();
+    }
+  }
+  window.checkPw = checkPw;
+  if (sessionStorage.getItem(KEY) === '1'){
+    document.getElementById('loginScreen').style.display = 'none';
+  } else {
+    // Hide app until authenticated
+    document.addEventListener('DOMContentLoaded', () => {
+      const app = document.getElementById('app');
+      if (app) app.style.visibility = 'hidden';
+      document.getElementById('loginScreen').style.display = 'flex';
+      document.getElementById('loginScreen').addEventListener('transitionend', () => {});
+    });
+    // Reveal app after login
+    const orig = window.checkPw;
+    window.checkPw = function(){
+      orig();
+      if (sessionStorage.getItem('am_auth') === '1'){
+        const app = document.getElementById('app');
+        if (app) app.style.visibility = 'visible';
+      }
+    };
+  }
+})();
+</script>
+
 <div id="app">
 
   <!-- Print header: hidden on screen, visible in PDF export -->
