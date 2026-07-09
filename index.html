@@ -462,6 +462,7 @@
   <div class="tab-bar" id="mainTabBar">
     <button class="main-tab active" data-tab="panel">Panel</button>
     <button class="main-tab" data-tab="eval">Evaluación del turno</button>
+    <button class="main-tab" data-tab="feedback">Feedback turno</button>
     <button class="main-tab print-btn no-print" onclick="window.print()">⬇ PDF</button>
   </div>
 
@@ -663,6 +664,7 @@ const State = {
   weather:{}, weatherFetching:false,
   radiografia:{},
   degustaciones:{ _loaded: false },
+  feedback:{ _loaded: false, entries: [] },
   activeTab: 'panel',
   productividadByShop: {
     'Amorino Sevilla Avenida':       110,
@@ -911,7 +913,154 @@ function renderError(err){
     </div>`;
 }
 
-/* ================= PREVIOUS YEAR (sheet data only) ================= */
+const FEEDBACK_SHEET_ID = '1AQvTb1r05hHABwyPCySz7ItWUy2bPrca1Nf2WKaWdcA';
+const FEEDBACK_GID      = '1693008984';
+
+/* Map messy form shop names → canonical shop names (may return multiple) */
+function normFeedbackShop(raw){
+  const s = (raw||'').trim().toLowerCase().normalize('NFC');
+  // Skip non-shop entries
+  if (/andy\s*semanal|mantenimiento|ruslan|dimitr|prevenci/i.test(s)) return [];
+  const results = [];
+  const parts = s.split(/\s+y\s+|\s*[\/&]\s*/);
+  for (const part of parts){
+    const p = part.trim();
+    if (!p) continue;
+    if (/alcaz|^alc$/.test(p))                       results.push('Amorino Alcázar');
+    else if (/^pn$|plaza/.test(p))                    results.push('Amorino Plaza Nueva');
+    else if (/catedral/.test(p))                      results.push('Amorino Catedral');
+    else if (/naranjo|^narq/.test(p))                 results.push('Amorino Patio de los Naranjos');
+    else if (/avenida|^aven|^avda/.test(p))           results.push('Amorino Sevilla Avenida');
+  }
+  return [...new Set(results)];
+}
+
+function parseFeedbackTimestamp(s){
+  if (!s) return null;
+  const m = String(s).trim().match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})/);
+  if (!m) return null;
+  const [,d,mo,y,h] = m;
+  const dt = new Date(parseInt(y), parseInt(mo)-1, parseInt(d), parseInt(h));
+  // Submissions before 6am belong to the previous day's shift
+  if (parseInt(h) < 6) dt.setDate(dt.getDate()-1);
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+}
+
+/* Load feedback data: State.feedback = { _loaded, entries: [{dkey, shops[], nombre, tienda, personas, andyManana, andyNoche, quienAndy}] } */
+async function loadFeedbackIfNeeded(){
+  if (State.feedback._loaded) return;
+  State.feedback._loaded = 'loading';
+  try {
+    const json = await loadViaJSONP_3(FEEDBACK_SHEET_ID, FEEDBACK_GID);
+    const rows = gvizJsonToRows(json);
+    // Detect column indices from header row
+    const header = rows[0] || [];
+    const ci = {
+      ts:      header.findIndex(h => /marca temporal/i.test(h)),
+      nombre:  header.findIndex(h => /nombre/i.test(h)),
+      tienda:  header.findIndex(h => /tienda/i.test(h)),
+      personas:header.findIndex(h => /coincidi/i.test(h)),
+      andyMan: header.findIndex(h => /mañana.*hecho|hecho.*mañana/i.test(h)),
+      andyNoc: header.findIndex(h => /anoche/i.test(h)),
+      quienA:  header.findIndex(h => /qui[eé]n.*andy/i.test(h)),
+    };
+    const entries = [];
+    for (const row of rows.slice(1)){
+      if (!row[ci.ts]) continue;
+      const dkey = parseFeedbackTimestamp(row[ci.ts]);
+      if (!dkey) continue;
+      const shops = normFeedbackShop(row[ci.tienda]);
+      if (!shops.length) continue;
+      entries.push({ dkey, shops, nombre: row[ci.nombre]||'', tienda: row[ci.tienda]||'',
+        personas: row[ci.personas]||'', andyManana: row[ci.andyMan]||'',
+        andyNoche: row[ci.andyNoc]||'', quienAndy: row[ci.quienA]||'' });
+    }
+    State.feedback = { _loaded: true, entries };
+  } catch(e){
+    State.feedback = { _loaded: 'error', entries: [] };
+  }
+  const el = document.getElementById('feedbackSection');
+  if (el) el.innerHTML = buildFeedbackHTML(State.shop, State.from, State.to);
+}
+
+/* JSONP loader using gid instead of sheet name */
+function loadViaJSONP_3(sheetId, gid){
+  return new Promise((resolve, reject) => {
+    const cbName = '__gvizCb' + (jsonpCounter++);
+    const scriptEl = document.createElement('script');
+    let settled = false;
+    function cleanup(){ delete window[cbName]; if(scriptEl.parentNode) scriptEl.parentNode.removeChild(scriptEl); clearTimeout(timer); }
+    window[cbName] = json => { if(settled) return; settled=true; cleanup(); if(!json||json.status==='error') reject(new Error('Error feedback')); else resolve(json); };
+    const timer = setTimeout(()=>{ if(settled) return; settled=true; cleanup(); reject(new Error('Timeout feedback')); }, 15000);
+    scriptEl.src = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json;responseHandler:${cbName}&gid=${gid}&headers=0&_=${Date.now()}`;
+    scriptEl.onerror = ()=>{ if(settled) return; settled=true; cleanup(); reject(new Error('Load error feedback')); };
+    document.head.appendChild(scriptEl);
+  });
+}
+
+function buildFeedbackHTML(shop, from, to){
+  if (!from) return '<div class="empty-note">Selecciona un periodo para ver el feedback.</div>';
+  if (State.feedback._loaded === 'loading')  return '<div class="empty-note">Cargando feedback…</div>';
+  if (State.feedback._loaded === 'error')    return '<div class="empty-note" style="color:var(--raspberry)">Error al cargar el feedback. Comprueba que la hoja esté compartida públicamente.</div>';
+  if (!State.feedback._loaded)               return '<div class="empty-note">Cargando feedback…</div>';
+
+  const entries = State.feedback.entries;
+  const shopsToShow = shop === 'all' ? SHOP_ORDER : [shop];
+  const isRange = from !== to;
+
+  if (!isRange){
+    /* ---- Single day: show full detail cards ---- */
+    const dayEntries = entries.filter(e => e.dkey === from && e.shops.some(s => shop === 'all' || shopEq(s, shop)));
+    if (!dayEntries.length) return `<div class="empty-note">Sin registros de feedback para ${dateLabel(from)}.</div>`;
+    return dayEntries.map(e => `
+      <div class="card" style="margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+          <div>
+            <div style="font-family:'Fraunces',serif;font-weight:700;font-size:15px;">${esc(e.nombre)}</div>
+            <div style="font-size:12px;color:var(--ink-soft);margin-top:2px;">${esc(e.tienda)}</div>
+          </div>
+          <div style="font-size:12px;color:var(--ink-soft);">${dateLabel(e.dkey)}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px;">
+          <div><span style="font-weight:700;color:var(--ink-soft);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;">Personas en turno</span><div style="margin-top:4px;">${esc(e.personas)||'—'}</div></div>
+          <div><span style="font-weight:700;color:var(--ink-soft);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;">¿Quién hace Andy mañana?</span><div style="margin-top:4px;">${esc(e.quienAndy)||'—'}</div></div>
+          <div><span style="font-weight:700;color:var(--ink-soft);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;">Andy mañana hecho</span><div style="margin-top:4px;">${esc(e.andyManana)||'—'}</div></div>
+          <div><span style="font-weight:700;color:var(--ink-soft);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;">Andy anoche</span><div style="margin-top:4px;">${esc(e.andyNoche)||'—'}</div></div>
+        </div>
+      </div>`).join('');
+  }
+
+  /* ---- Range: checklist table ---- */
+  const days = []; let d = from; while(d<=to){ days.push(d); d=shiftDate(d,1); }
+
+  // Build lookup: {dkey: Set(shopFull)}
+  const lookup = {};
+  for (const e of entries){
+    if (!inRange(e.dkey, from, to)) continue;
+    if (!lookup[e.dkey]) lookup[e.dkey] = new Set();
+    for (const s of e.shops) lookup[e.dkey].add(s);
+  }
+
+  const shopCols = shopsToShow.map(s => s.replace('Amorino ',''));
+  const rows = days.map(dd => {
+    const haveDic = lookup[dd] || new Set();
+    const cells = shopsToShow.map(s => {
+      const has = [...haveDic].some(hs => shopEq(hs, s));
+      return `<td style="text-align:center;font-size:16px;">${has ? '✅' : '<span style="color:var(--line)">—</span>'}</td>`;
+    });
+    return `<tr><td style="font-size:13px;padding:7px 10px;">${dateLabel(dd)}</td>${cells.join('')}</tr>`;
+  });
+
+  return `<div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr>
+        <th style="text-align:left;padding:0 10px 10px;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);border-bottom:1px solid var(--line);">Fecha</th>
+        ${shopCols.map(s=>`<th style="text-align:center;padding:0 10px 10px;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);border-bottom:1px solid var(--line);">${esc(s)}</th>`).join('')}
+      </tr></thead>
+      <tbody>${rows.join('')}</tbody>
+    </table>
+  </div>`;
+}
 function prevYearKey(dkey){
   const [y,m,d] = dkey.split('-');
   return `${parseInt(y,10)-1}-${m}-${d}`;
@@ -1489,6 +1638,14 @@ function renderAll(){
   if (!State.raw) return;
   const shop = State.shop, from = State.from, to = State.to;
   const isRange = from !== to;
+
+  if (State.activeTab === 'feedback'){
+    document.getElementById('content').innerHTML = `
+      <div class="section-title"><span class="swatch" style="background:var(--blueberry)"></span>Feedback Desarrollo del Turno</div>
+      <div class="card" id="feedbackSection">${buildFeedbackHTML(shop, from, to)}</div>`;
+    loadFeedbackIfNeeded();
+    return;
+  }
 
   if (State.activeTab === 'eval'){
     const html = isRange
