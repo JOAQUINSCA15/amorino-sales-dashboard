@@ -1004,6 +1004,8 @@ async function loadFeedbackIfNeeded(){
         andyNoche: row[ci.andyNoc]||'', quienAndy: row[ci.quienA]||'' });
     }
     State.feedback = { _loaded: true, entries };
+    // DEBUG: store raw sample for inspection
+    State.feedback._debug = rows.slice(1,4).map(r => ({ts: r[ci.ts], tienda: r[ci.tienda]}));
   } catch(e){
     State.feedback = { _loaded: 'error', entries: [] };
   }
@@ -1032,6 +1034,13 @@ function buildFeedbackHTML(shop, from, to){
   if (State.feedback._loaded === 'error')    return '<div class="empty-note" style="color:var(--raspberry)">Error al cargar el feedback. Comprueba que la hoja esté compartida públicamente.</div>';
   if (!State.feedback._loaded)               return '<div class="empty-note">Cargando feedback…</div>';
 
+  // Debug info
+  const dbg = State.feedback._debug || [];
+  const dbgHtml = `<div style="background:#f5f5f5;border-radius:8px;padding:10px;font-size:11px;font-family:monospace;margin-bottom:16px;color:#333;">
+    <strong>Debug:</strong> ${State.feedback.entries.length} entradas cargadas<br>
+    ${dbg.map(r=>`ts="${esc(r.ts)}" tienda="${esc(r.tienda)}"`).join('<br>')}
+  </div>`;
+
   const entries = State.feedback.entries;
   const shopsToShow = shop === 'all' ? SHOP_ORDER : [shop];
   const isRange = from !== to;
@@ -1039,7 +1048,7 @@ function buildFeedbackHTML(shop, from, to){
   if (!isRange){
     /* ---- Single day: show full detail cards ---- */
     const dayEntries = entries.filter(e => e.dkey === from && e.shops.some(s => shop === 'all' || shopEq(s, shop)));
-    if (!dayEntries.length) return `<div class="empty-note">Sin registros de feedback para ${dateLabel(from)}.</div>`;
+    if (!dayEntries.length) return dbgHtml + `<div class="empty-note">Sin registros de feedback para ${dateLabel(from)}.</div>`;
     return dayEntries.map(e => `
       <div class="card" style="margin-bottom:14px;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
@@ -1079,7 +1088,7 @@ function buildFeedbackHTML(shop, from, to){
     return `<tr><td style="font-size:13px;padding:7px 10px;">${dateLabel(dd)}</td>${cells.join('')}</tr>`;
   });
 
-  return `<div style="overflow-x:auto;">
+  return dbgHtml + `<div style="overflow-x:auto;">
     <table style="width:100%;border-collapse:collapse;font-size:13px;">
       <thead><tr>
         <th style="text-align:left;padding:0 10px 10px;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);border-bottom:1px solid var(--line);">Fecha</th>
