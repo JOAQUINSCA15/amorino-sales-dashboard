@@ -980,9 +980,17 @@ async function loadFeedbackIfNeeded(){
   State.feedback._loaded = 'loading';
   try {
     const json = await loadViaJSONP_3(FEEDBACK_SHEET_ID, FEEDBACK_GID);
-    const rows = gvizJsonToRows(json);
-    // Detect column indices from header row
-    const header = rows[0] || [];
+    const allRows = gvizJsonToRows(json);
+    // gviz with &gid= may put column names in allRows[0] (via json.table.cols)
+    // OR leave them as generic labels and include header as first data row (allRows[1])
+    let header, dataRows;
+    if (allRows[0] && allRows[0].some(c => /marca temporal/i.test(c))){
+      header = allRows[0]; dataRows = allRows.slice(1);
+    } else if (allRows[1] && allRows[1].some(c => /marca temporal/i.test(c))){
+      header = allRows[1]; dataRows = allRows.slice(2);
+    } else {
+      header = allRows[0] || []; dataRows = allRows.slice(1);
+    }
     const ci = {
       ts:      header.findIndex(h => /marca temporal/i.test(h)),
       nombre:  header.findIndex(h => /nombre/i.test(h)),
@@ -993,7 +1001,7 @@ async function loadFeedbackIfNeeded(){
       quienA:  header.findIndex(h => /qui[eé]n.*andy/i.test(h)),
     };
     const entries = [];
-    for (const row of rows.slice(1)){
+    for (const row of dataRows){
       if (!row[ci.ts]) continue;
       const dkey = parseFeedbackTimestamp(row[ci.ts]);
       if (!dkey) continue;
@@ -1004,8 +1012,13 @@ async function loadFeedbackIfNeeded(){
         andyNoche: row[ci.andyNoc]||'', quienAndy: row[ci.quienA]||'' });
     }
     State.feedback = { _loaded: true, entries };
-    // DEBUG: store raw sample for inspection
-    State.feedback._debug = rows.slice(1,4).map(r => ({ts: r[ci.ts], tienda: r[ci.tienda]}));
+    // DEBUG
+    State.feedback._debug = {
+      totalRows: allRows.length,
+      header: header.slice(0,6),
+      ci,
+      sample: dataRows.slice(0,3).map(r => ({ts: r[0], tienda: r[ci.tienda > 0 ? ci.tienda : 3]}))
+    };
   } catch(e){
     State.feedback = { _loaded: 'error', entries: [] };
   }
@@ -1035,10 +1048,13 @@ function buildFeedbackHTML(shop, from, to){
   if (!State.feedback._loaded)               return '<div class="empty-note">Cargando feedback…</div>';
 
   // Debug info
-  const dbg = State.feedback._debug || [];
-  const dbgHtml = `<div style="background:#f5f5f5;border-radius:8px;padding:10px;font-size:11px;font-family:monospace;margin-bottom:16px;color:#333;">
-    <strong>Debug:</strong> ${State.feedback.entries.length} entradas cargadas<br>
-    ${dbg.map(r=>`ts="${esc(r.ts)}" tienda="${esc(r.tienda)}"`).join('<br>')}
+  const dbg = State.feedback._debug || {};
+  const dbgHtml = `<div style="background:#f5f5f5;border-radius:8px;padding:10px;font-size:11px;font-family:monospace;margin-bottom:16px;color:#333;white-space:pre-wrap;word-break:break-all;">
+<strong>Debug:</strong> ${State.feedback.entries.length} entradas · ${dbg.totalRows||0} filas raw
+header[0..5]: ${JSON.stringify(dbg.header||[])}
+ci: ${JSON.stringify(dbg.ci||{})}
+sample rows[0]: ${JSON.stringify((dbg.sample||[])[0]||{})}
+sample rows[1]: ${JSON.stringify((dbg.sample||[])[1]||{})}
   </div>`;
 
   const entries = State.feedback.entries;
