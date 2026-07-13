@@ -1173,28 +1173,21 @@ function exportToExcel(){
   if (!State.raw || typeof XLSX === 'undefined') { alert('Cargando… inténtalo de nuevo.'); return; }
   const shop = State.shop, from = State.from, to = State.to;
   const inScope = r => inRange(r.dkey, from, to) && (shop === 'all' || shopEq(r.shop, shop));
-  const t1rows = State.raw.t1.filter(inScope)
-    .sort((a,b) => a.dkey.localeCompare(b.dkey) || a.shop.localeCompare(b.shop) || hourOrderKey(a.horario)-hourOrderKey(b.horario));
 
-  const data = [['Fecha','Tienda','Franja','Ventas (€)','Tickets','Ticket Medio (€)']];
-  for (const r of t1rows){
-    const tm = (!isNaN(r.ventas)&&!isNaN(r.tickets)&&r.tickets>0) ? +(r.ventas/r.tickets).toFixed(2) : '';
-    data.push([dateLabel(r.dkey), r.shop, r.horario, isNaN(r.ventas)?'':r.ventas, isNaN(r.tickets)?'':r.tickets, tm]);
+  // Aggregate t1 to daily totals per shop
+  const map = new Map();
+  for (const r of State.raw.t1.filter(inScope)){
+    const key = `${r.dkey}||${r.shop}`;
+    if (!map.has(key)) map.set(key, { dkey: r.dkey, shop: r.shop, ventas: 0 });
+    if (!isNaN(r.ventas)) map.get(key).ventas += r.ventas;
   }
+  const rows = [...map.values()].sort((a,b) => a.dkey.localeCompare(b.dkey) || a.shop.localeCompare(b.shop));
 
-  const t2rows = [...State.raw.t2.filter(inScope)]
-    .sort((a,b)=>a.dkey.localeCompare(b.dkey)||a.shop.localeCompare(b.shop));
-  const summary = [['Fecha','Tienda','Tickets Total','Ticket Medio (€)','Media Helado (€)','% Sugerencias','Litros']];
-  for (const r of t2rows){
-    summary.push([dateLabel(r.dkey), r.shop,
-      isNaN(r.ticketsTotal)?'':r.ticketsTotal, isNaN(r.ticketMedio)?'':r.ticketMedio,
-      isNaN(r.ticketMedioGelato)?'':r.ticketMedioGelato,
-      isNaN(r.sugerenciasPct)?'':r.sugerenciasPct, isNaN(r.litrosDia)?'':r.litrosDia]);
-  }
+  const data = [['Fecha','Tienda','Ventas (€)']];
+  for (const r of rows) data.push([dateLabel(r.dkey), r.shop, +r.ventas.toFixed(2)]);
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), 'Ventas por franja');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Resumen diario');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), 'Ventas diarias');
   const shopLabel = shop==='all' ? 'Todas' : shop.replace('Amorino ','');
   XLSX.writeFile(wb, `Amorino_${shopLabel}_${from}_${to}.xlsx`);
 }
