@@ -1918,8 +1918,16 @@ function renderKPIs(shop, from, to){
   }
 
   const isRange = from !== to;
+  // Days with data vs total days in range
+  const totalDays = (() => { let n=0, d=from; while(d<=to){ n++; d=shiftDate(d,1); } return n; })();
+  const daysWithData = (() => {
+    const have = new Set(t1rows.map(r => r.dkey));
+    return have.size;
+  })();
+  const coverageNote = isRange && daysWithData < totalDays ? `${daysWithData}/${totalDays} días con datos` : null;
+
   const cards = [
-    { label: isRange ? 'Ventas del periodo' : 'Ventas del día', value:fmtEUR(ventasPeriodo), color:'var(--raspberry)' },
+    { label: isRange ? 'Ventas del periodo' : 'Ventas del día', value:fmtEUR(ventasPeriodo), color:'var(--raspberry)', note: coverageNote },
     { label:'Tickets totales', value:fmtInt(ticketsTotal), color:'var(--mango)' },
     { label:'Ticket medio', value:fmtEUR(ticketMedio), color:'var(--pistachio)' },
     { label:'Litros de helado', value:fmtNum(litros,1)+' Lt.', color:'var(--blueberry)' },
