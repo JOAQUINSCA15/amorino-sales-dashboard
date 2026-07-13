@@ -236,6 +236,11 @@
   .main-tab.print-btn{margin-left:auto;color:var(--ink-soft);font-size:12px;}
   .main-tab.print-btn:hover{color:var(--ink);}
 
+  .eval-day-block{margin-bottom:36px;}
+  .eval-day-header{font-family:'Fraunces',serif;font-size:18px;font-weight:700;
+    padding:10px 0 10px;margin-bottom:14px;border-bottom:2px solid var(--line);}
+  @media print{.eval-day-block{page-break-inside:avoid;page-break-after:always;}}
+
   /* ===== EVAL ENHANCEMENTS ===== */
   .eval-global-controls{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--line);}
   .eval-cost-row{display:flex;flex-wrap:wrap;gap:16px;font-size:12.5px;color:var(--ink-soft);padding:10px 2px 0;border-top:1px dashed var(--line);margin-top:8px;}
@@ -1575,8 +1580,14 @@ async function fetchRadiografiaIfNeeded(dkey, updatePanel){
   } catch(e){
     State.radiografia[tabName] = null;
   }
-  const el = document.getElementById('evalTurnoSection');
-  if (el) el.innerHTML = buildEvalTurnoHTML(State.shop, State.from);
+  const singleEl = document.getElementById('evalTurnoSection');
+  if (singleEl) { singleEl.innerHTML = buildEvalTurnoHTML(State.shop, State.from); attachEvalHandlers(); }
+  // Refresh any multi-day blocks using this tab
+  document.querySelectorAll('[id^="evalDay-"]').forEach(el => {
+    const dd = el.id.replace('evalDay-','');
+    if (getRadiografiaTab(dd) === tabName) el.innerHTML = buildEvalDayContent(State.shop, dd);
+  });
+  attachEvalHandlers();
   if (updatePanel) updateCostePersonalKPI(dkey);
 }
 
@@ -1650,54 +1661,32 @@ function calcPersonnelCostForShop(shopKey, jsDay, radData){
   return totalHours;
 }
 
-function buildEvalTurnoHTML(shop, dkey){
-  if (!dkey) return '<div class="empty-note">Selecciona un día para ver la evaluación del turno.</div>';
+/* Core per-day eval content (no global controls) — used by both single and multi-day */
+function buildEvalDayContent(shop, dkey){
   const tabName = getRadiografiaTab(dkey);
   if (!tabName) return '<div class="empty-note">Sin radiografía disponible para esta fecha.</div>';
   const radData = State.radiografia[tabName];
   if (!radData) return '<div class="empty-note" style="padding:16px;">Cargando radiografía…</div>';
   const [y,m,d] = dkey.split('-').map(Number);
-  const jsDay = new Date(y, m-1, d).getDay();
+  const jsDay = new Date(y,m-1,d).getDay();
   const shopsToShow = shop === 'all' ? SHOP_ORDER : [shop];
-  // Pre-calculate grand totals so we can render them at the top
-  let grandTotalHours = 0, grandTotalCost = 0, grandVentas = 0, grandHasData = false;
   const costeHora = State.costeBruto * (1 + State.seguridadSocial / 100);
-  const totalHourlyDisplay = fmtNum(costeHora, 2);
 
+  let grandTotalHours=0, grandTotalCost=0, grandVentas=0, grandHasData=false;
   for (const shopFull of shopsToShow){
-    const shopKey = SHOP_RAD_KEY[shopFull];
-    if (!shopKey) continue;
-    const t1rows = (State.raw.t1||[]).filter(r => r.dkey === dkey && shopEq(r.shop, shopFull));
+    const shopKey = SHOP_RAD_KEY[shopFull]; if(!shopKey) continue;
+    const t1rows = (State.raw.t1||[]).filter(r=>r.dkey===dkey&&shopEq(r.shop,shopFull));
     const ventasDia = t1rows.reduce((a,r)=>a+(isNaN(r.ventas)?0:r.ventas),0);
-    const totalHours = calcPersonnelCostForShop(shopKey, jsDay, radData);
-    const totalCost = isNaN(totalHours) ? NaN : totalHours * costeHora;
-    if (!isNaN(totalHours)) { grandTotalHours += totalHours; grandTotalCost += totalCost; grandHasData = true; }
-    if (ventasDia > 0) grandVentas += ventasDia;
+    const totalHours = calcPersonnelCostForShop(shopKey,jsDay,radData);
+    const totalCost = isNaN(totalHours)?NaN:totalHours*costeHora;
+    if(!isNaN(totalHours)){grandTotalHours+=totalHours;grandTotalCost+=totalCost;grandHasData=true;}
+    if(ventasDia>0) grandVentas+=ventasDia;
   }
+  const grandNetas = grandVentas/1.1;
+  const grandRatio = grandNetas>0 ? grandTotalCost/grandNetas : NaN;
 
-  const grandNetas = grandVentas / 1.1;
-  const grandRatio = grandNetas > 0 ? grandTotalCost / grandNetas : NaN;
-
-  // Global controls row
-  let html = `<div class="eval-global-controls">
-    <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
-      <div class="prod-control">
-        <label>Coste bruto:</label>
-        <input type="number" id="costeBrutoInput" value="${State.costeBruto}" min="0.01" max="999" step="0.05"> €/h
-      </div>
-      <div class="prod-control">
-        <label>Seg. Social:</label>
-        <input type="number" id="ssInput" value="${State.seguridadSocial}" min="0" max="100" step="1"> %
-      </div>
-      <div class="prod-control" style="color:var(--ink);font-weight:700;">
-        → Total: ${totalHourlyDisplay} €/h
-      </div>
-    </div>
-    <button class="btn no-print" style="background:var(--cocoa);font-size:12px;padding:7px 14px;" onclick="window.print()">⬇ Exportar PDF</button>
-  </div>`;
-
-  // Grand total at the TOP
-  if (shop === 'all' && grandHasData){
+  let html = '';
+  if (shop==='all' && grandHasData){
     html += `<div class="eval-grand-total" style="margin-bottom:24px;">
       <strong>Total 5 tiendas</strong>
       <span>Horas: <strong>${grandTotalHours.toFixed(1)}</strong></span>
@@ -1707,18 +1696,15 @@ function buildEvalTurnoHTML(shop, dkey){
     </div>`;
   }
 
-  // Per-shop blocks
   for (const shopFull of shopsToShow){
-    const shopKey = SHOP_RAD_KEY[shopFull];
-    if (!shopKey) continue;
-    const prod = State.productividadByShop[shopFull] || 110;
-    const t1rows = (State.raw.t1||[]).filter(r => r.dkey === dkey && shopEq(r.shop, shopFull));
+    const shopKey = SHOP_RAD_KEY[shopFull]; if(!shopKey) continue;
+    const prod = State.productividadByShop[shopFull]||110;
+    const t1rows = (State.raw.t1||[]).filter(r=>r.dkey===dkey&&shopEq(r.shop,shopFull));
     const ventasDia = t1rows.reduce((a,r)=>a+(isNaN(r.ventas)?0:r.ventas),0);
-    const ventasNetas = ventasDia / 1.1;
-    const totalHours = calcPersonnelCostForShop(shopKey, jsDay, radData);
-    const totalCost = isNaN(totalHours) ? NaN : totalHours * costeHora;
-    const costRatio = (!isNaN(totalCost) && ventasNetas > 0) ? totalCost / ventasNetas : NaN;
-
+    const ventasNetas = ventasDia/1.1;
+    const totalHours = calcPersonnelCostForShop(shopKey,jsDay,radData);
+    const totalCost = isNaN(totalHours)?NaN:totalHours*costeHora;
+    const costRatio = (!isNaN(totalCost)&&ventasNetas>0)?totalCost/ventasNetas:NaN;
     const sorted = [...t1rows].sort((a,b)=>hourOrderKey(a.horario)-hourOrderKey(b.horario));
 
     html += `<div class="eval-shop-block">
@@ -1729,31 +1715,27 @@ function buildEvalTurnoHTML(shop, dkey){
           <input type="number" class="prod-shop-input" data-shop="${esc(shopFull)}" value="${prod}" min="1" max="9999" step="5"> €/p/h
         </div>
       </div>`;
-
     if (sorted.length){
       html += `<div class="eval-table-wrap"><table class="eval-table">
-        <thead><tr>
-          <th>Franja</th><th class="num">Ventas</th><th class="num">P. nec.</th>
-          <th class="num">P. rad.</th><th class="num">Ev</th><th class="num">Deg.</th>
-        </tr></thead><tbody>
-        ${sorted.map(row => {
-          const staff  = getStaffForSlot(shopKey, jsDay, row.horario, radData);
-          const needed = isNaN(row.ventas) ? NaN : row.ventas / prod;
-          const ev     = (!isNaN(needed) && !isNaN(staff)) ? staff - needed : NaN;
-          const cls    = isNaN(ev) ? '' : (ev >= 0 ? 'ev-pos' : 'ev-neg');
-          const evStr  = isNaN(ev) ? '—' : (ev >= 0 ? '+' : '') + ev.toFixed(2);
-          const degu   = getDeguCount(shopFull, dkey, row.horario);
+        <thead><tr><th>Franja</th><th class="num">Ventas</th><th class="num">P. nec.</th>
+          <th class="num">P. rad.</th><th class="num">Ev</th><th class="num">Deg.</th></tr></thead><tbody>
+        ${sorted.map(row=>{
+          const staff=getStaffForSlot(shopKey,jsDay,row.horario,radData);
+          const needed=isNaN(row.ventas)?NaN:row.ventas/prod;
+          const ev=(!isNaN(needed)&&!isNaN(staff))?staff-needed:NaN;
+          const cls=isNaN(ev)?'':(ev>=0?'ev-pos':'ev-neg');
+          const evStr=isNaN(ev)?'—':(ev>=0?'+':'')+ev.toFixed(2);
+          const degu=getDeguCount(shopFull,dkey,row.horario);
           return `<tr class="${cls}"><td>${esc(row.horario)}</td><td class="num">${fmtEUR(row.ventas)}</td>
             <td class="num">${isNaN(needed)?'—':needed.toFixed(2)}</td>
             <td class="num">${isNaN(staff)?'—':staff.toFixed(1)}</td>
             <td class="num"><strong>${evStr}</strong></td>
-            <td class="num">${degu > 0 ? `<strong style="color:var(--pistachio)">${degu}</strong>` : '—'}</td></tr>`;
+            <td class="num">${degu>0?`<strong style="color:var(--pistachio)">${degu}</strong>`:'—'}</td></tr>`;
         }).join('')}
         </tbody></table></div>`;
     } else {
       html += `<div class="empty-note">Sin datos de ventas para este día.</div>`;
     }
-
     html += `<div class="eval-cost-row">
       <span>Horas según rad.: <strong>${isNaN(totalHours)?'—':totalHours.toFixed(1)}</strong></span>
       <span>Coste personal: <strong>${isNaN(totalCost)?'—':fmtEUR(totalCost)}</strong></span>
@@ -1761,8 +1743,38 @@ function buildEvalTurnoHTML(shop, dkey){
       <span>Ratio: <strong>${isNaN(costRatio)?'—':(costRatio*100).toFixed(1)+' %'}</strong></span>
     </div></div>`;
   }
-
   return html || '<div class="empty-note">Sin datos para mostrar.</div>';
+}
+
+function buildEvalGlobalControls(){
+  const costeHora = State.costeBruto * (1 + State.seguridadSocial / 100);
+  return `<div class="eval-global-controls">
+    <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
+      <div class="prod-control"><label>Coste bruto:</label>
+        <input type="number" id="costeBrutoInput" value="${State.costeBruto}" min="0.01" max="999" step="0.05"> €/h</div>
+      <div class="prod-control"><label>Seg. Social:</label>
+        <input type="number" id="ssInput" value="${State.seguridadSocial}" min="0" max="100" step="1"> %</div>
+      <div class="prod-control" style="color:var(--ink);font-weight:700;">→ Total: ${fmtNum(costeHora,2)} €/h</div>
+    </div>
+    <button class="btn no-print" style="background:var(--cocoa);font-size:12px;padding:7px 14px;" onclick="window.print()">⬇ Exportar PDF</button>
+  </div>`;
+}
+
+function buildEvalTurnoHTML(shop, dkey){
+  if (!dkey) return '<div class="empty-note">Selecciona un día para ver la evaluación del turno.</div>';
+  return buildEvalGlobalControls() + buildEvalDayContent(shop, dkey);
+}
+
+function buildEvalMultiDayHTML(shop, from, to){
+  const days=[]; let d=from; while(d<=to){days.push(d);d=shiftDate(d,1);}
+  let html = buildEvalGlobalControls();
+  for (const dd of days){
+    html += `<div class="eval-day-block">
+      <div class="eval-day-header">${dateLabel(dd)}</div>
+      <div id="evalDay-${dd}">${buildEvalDayContent(shop, dd)}</div>
+    </div>`;
+  }
+  return html;
 }
 
 function renderAll(){
@@ -1779,13 +1791,20 @@ function renderAll(){
   }
 
   if (State.activeTab === 'eval'){
-    const html = isRange
-      ? '<div class="card"><div class="empty-note">La Evaluación del Turno sólo está disponible para un día concreto. Usa el selector "Hoy" o elige la misma fecha en "Desde" y "Hasta".</div></div>'
+    const isMulti = isRange;
+    const html = isMulti
+      ? `<div class="card" style="padding-bottom:24px;" id="evalCard">${buildEvalMultiDayHTML(shop, from, to)}</div>`
       : `<div class="card" style="padding-bottom:24px;" id="evalCard"><div id="evalTurnoSection">${buildEvalTurnoHTML(shop, from)}</div></div>`;
     document.getElementById('content').innerHTML = html;
     attachEvalHandlers();
-    if (!isRange) fetchRadiografiaIfNeeded(from);
-    if (!isRange) loadDegustacionesIfNeeded();
+    if (!isMulti){
+      fetchRadiografiaIfNeeded(from);
+      loadDegustacionesIfNeeded();
+    } else {
+      const days=[]; let d=from; while(d<=to){days.push(d);d=shiftDate(d,1);}
+      days.forEach(dd => fetchRadiografiaIfNeeded(dd));
+      loadDegustacionesIfNeeded();
+    }
     return;
   }
 
@@ -1946,13 +1965,13 @@ function renderKPIs(shop, from, to){
   // Days with data vs total days in range
   const totalDays = (() => { let n=0, d=from; while(d<=to){ n++; d=shiftDate(d,1); } return n; })();
   const daysWithData = (() => {
-    const have = new Set(t1rows.map(r => r.dkey));
+    const have = new Set(t1rows.filter(r => !isNaN(r.ventas) && r.ventas > 0).map(r => r.dkey));
     return have.size;
   })();
   const coverageNote = isRange && daysWithData < totalDays ? `${daysWithData}/${totalDays} días con datos` : null;
 
-  // Trayectoria: (ventas / days) × days_in_month
-  const avgDaily = totalDays > 0 ? ventasPeriodo / totalDays : NaN;
+  // Trayectoria: (ventas / daysWithData) × days_in_month
+  const avgDaily = daysWithData > 0 ? ventasPeriodo / daysWithData : NaN;
   const monthDays = (() => {
     if (!isRange) return null;
     const [fy, fm] = from.split('-').map(Number);
@@ -2254,8 +2273,19 @@ function attachEvalHandlers(){
   });
 }
 function refreshEval(){
+  // Single-day mode
   const sec = document.getElementById('evalTurnoSection');
-  if (sec) { sec.innerHTML = buildEvalTurnoHTML(State.shop, State.from); attachEvalHandlers(); }
+  if (sec) { sec.innerHTML = buildEvalTurnoHTML(State.shop, State.from); attachEvalHandlers(); return; }
+  // Multi-day mode: refresh all day blocks
+  document.querySelectorAll('[id^="evalDay-"]').forEach(el => {
+    const dd = el.id.replace('evalDay-','');
+    el.innerHTML = buildEvalDayContent(State.shop, dd);
+  });
+  // Refresh global controls cost display
+  const ctrl = document.getElementById('costeBrutoInput');
+  if (ctrl) ctrl.closest('.eval-global-controls').querySelector('.prod-control:last-of-type').textContent =
+    `→ Total: ${fmtNum(State.costeBruto*(1+State.seguridadSocial/100),2)} €/h`;
+  attachEvalHandlers();
 }
 
 /* ---- Flavors ---- */
