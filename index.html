@@ -1934,14 +1934,17 @@ function renderKPIs(shop, from, to){
         .reduce((a,r) => a + r.ticketMedioGelato * r.ticketsTotal, 0) / t2TicketsTotal
     : NaN;
 
-  // "Diferencia vs año anterior" es una comparación mensual acumulada, no se puede sumar
-  // día a día sin distorsionar: se toma la foto del último día del rango seleccionado.
-  const snapRows = State.raw.t2.filter(r => r.dkey === to && (shop === 'all' || shopEq(r.shop, shop)));
+  // "Var. mes vs año anterior": compute from t1 + historical to avoid gaps in Table 2
   let difPct = NaN;
-  if (snapRows.length){
-    const mesActual = sum(snapRows.map(r => r.totalMesEnCurso));
-    const mesAnt = sum(snapRows.map(r => r.totalMesAnoAnterior));
-    difPct = mesAnt ? ((mesActual - mesAnt) / mesAnt) * 100 : NaN;
+  {
+    const mStart = monthStart(to);
+    const inScopeMonth = r => inRange(r.dkey, mStart, to) && (shop === 'all' || shopEq(r.shop, shop));
+    const mesActual = sum(State.raw.t1.filter(inScopeMonth).map(r => r.ventas));
+    const mDays = []; let dd = mStart; while(dd <= to){ mDays.push(dd); dd = shiftDate(dd,1); }
+    const prevMesTotal = mDays.map(d => getPrevYearTotalForShop(d, shop)).filter(v => !isNaN(v));
+    const mesAnt = prevMesTotal.length ? prevMesTotal.reduce((a,b)=>a+b,0) : NaN;
+    difPct = (!isNaN(mesActual) && !isNaN(mesAnt) && mesAnt > 0)
+      ? ((mesActual - mesAnt) / mesAnt) * 100 : NaN;
   }
 
   const isRange = from !== to;
