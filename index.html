@@ -1613,25 +1613,8 @@ function calcTotalPersonnelCostForDay(shop, dkey){
 function updateCostePersonalKPI(dkey){
   const el = document.getElementById('costePersonalKPI');
   if (!el) return;
-  const costeHora = State.costeBruto * (1 + State.seguridadSocial / 100);
-  const tabName = getRadiografiaTab(dkey);
-  const radData = tabName ? State.radiografia[tabName] : null;
-  const parts = dkey.split('-').map(Number);
-  const jsDay = new Date(parts[0], parts[1]-1, parts[2]).getDay();
-  const shopsToCalc = State.shop === 'all' ? SHOP_ORDER : [State.shop];
-  let totalCost = 0, totalVentas = 0, hasRad = false;
-  for (const shopFull of shopsToCalc){
-    const shopKey = SHOP_RAD_KEY[shopFull];
-    if (!shopKey) continue;
-    const h = radData ? calcPersonnelCostForShop(shopKey, jsDay, radData) : NaN;
-    if (!isNaN(h)){ totalCost += h * costeHora; hasRad = true; }
-    const rows = (State.raw.t1||[]).filter(r => r.dkey === dkey && shopEq(r.shop, shopFull));
-    totalVentas += rows.reduce((a,r)=>a+(isNaN(r.ventas)?0:r.ventas),0);
-  }
-  const ratio = (hasRad && totalVentas > 0) ? (totalCost / (totalVentas / 1.1)) * 100 : NaN;
-  el.innerHTML = isNaN(ratio)
-    ? '<div class="kpi-value small">—</div>'
-    : `<div class="kpi-value small">${fmtNum(ratio,1)} %</div>`;
+  // Re-render the whole panel to pick up the updated ratio (handles both single and range)
+  renderAll();
 }
 
 function getStaffForSlot(shopKey, jsDay, t1Slot, radData){
@@ -1968,7 +1951,7 @@ function renderKPIs(shop, from, to){
     const have = new Set(t1rows.filter(r => !isNaN(r.ventas) && r.ventas > 0).map(r => r.dkey));
     return have.size;
   })();
-  const coverageNote = isRange && daysWithData < totalDays ? `${daysWithData}/${totalDays} días con datos` : null;
+  const coverageNote = isRange ? `${daysWithData}/${totalDays} días con datos` : null;
 
   // Trayectoria: (ventas / daysWithData) × days_in_month
   const avgDaily = daysWithData > 0 ? ventasPeriodo / daysWithData : NaN;
@@ -2083,21 +2066,25 @@ function renderKPIs(shop, from, to){
         </div>
       </div>`).join('')}</div>`;
   })()}
-  ${!isRange ? (() => {
+  ${(() => {
     const costeHora = State.costeBruto * (1 + State.seguridadSocial / 100);
-    const tabName = getRadiografiaTab(from);
-    const radData = tabName ? State.radiografia[tabName] : null;
-    const parts = from.split('-').map(Number);
-    const jsDay = new Date(parts[0], parts[1]-1, parts[2]).getDay();
     const shopsToCalc = shop === 'all' ? SHOP_ORDER : [shop];
+    const days = []; let dd = from; while(dd <= to){ days.push(dd); dd = shiftDate(dd,1); }
+
     let totalCost = 0, totalVentas = 0, hasRad = false;
-    for (const shopFull of shopsToCalc){
-      const shopKey = SHOP_RAD_KEY[shopFull];
-      if (!shopKey) continue;
-      const h = radData ? calcPersonnelCostForShop(shopKey, jsDay, radData) : NaN;
-      if (!isNaN(h)){ totalCost += h * costeHora; hasRad = true; }
-      const rows = (State.raw.t1||[]).filter(r => r.dkey === from && shopEq(r.shop, shopFull));
-      totalVentas += rows.reduce((a,r)=>a+(isNaN(r.ventas)?0:r.ventas),0);
+    for (const dd of days){
+      const tabName = getRadiografiaTab(dd);
+      const radData = tabName ? State.radiografia[tabName] : null;
+      if (!radData) continue;
+      const parts = dd.split('-').map(Number);
+      const jsDay = new Date(parts[0], parts[1]-1, parts[2]).getDay();
+      for (const shopFull of shopsToCalc){
+        const shopKey = SHOP_RAD_KEY[shopFull]; if(!shopKey) continue;
+        const h = calcPersonnelCostForShop(shopKey, jsDay, radData);
+        if (!isNaN(h)){ totalCost += h * costeHora; hasRad = true; }
+        const rows = (State.raw.t1||[]).filter(r => r.dkey === dd && shopEq(r.shop, shopFull));
+        totalVentas += rows.reduce((a,r)=>a+(isNaN(r.ventas)?0:r.ventas),0);
+      }
     }
     const ventasNetas = totalVentas / 1.1;
     const ratio = (hasRad && ventasNetas > 0) ? (totalCost / ventasNetas) * 100 : NaN;
@@ -2109,10 +2096,12 @@ function renderKPIs(shop, from, to){
         <div class="kpi-body">
           <div class="kpi-label">${esc(shopLabel)} · ${fmtNum(costeHora,2)} €/h</div>
           <div id="costePersonalKPI">${isNaN(ratio) ? '<div class="kpi-value small">—</div>' : `<div class="kpi-value small">${fmtNum(ratio,1)} %</div>`}</div>
+          ${isRange && !hasRad ? `<div class="kpi-sub">Cargando radiografías…</div>` : ''}
+          ${isRange && hasRad && days.length > 1 ? `<div class="kpi-sub">${days.filter(dd=>{const t=getRadiografiaTab(dd);return t&&State.radiografia[t];}).length}/${days.length} días con rad.</div>` : ''}
         </div>
       </div>
     </div>`;
-  })() : ''}`;
+  })()}`;
 }
 function sum(arr){ const v = arr.filter(n => !isNaN(n)); return v.length ? v.reduce((a,b)=>a+b,0) : NaN; }
 
