@@ -836,6 +836,12 @@ async function loadData(){
     const t1Final = [...t1Hist, ...t1Live];
 
     State.raw = { t1:t1Final, t2, t3, t5, t6, ult };
+
+    // Build fast lookup indexes to avoid repeated O(n) scans in hot render paths
+    State.t1ByDkey = {};
+    for (const r of t1Final){ if(!State.t1ByDkey[r.dkey]) State.t1ByDkey[r.dkey]=[]; State.t1ByDkey[r.dkey].push(r); }
+    State.t2ByDkey = {};
+    for (const r of t2){ if(!State.t2ByDkey[r.dkey]) State.t2ByDkey[r.dkey]=[]; State.t2ByDkey[r.dkey].push(r); }
     State.lastSync = new Date();
 
     const shopsFound = Array.from(new Set(t2.map(r => r.shop)));
@@ -1181,7 +1187,7 @@ function exportToExcel(){
 
   // Aggregate t1 to daily totals per shop
   const map = new Map();
-  for (const r of State.raw.t1.filter(inScope)){
+  for (const r of t1ForRange(from, to, shop)){
     const key = `${r.dkey}||${r.shop}`;
     if (!map.has(key)) map.set(key, { dkey: r.dkey, shop: r.shop, ventas: 0 });
     if (!isNaN(r.ventas)) map.get(key).ventas += r.ventas;
@@ -1197,6 +1203,18 @@ function exportToExcel(){
   XLSX.writeFile(wb, `Amorino_${shopLabel}_${from}_${to}.xlsx`);
 }
 
+/* Fast range lookups using dkey indexes — avoids O(n) full-array scan per render */
+function t1ForRange(from, to, shop){
+  const result = []; let d = from;
+  while(d <= to){ for(const r of (State.t1ByDkey[d]||[])){ if(shop==='all'||shopEq(r.shop,shop)) result.push(r); } d=shiftDate(d,1); }
+  return result;
+}
+function t2ForRange(from, to, shop){
+  const result = []; let d = from;
+  while(d <= to){ for(const r of (State.t2ByDkey[d]||[])){ if(shop==='all'||shopEq(r.shop,shop)) result.push(r); } d=shiftDate(d,1); }
+  return result;
+}
+
 function prevYearKey(dkey){
   const [y,m,d] = dkey.split('-');
   return `${parseInt(y,10)-1}-${m}-${d}`;
@@ -1206,17 +1224,11 @@ function getPrevYearTotalForShop(dkey, shop){
   // 1. Try Google Sheet data (covers 2026+ for future comparison years)
   if (State.raw){
     if (shop === 'all'){
-      const rows = State.raw.t1.filter(r => r.dkey === pkey);
-      if (rows.length){
-        const s = rows.reduce((a,r) => a+(isNaN(r.ventas)?0:r.ventas), 0);
-        if (s > 0) return s;
-      }
+      const rows = State.t1ByDkey[pkey] || [];
+      if (rows.length){ const s = rows.reduce((a,r)=>a+(isNaN(r.ventas)?0:r.ventas),0); if(s>0) return s; }
     } else {
-      const rows = State.raw.t1.filter(r => r.dkey === pkey && shopEq(r.shop, shop));
-      if (rows.length){
-        const s = rows.reduce((a,r) => a+(isNaN(r.ventas)?0:r.ventas), 0);
-        if (s > 0) return s;
-      }
+      const rows = (State.t1ByDkey[pkey]||[]).filter(r => shopEq(r.shop, shop));
+      if (rows.length){ const s = rows.reduce((a,r)=>a+(isNaN(r.ventas)?0:r.ventas),0); if(s>0) return s; }
     }
   }
   // 2. Fall back to historical constants (May 2025 – May 2026)
@@ -1242,7 +1254,7 @@ function getPrevYearSugForShop(from, to, shop){
   for (const dd of days){
     const pkey = prevYearKey(dd);
     // 1. Try live sheet (t2)
-    const t2rows = State.raw.t2.filter(r => r.dkey === pkey && (shop === 'all' || shopEq(r.shop, shop)));
+    const t2rows = (State.t2ByDkey[pkey]||[]).filter(r => shop==='all' || shopEq(r.shop,shop));
     if (t2rows.length){
       for (const r of t2rows){
         if (!isNaN(r.sugerenciasPct) && !isNaN(r.ticketsTotal)){
@@ -1280,7 +1292,7 @@ function getMatchedMedHelComparison(from, to, shop){
     // --- Previous year value for this day ---
     let prevVal = NaN, prevTix = 0;
     // 1. Live sheet t2
-    const t2prev = State.raw.t2.filter(r => r.dkey === pkey && (shop === 'all' || shopEq(r.shop, shop)));
+    const t2prev = (State.t2ByDkey[pkey]||[]).filter(r => shop==='all' || shopEq(r.shop,shop));
     for (const r of t2prev){
       if (!isNaN(r.ticketMedioGelato) && !isNaN(r.ticketsTotal) && r.ticketsTotal > 0){
         prevW += r.ticketMedioGelato * r.ticketsTotal;
@@ -1613,8 +1625,27 @@ function calcTotalPersonnelCostForDay(shop, dkey){
 function updateCostePersonalKPI(dkey){
   const el = document.getElementById('costePersonalKPI');
   if (!el) return;
-  // Re-render the whole panel to pick up the updated ratio (handles both single and range)
-  renderAll();
+  const costeHora = State.costeBruto * (1 + State.seguridadSocial / 100);
+  const shop = State.shop, from = State.from, to = State.to;
+  const shopsToCalc = shop === 'all' ? SHOP_ORDER : [shop];
+  const days = []; let dd = from; while(dd <= to){ days.push(dd); dd = shiftDate(dd,1); }
+  let totalCost = 0, totalVentas = 0, hasRad = false;
+  for (const dd of days){
+    const tabName = getRadiografiaTab(dd);
+    const radData = tabName ? State.radiografia[tabName] : null;
+    if (!radData) continue;
+    const parts = dd.split('-').map(Number);
+    const jsDay = new Date(parts[0], parts[1]-1, parts[2]).getDay();
+    for (const shopFull of shopsToCalc){
+      const shopKey = SHOP_RAD_KEY[shopFull]; if(!shopKey) continue;
+      const h = calcPersonnelCostForShop(shopKey, jsDay, radData);
+      if (!isNaN(h)){ totalCost += h * costeHora; hasRad = true; }
+      const rows = (State.t1ByDkey[dd]||[]).filter(r => shopEq(r.shop, shopFull));
+      totalVentas += rows.reduce((a,r)=>a+(isNaN(r.ventas)?0:r.ventas),0);
+    }
+  }
+  const ratio = (hasRad && totalVentas > 0) ? (totalCost / (totalVentas/1.1)) * 100 : NaN;
+  el.innerHTML = isNaN(ratio) ? '<div class="kpi-value small">—</div>' : `<div class="kpi-value small">${fmtNum(ratio,1)} %</div>`;
 }
 
 function getStaffForSlot(shopKey, jsDay, t1Slot, radData){
@@ -1832,7 +1863,7 @@ function renderDailySeriesCard(shop, from, to){
     </div>`;
   }
 
-  const rows = State.raw.t1.filter(r => inRange(r.dkey, from, to) && (shop === 'all' || shopEq(r.shop, shop)));
+  const rows = t1ForRange(from, to, shop);
   const byDay = new Map();
   days.forEach(dd => byDay.set(dd, 0));
   rows.forEach(r => { if (!isNaN(r.ventas)) byDay.set(r.dkey, (byDay.get(r.dkey) || 0) + r.ventas); });
@@ -1910,8 +1941,8 @@ function renderDailySeriesCard(shop, from, to){
 function renderKPIs(shop, from, to){
   if (!from || !to) return `<div class="banner">No hay fechas seleccionadas todavía.</div>`;
   const inScope = r => inRange(r.dkey, from, to) && (shop === 'all' || shopEq(r.shop, shop));
-  const t1rows = State.raw.t1.filter(inScope);
-  const t2rows = State.raw.t2.filter(inScope);
+  const t1rows = t1ForRange(from, to, shop);
+  const t2rows = t2ForRange(from, to, shop);
   const t3rows = State.raw.t3.filter(inScope);
 
   const ventasPeriodo = sum(t1rows.map(r => r.ventas));
@@ -1939,7 +1970,7 @@ function renderKPIs(shop, from, to){
   {
     const mStart = monthStart(to);
     const inScopeMonth = r => inRange(r.dkey, mStart, to) && (shop === 'all' || shopEq(r.shop, shop));
-    const mesActual = sum(State.raw.t1.filter(inScopeMonth).map(r => r.ventas));
+    const mesActual = sum(t1ForRange(mStart, to, shop).map(r => r.ventas));
     const mDays = []; let dd = mStart; while(dd <= to){ mDays.push(dd); dd = shiftDate(dd,1); }
     const prevMesTotal = mDays.map(d => getPrevYearTotalForShop(d, shop)).filter(v => !isNaN(v));
     const mesAnt = prevMesTotal.length ? prevMesTotal.reduce((a,b)=>a+b,0) : NaN;
@@ -2111,7 +2142,7 @@ function sum(arr){ const v = arr.filter(n => !isNaN(n)); return v.length ? v.red
 /* ---- Hourly chart ---- */
 function renderHourlyCard(shop, from, to){
   if (!from || !to) return `<div class="card"><div class="empty-note">Sin fechas seleccionadas</div></div>`;
-  const rows = State.raw.t1.filter(r => inRange(r.dkey, from, to) && (shop === 'all' || shopEq(r.shop, shop)));
+  const rows = t1ForRange(from, to, shop);
   if (!rows.length) return `<div class="card"><h3>Ventas por hora</h3><div class="empty-note">Sin datos para esta selección</div></div>`;
   const map = new Map();
   rows.forEach(r => map.set(r.horario, (map.get(r.horario)||0) + (isNaN(r.ventas)?0:r.ventas)));
