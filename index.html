@@ -2182,7 +2182,10 @@ function renderPaymentCard(shop, from, to){
     <div class="legend-row">
       <span class="legend-sw" style="background:${FLAVOR_COLORS[i % FLAVOR_COLORS.length]}"></span>
       <span>${esc(e[0])}</span>
-      <span class="pct">${fmtPct((e[1]/total)*100)}</span>
+      <span class="pct" style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;">
+        <span>${fmtEUR(e[1])}</span>
+        <span style="font-size:10.5px;color:var(--ink-soft);font-weight:400;">${fmtPct((e[1]/total)*100)}</span>
+      </span>
     </div>`).join('');
   return `<div class="card">
     <h3>Formas de pago</h3>
