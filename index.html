@@ -303,8 +303,10 @@
     }
     .eval-grand-total strong { color: var(--ink) !important; }
 
-    /* Hide panel sections when printing from eval tab */
-    #content > *:not(#evalCard):not(.eval-day-block) .card { display: none !important; }
+    /* Hide print header when printing from eval tab */
+    body.eval-active .print-header { display: none !important; }
+    /* Don't add a blank page after the last day block */
+    .eval-day-block:last-child { page-break-after: auto !important; }
 
     /* Compact cards */
     .card{box-shadow:none;border:1px solid #ccc;break-inside:avoid;margin-bottom:8px;padding:10px 12px;}
@@ -2451,6 +2453,7 @@ document.getElementById('mainTabBar').addEventListener('click', e => {
   if (!btn) return;
   const tab = btn.dataset.tab;
   State.activeTab = tab;
+  document.body.classList.toggle('eval-active', tab === 'eval');
   document.querySelectorAll('.main-tab[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   renderAll();
 });
