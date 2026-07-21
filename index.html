@@ -1985,7 +1985,42 @@ function renderKPIs(shop, from, to){
     const have = new Set(t1rows.filter(r => !isNaN(r.ventas) && r.ventas > 0).map(r => r.dkey));
     return have.size;
   })();
-  const coverageNote = isRange ? `${daysWithData}/${totalDays} días con datos` : null;
+  const SHOP_ABBR = {
+    'Amorino Sevilla Avenida':       'Ave',
+    'Amorino Patio de los Naranjos': 'Nar',
+    'Amorino Catedral':              'Cat',
+    'Amorino Plaza Nueva':           'PN',
+    'Amorino Alcázar':               'Alc',
+  };
+  const shopsToCheck = shop === 'all' ? SHOP_ORDER : [shop];
+
+  let coverageNote;
+  if (isRange){
+    if (shop === 'all'){
+      const perShop = shopsToCheck.map(s => {
+        const n = new Set((State.t1ByDkey ? [] : []).concat(
+          (() => { const res=[]; let d=from; while(d<=to){for(const r of(State.t1ByDkey[d]||[])){if(shopEq(r.shop,s)&&!isNaN(r.ventas)&&r.ventas>0)res.push(d);} d=shiftDate(d,1);} return res; })()
+        )).size;
+        const abbr = SHOP_ABBR[s] || s.replace('Amorino ','');
+        return `${abbr} ${n}/${totalDays}`;
+      });
+      coverageNote = `${daysWithData}/${totalDays} días · ` + perShop.join(' · ');
+    } else {
+      coverageNote = `${daysWithData}/${totalDays} días con datos`;
+    }
+  } else {
+    // Single day
+    if (shop === 'all'){
+      const statuses = shopsToCheck.map(s => {
+        const has = (State.t1ByDkey[from]||[]).some(r => shopEq(r.shop,s) && !isNaN(r.ventas) && r.ventas > 0);
+        return `${SHOP_ABBR[s]||s} ${has ? '✓' : '✗'}`;
+      });
+      coverageNote = statuses.join(' · ');
+    } else {
+      const has = (State.t1ByDkey[from]||[]).some(r => shopEq(r.shop,shop) && !isNaN(r.ventas) && r.ventas > 0);
+      coverageNote = has ? 'Con datos ✓' : 'Sin datos ✗';
+    }
+  }
 
   // Trayectoria: (ventas / daysWithData) × days_in_month
   const avgDaily = daysWithData > 0 ? ventasPeriodo / daysWithData : NaN;
