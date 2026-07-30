@@ -2334,30 +2334,76 @@ function renderEmployeesCard(shop, from, to){
       });
       const days = [...byDay.keys()].sort();
       const vals = days.map(d => { const e = byDay.get(d); return e.tix > 0 ? (e.sg/e.tix)*100 : NaN; });
+      const tixByDay = days.map(d => byDay.get(d).tix);
+      const sgByDay  = days.map(d => byDay.get(d).sg);
       const validVals = vals.filter(v => !isNaN(v));
-      if (validVals.length >= 2){
-        const W=700, H=160, padL=14, padR=14, padT=14, padB=36;
+      const avg = validVals.length ? validVals.reduce((a,b)=>a+b,0)/validVals.length : NaN;
+
+      // Excel download
+      const xlsData = [['Fecha','Tienda','Tickets','Sugerencias','% Sugerencias']]
+        .concat(days.map((d,i) => [dateLabel(d), selShop, tixByDay[i]||0, sgByDay[i]||0, isNaN(vals[i])?'':+vals[i].toFixed(2)]));
+      const xlsDownload = `onclick="(function(){
+        const wb=XLSX.utils.book_new();
+        const ws=XLSX.utils.aoa_to_sheet(${JSON.stringify(xlsData)});
+        XLSX.utils.book_append_sheet(wb,ws,'Sugerencias');
+        XLSX.writeFile(wb,'${(selName+'_sugerencias').replace(/[^a-zA-Z0-9_]/g,'_')}.xlsx');
+      })()"`;
+
+      if (validVals.length >= 1){
+        const W=700, H=200, padL=38, padR=14, padT=14, padB=36;
         const innerW=W-padL-padR, innerH=H-padT-padB;
-        const max=Math.max(...validVals, 30);
+        const max=Math.max(...validVals, 25);
         const stepX = days.length>1 ? innerW/(days.length-1) : 0;
-        const toY = v => isNaN(v) ? null : padT+innerH-(v/max)*innerH;
+        const toY = v => isNaN(v)?null:padT+innerH-(v/max)*innerH;
         const pts = vals.map((v,i)=>[padL+i*stepX, toY(v)]);
         const path = pts.map((p,i)=>p[1]===null?'':(i===0||pts[i-1][1]===null?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
-        const avg = validVals.reduce((a,b)=>a+b,0)/validVals.length;
-        const labelEvery = days.length<=8?1:Math.ceil(days.length/8);
-        const dots = pts.map((p,i)=>p[1]===null?'':`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="#5E6FA3" stroke="#fff" stroke-width="1.5"><title>${dateLabel(days[i])}: ${fmtPct(vals[i])}</title></circle>`).join('');
-        const xLabels = pts.map((p,i)=>(i%labelEvery===0||i===pts.length-1)?`<text x="${p[0].toFixed(1)}" y="${H-8}" font-size="9" fill="#766955" text-anchor="middle">${dateLabel(days[i]).slice(0,5)}</text>`:'').join('');
+        const labelEvery = days.length<=10?1:Math.ceil(days.length/10);
+
+        // 20% reference line y position
+        const refY = toY(20);
+        const avgY = !isNaN(avg) ? toY(avg) : null;
+
+        const dots = pts.map((p,i)=>p[1]===null?'':`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3.5"
+          fill="${vals[i]>=20?'#4D7A3F':'#C84B5E'}" stroke="#fff" stroke-width="1.5">
+          <title>${dateLabel(days[i])}: ${fmtPct(vals[i])} (${sgByDay[i]} sg / ${tixByDay[i]} tix)</title></circle>`).join('');
+        const xLabels = pts.map((p,i)=>(i%labelEvery===0||i===pts.length-1)?
+          `<text x="${p[0].toFixed(1)}" y="${H-8}" font-size="9" fill="#766955" text-anchor="middle">${dateLabel(days[i]).slice(0,5)}</text>`:''
+        ).join('');
+
+        // Y-axis labels
+        const yTicks = [0, 10, 20, 30, 40, 50].filter(v => v <= max+5);
+        const yAxisLabels = yTicks.map(v=>{
+          const y = toY(v); if(y===null) return '';
+          return `<line x1="${padL-4}" y1="${y.toFixed(1)}" x2="${padL}" y2="${y.toFixed(1)}" stroke="#ccc" stroke-width="1"/>
+          <line x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}" stroke="#f0e8d8" stroke-width="0.5"/>
+          <text x="${padL-6}" y="${(y+3).toFixed(1)}" font-size="9" fill="#999" text-anchor="end">${v}%</text>`;
+        }).join('');
+
         trendHtml = `<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line);">
-          <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;">
-            ${esc(selName)} · ${esc(selShop.replace('Amorino ',''))} · % Sugerencias · media ${fmtPct(avg)}
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+            <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);">
+              ${esc(selName)} · ${esc(selShop.replace('Amorino ',''))} · ${validVals.length} días · media ${fmtPct(avg)}
+            </div>
+            <button ${xlsDownload}
+              style="font-size:12px;font-weight:600;color:var(--cocoa);background:var(--cream-2);
+              border:1px solid var(--line);border-radius:8px;padding:5px 12px;cursor:pointer;">⬇ Excel</button>
           </div>
-          <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px;overflow:visible;">
+          <svg viewBox="0 0 ${W} ${H}" style="width:100%;overflow:visible;">
+            ${yAxisLabels}
+            <!-- 20% reference line -->
+            ${refY!==null?`<line x1="${padL}" y1="${refY.toFixed(1)}" x2="${W-padR}" y2="${refY.toFixed(1)}"
+              stroke="#C84B5E" stroke-width="1.5" stroke-dasharray="6 3"/>
+            <text x="${W-padR-2}" y="${(refY-4).toFixed(1)}" font-size="9" fill="#C84B5E" text-anchor="end">20%</text>`:''}
+            <!-- Average line -->
+            ${avgY!==null?`<line x1="${padL}" y1="${avgY.toFixed(1)}" x2="${W-padR}" y2="${avgY.toFixed(1)}"
+              stroke="#5E6FA3" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>
+            <text x="${padL+4}" y="${(avgY-4).toFixed(1)}" font-size="9" fill="#5E6FA3">media</text>`:''}
             <path d="${path.trim()}" fill="none" stroke="#5E6FA3" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
             ${dots}${xLabels}
           </svg>
         </div>`;
       } else {
-        trendHtml = `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line);font-size:12px;color:var(--ink-soft);">Selecciona un rango de varios días para ver la trayectoria.</div>`;
+        trendHtml = `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line);font-size:12px;color:var(--ink-soft);">Sin datos suficientes para mostrar la trayectoria.</div>`;
       }
     }
   }
