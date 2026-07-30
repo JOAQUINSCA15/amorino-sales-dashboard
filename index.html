@@ -197,6 +197,7 @@
   }
   tbody td{padding:10px 10px;border-bottom:1px solid var(--cream-2);}
   tbody tr:hover{background:var(--cream-2);}
+  tr.emp-row{cursor:pointer;}
   td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}
   .emp-name{font-weight:700;}
   .shop-tag{font-size:10.5px;color:var(--ink-soft);}
@@ -2277,6 +2278,11 @@ function renderPaymentCard(shop, from, to){
 
 /* ---- Employees ---- */
 let empSortKey = 'tickets';
+let empSearch = ''; // format: "shopFull||empleado"
+
+function empKey(shop, emp){ return `${shop}||${emp}`; }
+function empKeyShop(key){ return key.split('||')[0]; }
+function empKeyName(key){ return key.split('||')[1]; }
 function renderEmployeesCard(shop, from, to){
   if (!from || !to) return `<div class="card"><div class="empty-note">Sin fechas seleccionadas</div></div>`;
   const rows = State.raw.t3.filter(r => inRange(r.dkey, from, to) && (shop === 'all' || shopEq(r.shop, shop)) && r.empleado);
@@ -2305,17 +2311,71 @@ function renderEmployeesCard(shop, from, to){
   }));
 
   const sorted = agg.sort((a,b) => (b[empSortKey]||0) - (a[empSortKey]||0));
+  const allEmps = Array.from(new Set(rows.map(r => empKey(r.shop, r.empleado)))).sort();
   const showShop = shop === 'all';
   const isRange = from !== to;
+
+  // Employee trend chart
+  let trendHtml = '';
+  if (empSearch){
+    const selShop = empKeyShop(empSearch);
+    const selName = empKeyName(empSearch);
+    const empRows = rows.filter(r => r.empleado === selName && shopEq(r.shop, selShop));
+    if (empRows.length){
+      const byDay = new Map();
+      empRows.forEach(r => {
+        if (!byDay.has(r.dkey)) byDay.set(r.dkey, {sg:0, tix:0});
+        const d = byDay.get(r.dkey);
+        if (!isNaN(r.sugerencias)) d.sg  += r.sugerencias;
+        if (!isNaN(r.tickets))     d.tix += r.tickets;
+      });
+      const days = [...byDay.keys()].sort();
+      const vals = days.map(d => { const e = byDay.get(d); return e.tix > 0 ? (e.sg/e.tix)*100 : NaN; });
+      const validVals = vals.filter(v => !isNaN(v));
+      if (validVals.length >= 2){
+        const W=700, H=160, padL=14, padR=14, padT=14, padB=36;
+        const innerW=W-padL-padR, innerH=H-padT-padB;
+        const max=Math.max(...validVals, 30);
+        const stepX = days.length>1 ? innerW/(days.length-1) : 0;
+        const toY = v => isNaN(v) ? null : padT+innerH-(v/max)*innerH;
+        const pts = vals.map((v,i)=>[padL+i*stepX, toY(v)]);
+        const path = pts.map((p,i)=>p[1]===null?'':(i===0||pts[i-1][1]===null?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+        const avg = validVals.reduce((a,b)=>a+b,0)/validVals.length;
+        const labelEvery = days.length<=8?1:Math.ceil(days.length/8);
+        const dots = pts.map((p,i)=>p[1]===null?'':`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="#5E6FA3" stroke="#fff" stroke-width="1.5"><title>${dateLabel(days[i])}: ${fmtPct(vals[i])}</title></circle>`).join('');
+        const xLabels = pts.map((p,i)=>(i%labelEvery===0||i===pts.length-1)?`<text x="${p[0].toFixed(1)}" y="${H-8}" font-size="9" fill="#766955" text-anchor="middle">${dateLabel(days[i]).slice(0,5)}</text>`:'').join('');
+        trendHtml = `<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line);">
+          <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;">
+            ${esc(selName)} · ${esc(selShop.replace('Amorino ',''))} · % Sugerencias · media ${fmtPct(avg)}
+          </div>
+          <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px;overflow:visible;">
+            <path d="${path.trim()}" fill="none" stroke="#5E6FA3" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+            ${dots}${xLabels}
+          </svg>
+        </div>`;
+      } else {
+        trendHtml = `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line);font-size:12px;color:var(--ink-soft);">Selecciona un rango de varios días para ver la trayectoria.</div>`;
+      }
+    }
+  }
+
   return `<div class="card">
     <h3>Rendimiento del equipo</h3>
     <div class="hint">${shop==='all'?'Todas las tiendas':esc(shop)} · ${rangeLabel(from,to)} · ${sorted.length} persona${sorted.length!==1?'s':''}</div>
-    <select class="sort-select" id="empSortSelect">
-      <option value="tickets"       ${empSortKey==='tickets'?'selected':''}>Ordenar por Nº de tickets</option>
-      <option value="ticketMedio"   ${empSortKey==='ticketMedio'?'selected':''}>Ordenar por ticket medio</option>
-      <option value="medHel"        ${empSortKey==='medHel'?'selected':''}>Ordenar por media helado</option>
-      <option value="sugerenciasPct"${empSortKey==='sugerenciasPct'?'selected':''}>Ordenar por % sugerencias</option>
-    </select>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px;">
+      <select class="sort-select" id="empSortSelect" style="margin-bottom:0;">
+        <option value="tickets"       ${empSortKey==='tickets'?'selected':''}>Ordenar por Nº de tickets</option>
+        <option value="ticketMedio"   ${empSortKey==='ticketMedio'?'selected':''}>Ordenar por ticket medio</option>
+        <option value="medHel"        ${empSortKey==='medHel'?'selected':''}>Ordenar por media helado</option>
+        <option value="sugerenciasPct"${empSortKey==='sugerenciasPct'?'selected':''}>Ordenar por % sugerencias</option>
+      </select>
+      <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:160px;">
+        <input id="empSearchInput" list="empList" placeholder="Buscar empleado…" value="${esc(empSearch ? empKeyName(empSearch) : '')}"
+          style="font-family:'Inter',sans-serif;font-size:13px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:var(--white);color:var(--ink);flex:1;">
+        <datalist id="empList">${allEmps.map(k=>`<option value="${esc(empKeyName(k))}" label="${esc(empKeyName(k))} (${esc(empKeyShop(k).replace('Amorino ',''))})">`).join('')}</datalist>
+        ${empSearch ? `<button onclick="empSearch='';renderAll();" style="font-size:11px;border:none;background:none;cursor:pointer;color:var(--ink-soft);">✕</button>` : ''}
+      </div>
+    </div>
     <div style="overflow-x:auto;">
     <table>
       <thead><tr>
@@ -2328,9 +2388,11 @@ function renderEmployeesCard(shop, from, to){
       </tr></thead>
       <tbody>
         ${sorted.map(r => {
-            const sugClass = isNaN(r.sugerenciasPct) ? '' : (r.sugerenciasPct >= 20 ? 'cell-good' : 'cell-bad');
-            const helClass = isNaN(r.medHel)         ? '' : (r.medHel >= 5.20        ? 'cell-good' : 'cell-bad');
-            return `<tr>
+          const sugClass = isNaN(r.sugerenciasPct)?'':(r.sugerenciasPct>=20?'cell-good':'cell-bad');
+          const helClass = isNaN(r.medHel)?'':(r.medHel>=5.20?'cell-good':'cell-bad');
+          const key = empKey(r.shop, r.empleado);
+          const isSelected = key === empSearch;
+          return `<tr style="${isSelected?'background:rgba(94,111,163,0.08);':''}" onclick="empSearch='${esc(key)}';renderAll();" class="emp-row">
             <td><div class="emp-name">${esc(r.empleado)}</div>${showShop?`<div class="shop-tag">${esc(r.shop.replace('Amorino ',''))}</div>`:''}</td>
             ${isRange?`<td class="num">${fmtInt(r.dias)}</td>`:''}
             <td class="num">${fmtInt(r.tickets)}</td>
@@ -2341,12 +2403,22 @@ function renderEmployeesCard(shop, from, to){
       </tbody>
     </table>
     </div>
-    ${isRange?'<div class="hint" style="margin:10px 0 0;">Ticket medio y Med. Hel.: media diaria del vendedor en el periodo · % Sug.: Sg totales ÷ tickets totales</div>':''}
+    ${trendHtml}
   </div>`;
 }
 function attachSortHandler(){
   const el = document.getElementById('empSortSelect');
   if (el) el.addEventListener('change', e => { empSortKey = e.target.value; renderAll(); });
+  const si = document.getElementById('empSearchInput');
+  if (si) si.addEventListener('change', e => {
+    const val = e.target.value.trim();
+    if (!val){ empSearch = ''; renderAll(); return; }
+    // Find matching compound key in current t3 data
+    const match = State.raw.t3.find(r => r.empleado === val);
+    if (match) empSearch = empKey(match.shop, match.empleado);
+    else empSearch = '';
+    renderAll();
+  });
 }
 
 function attachEvalHandlers(){
