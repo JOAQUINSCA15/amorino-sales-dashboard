@@ -2339,16 +2339,14 @@ function renderEmployeesCard(shop, from, to){
       const validVals = vals.filter(v => !isNaN(v));
       const avg = validVals.length ? validVals.reduce((a,b)=>a+b,0)/validVals.length : NaN;
 
-      // Excel download
-      const xlsData = [['Fecha','Tienda','Tickets','Sugerencias','% Sugerencias']]
-        .concat(days.map((d,i) => [dateLabel(d), selShop, tixByDay[i]||0, sgByDay[i]||0, isNaN(vals[i])?'':+vals[i].toFixed(2)]));
-      const xlsDownload = `onclick="(function(){
-        const wb=XLSX.utils.book_new();
-        const ws=XLSX.utils.aoa_to_sheet(${JSON.stringify(xlsData)});
-        XLSX.utils.book_append_sheet(wb,ws,'Sugerencias');
-        XLSX.writeFile(wb,'${(selName+'_sugerencias').replace(/[^a-zA-Z0-9_]/g,'_')}.xlsx');
-      })()"`;
-
+      // Store for download
+      State.empTrendExport = days.map((d,i) => ({
+        fecha: dateLabel(d),
+        tienda: selShop,
+        tickets: tixByDay[i]||0,
+        sugerencias: sgByDay[i]||0,
+        pct: isNaN(vals[i]) ? '' : +vals[i].toFixed(2)
+      }));
       if (validVals.length >= 1){
         const W=700, H=200, padL=38, padR=14, padT=14, padB=36;
         const innerW=W-padL-padR, innerH=H-padT-padB;
@@ -2384,7 +2382,8 @@ function renderEmployeesCard(shop, from, to){
             <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);">
               ${esc(selName)} · ${esc(selShop.replace('Amorino ',''))} · ${validVals.length} días · media ${fmtPct(avg)}
             </div>
-            <button ${xlsDownload}
+            <div style="font-size:10px;color:var(--ink-soft);margin-top:2px;">Un punto = un día de trabajo · sugerencias ÷ tickets de ese día</div>
+            <button onclick="downloadEmpTrend()"
               style="font-size:12px;font-weight:600;color:var(--cocoa);background:var(--cream-2);
               border:1px solid var(--line);border-radius:8px;padding:5px 12px;cursor:pointer;">⬇ Excel</button>
           </div>
@@ -2454,6 +2453,17 @@ function renderEmployeesCard(shop, from, to){
     ${trendHtml}
   </div>`;
 }
+function downloadEmpTrend(){
+  if (!State.empTrendExport || !State.empTrendExport.length || typeof XLSX === 'undefined') return;
+  const rows = [['Fecha','Tienda','Tickets del día','Sugerencias del día','% Sugerencias del día']]
+    .concat(State.empTrendExport.map(r => [r.fecha, r.tienda, r.tickets, r.sugerencias, r.pct]));
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb, ws, 'Sugerencias');
+  const emp = empSearch ? empKeyName(empSearch).replace(/[^a-zA-Z0-9]/g,'_') : 'empleado';
+  XLSX.writeFile(wb, `${emp}_sugerencias_diarias.xlsx`);
+}
+
 function attachSortHandler(){
   const el = document.getElementById('empSortSelect');
   if (el) el.addEventListener('change', e => { empSortKey = e.target.value; renderAll(); });
