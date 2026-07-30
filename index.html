@@ -2278,7 +2278,8 @@ function renderPaymentCard(shop, from, to){
 
 /* ---- Employees ---- */
 let empSortKey = 'tickets';
-let empSearch = ''; // format: "shopFull||empleado"
+let empSearch = '';    // compound key "shop||name" for trend chart
+let empSearchText = ''; // free text for table filtering
 
 function empKey(shop, emp){ return `${shop}||${emp}`; }
 function empKeyShop(key){ return key.split('||')[0]; }
@@ -2311,7 +2312,9 @@ function renderEmployeesCard(shop, from, to){
   }));
 
   const sorted = agg.sort((a,b) => (b[empSortKey]||0) - (a[empSortKey]||0));
-  const allEmps = Array.from(new Set(rows.map(r => empKey(r.shop, r.empleado)))).sort();
+  const filtered = empSearchText
+    ? sorted.filter(r => r.empleado.toLowerCase().includes(empSearchText.toLowerCase()))
+    : sorted;
   const showShop = shop === 'all';
   const isRange = from !== to;
 
@@ -2370,10 +2373,9 @@ function renderEmployeesCard(shop, from, to){
         <option value="sugerenciasPct"${empSortKey==='sugerenciasPct'?'selected':''}>Ordenar por % sugerencias</option>
       </select>
       <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:160px;">
-        <input id="empSearchInput" list="empList" placeholder="Buscar empleado…" value="${esc(empSearch ? empKeyName(empSearch) : '')}"
+        <input id="empSearchInput" placeholder="Buscar empleado…" value="${esc(empSearchText)}"
           style="font-family:'Inter',sans-serif;font-size:13px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:var(--white);color:var(--ink);flex:1;">
-        <datalist id="empList">${allEmps.map(k=>`<option value="${esc(empKeyName(k))}" label="${esc(empKeyName(k))} (${esc(empKeyShop(k).replace('Amorino ',''))})">`).join('')}</datalist>
-        ${empSearch ? `<button onclick="empSearch='';renderAll();" style="font-size:11px;border:none;background:none;cursor:pointer;color:var(--ink-soft);">✕</button>` : ''}
+        ${empSearchText ? `<button onclick="empSearch='';empSearchText='';renderAll();" style="font-size:11px;border:none;background:none;cursor:pointer;color:var(--ink-soft);">✕</button>` : ''}
       </div>
     </div>
     <div style="overflow-x:auto;">
@@ -2387,7 +2389,7 @@ function renderEmployeesCard(shop, from, to){
         <th class="num">% Sug.</th>
       </tr></thead>
       <tbody>
-        ${sorted.map(r => {
+        ${filtered.map(r => {
           const sugClass = isNaN(r.sugerenciasPct)?'':(r.sugerenciasPct>=20?'cell-good':'cell-bad');
           const helClass = isNaN(r.medHel)?'':(r.medHel>=5.20?'cell-good':'cell-bad');
           const key = empKey(r.shop, r.empleado);
@@ -2410,15 +2412,18 @@ function attachSortHandler(){
   const el = document.getElementById('empSortSelect');
   if (el) el.addEventListener('change', e => { empSortKey = e.target.value; renderAll(); });
   const si = document.getElementById('empSearchInput');
-  if (si) si.addEventListener('change', e => {
-    const val = e.target.value.trim();
-    if (!val){ empSearch = ''; renderAll(); return; }
-    // Find matching compound key in current t3 data
-    const match = State.raw.t3.find(r => r.empleado === val);
-    if (match) empSearch = empKey(match.shop, match.empleado);
-    else empSearch = '';
-    renderAll();
-  });
+  if (si){
+    // Live filter as user types
+    si.addEventListener('input', e => {
+      empSearchText = e.target.value.trim();
+      // Clear trend if search text changed
+      if (empSearch && empKeyName(empSearch).toLowerCase() !== empSearchText.toLowerCase()) empSearch = '';
+      renderAll();
+      // Restore focus and cursor position
+      const inp = document.getElementById('empSearchInput');
+      if (inp){ inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+    });
+  }
 }
 
 function attachEvalHandlers(){
