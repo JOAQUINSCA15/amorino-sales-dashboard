@@ -2327,17 +2327,24 @@ function renderEmployeesCard(shop, from, to){
     if (empRows.length){
       const byDay = new Map();
       empRows.forEach(r => {
-        if (!byDay.has(r.dkey)) byDay.set(r.dkey, {sg:0, tix:0});
+        if (!byDay.has(r.dkey)) byDay.set(r.dkey, {sg:0, tix:0, medHelSum:0, medHelTix:0});
         const d = byDay.get(r.dkey);
-        if (!isNaN(r.sugerencias)) d.sg  += r.sugerencias;
+        if (!isNaN(r.sugerencias)) d.sg += r.sugerencias;
         if (!isNaN(r.tickets))     d.tix += r.tickets;
+        if (!isNaN(r.medHel) && !isNaN(r.tickets) && r.tickets > 0){
+          d.medHelSum += r.medHel * r.tickets;
+          d.medHelTix += r.tickets;
+        }
       });
       const days = [...byDay.keys()].sort();
-      const vals = days.map(d => { const e = byDay.get(d); return e.tix > 0 ? (e.sg/e.tix)*100 : NaN; });
+      const vals    = days.map(d => { const e = byDay.get(d); return e.tix > 0 ? (e.sg/e.tix)*100 : NaN; });
+      const medHels = days.map(d => { const e = byDay.get(d); return e.medHelTix > 0 ? e.medHelSum/e.medHelTix : NaN; });
       const tixByDay = days.map(d => byDay.get(d).tix);
       const sgByDay  = days.map(d => byDay.get(d).sg);
-      const validVals = vals.filter(v => !isNaN(v));
-      const avg = validVals.length ? validVals.reduce((a,b)=>a+b,0)/validVals.length : NaN;
+      const validVals   = vals.filter(v => !isNaN(v));
+      const validMedHel = medHels.filter(v => !isNaN(v));
+      const avg    = validVals.length   ? validVals.reduce((a,b)=>a+b,0)/validVals.length : NaN;
+      const avgMH  = validMedHel.length ? validMedHel.reduce((a,b)=>a+b,0)/validMedHel.length : NaN;
 
       // Store for download
       State.empTrendExport = days.map((d,i) => ({
@@ -2345,7 +2352,8 @@ function renderEmployeesCard(shop, from, to){
         tienda: selShop,
         tickets: tixByDay[i]||0,
         sugerencias: sgByDay[i]||0,
-        pct: isNaN(vals[i]) ? '' : +vals[i].toFixed(2)
+        pct: isNaN(vals[i]) ? '' : +vals[i].toFixed(2),
+        medHel: isNaN(medHels[i]) ? '' : +medHels[i].toFixed(2)
       }));
       if (validVals.length >= 1){
         const W=700, H=200, padL=38, padR=14, padT=14, padB=36;
@@ -2400,6 +2408,42 @@ function renderEmployeesCard(shop, from, to){
             <path d="${path.trim()}" fill="none" stroke="#5E6FA3" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
             ${dots}${xLabels}
           </svg>
+          ${(() => {
+            if (validMedHel.length < 1) return '';
+            const MH_THRESH = 5.10;
+            const mhMax = Math.max(...validMedHel, MH_THRESH + 0.5);
+            const mhMin = Math.max(0, Math.min(...validMedHel, MH_THRESH) - 0.5);
+            const mhRange = mhMax - mhMin || 1;
+            const mhToY = v => isNaN(v) ? null : padT + innerH - ((v - mhMin) / mhRange) * innerH;
+            const mhPts = medHels.map((v,i) => [padL + i*stepX, mhToY(v)]);
+            const mhPath = mhPts.map((p,i) => p[1]===null?'':(i===0||mhPts[i-1][1]===null?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+            const thrY = mhToY(MH_THRESH);
+            const avgMhY = mhToY(avgMH);
+            const mhTicks = [mhMin, MH_THRESH, mhMax].map(v=>+v.toFixed(2));
+            const mhYAxis = [...new Set(mhTicks)].map(v=>{
+              const y=mhToY(v); if(y===null) return '';
+              return `<line x1="${padL-4}" y1="${y.toFixed(1)}" x2="${padL}" y2="${y.toFixed(1)}" stroke="#ccc" stroke-width="1"/>
+              <line x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}" stroke="#f0e8d8" stroke-width="0.5"/>
+              <text x="${padL-6}" y="${(y+3).toFixed(1)}" font-size="9" fill="#999" text-anchor="end">${v.toFixed(2)}€</text>`;
+            }).join('');
+            const mhDots = mhPts.map((p,i)=>p[1]===null?'':`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3.5"
+              fill="${medHels[i]>=MH_THRESH?'#4D7A3F':'#C84B5E'}" stroke="#fff" stroke-width="1.5">
+              <title>${dateLabel(days[i])}: ${fmtEUR(medHels[i])}</title></circle>`).join('');
+            return `<div style="margin-top:14px;font-size:10px;color:var(--ink-soft);margin-bottom:6px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;">
+              Media de helado · media ${fmtEUR(avgMH)}
+            </div>
+            <svg viewBox="0 0 ${W} ${H}" style="width:100%;overflow:visible;">
+              ${mhYAxis}
+              ${thrY!==null?`<line x1="${padL}" y1="${thrY.toFixed(1)}" x2="${W-padR}" y2="${thrY.toFixed(1)}"
+                stroke="#C84B5E" stroke-width="1.5" stroke-dasharray="6 3"/>
+              <text x="${W-padR-2}" y="${(thrY-4).toFixed(1)}" font-size="9" fill="#C84B5E" text-anchor="end">5,10 €</text>`:''}
+              ${avgMhY!==null?`<line x1="${padL}" y1="${avgMhY.toFixed(1)}" x2="${W-padR}" y2="${avgMhY.toFixed(1)}"
+                stroke="#8FA871" stroke-width="1" stroke-dasharray="3 3" opacity="0.7"/>
+              <text x="${padL+4}" y="${(avgMhY-4).toFixed(1)}" font-size="9" fill="#8FA871">media</text>`:''}
+              <path d="${mhPath.trim()}" fill="none" stroke="#8FA871" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+              ${mhDots}${xLabels}
+            </svg>`;
+          })()}
         </div>`;
       } else {
         trendHtml = `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line);font-size:12px;color:var(--ink-soft);">Sin datos suficientes para mostrar la trayectoria.</div>`;
@@ -2455,8 +2499,8 @@ function renderEmployeesCard(shop, from, to){
 }
 function downloadEmpTrend(){
   if (!State.empTrendExport || !State.empTrendExport.length || typeof XLSX === 'undefined') return;
-  const rows = [['Fecha','Tienda','Tickets del día','Sugerencias del día','% Sugerencias del día']]
-    .concat(State.empTrendExport.map(r => [r.fecha, r.tienda, r.tickets, r.sugerencias, r.pct]));
+  const rows = [['Fecha','Tienda','Tickets del día','Sugerencias del día','% Sugerencias del día','Media Helado (€)del día']]
+    .concat(State.empTrendExport.map(r => [r.fecha, r.tienda, r.tickets, r.sugerencias, r.pct, r.medHel]));
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(rows);
   XLSX.utils.book_append_sheet(wb, ws, 'Sugerencias');
