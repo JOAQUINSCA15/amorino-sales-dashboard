@@ -576,6 +576,7 @@
     <button class="main-tab active" data-tab="panel">Panel</button>
     <button class="main-tab" data-tab="eval">Evaluación del turno</button>
     <button class="main-tab" data-tab="feedback">Feedback turno</button>
+    <button class="main-tab" data-tab="anulaciones">Anulaciones</button>
     <button class="main-tab print-btn no-print" onclick="exportToExcel()">⬇ Excel</button>
     <button class="main-tab print-btn no-print" onclick="window.print()">⬇ PDF</button>
   </div>
@@ -779,6 +780,7 @@ const State = {
   radiografia:{},
   degustaciones:{ _loaded: false },
   feedback:{ _loaded: false, entries: [] },
+  anulaciones:{ _loaded: false, byShop: {} },
   activeTab: 'panel',
   productividadByShop: {
     'Amorino Sevilla Avenida':       110,
@@ -1221,6 +1223,105 @@ function buildFeedbackHTML(shop, from, to){
     </table>
   </div>`;
 }
+/* ================= ANULACIONES ================= */
+const ANULACIONES_SHEET_ID = '1387CUa_LkCmuLPCz2KXzFOgbuqfaqVDKRngklwcsAsE';
+const ANULACIONES_GID = '0';
+
+function normAnulacionSender(raw){
+  const s = (raw||'').trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+  if (s.includes('catedral'))  return 'Amorino Catedral';
+  if (s.includes('naranjo'))   return 'Amorino Patio de los Naranjos';
+  if (s.includes('plaza'))     return 'Amorino Plaza Nueva';
+  if (s.includes('alcaz'))     return 'Amorino Alcázar';
+  if (s.includes('avenida'))   return 'Amorino Sevilla Avenida';
+  return null;
+}
+
+function parseAnulacionTimestamp(s){
+  if (!s) return null;
+  const str = String(s).trim();
+  const m = str.match(/(?:^|[^0-9])(20\d{2})-(\d{2})-(\d{2})[\sT]+(\d{1,2}):/);
+  if (m){
+    const [,y,mo,d,h] = m;
+    const dt = new Date(+y, +mo-1, +d);
+    if (+h < 6) dt.setDate(dt.getDate()-1);
+    return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  }
+  return null;
+}
+
+async function loadAnulacionesIfNeeded(){
+  if (State.anulaciones._loaded) return;
+  State.anulaciones._loaded = 'loading';
+  try {
+    const json = await loadViaJSONP_3(ANULACIONES_SHEET_ID, ANULACIONES_GID);
+    const allRows = gvizJsonToRows(json);
+    const dataRows = allRows.slice(2);
+    const byShop = {};
+    for (const row of dataRows){
+      const dkey = parseAnulacionTimestamp(row[0]);
+      if (!dkey) continue;
+      const shop = normAnulacionSender(row[1]);
+      if (!shop) continue;
+      if (!byShop[shop]) byShop[shop] = {};
+      byShop[shop][dkey] = (byShop[shop][dkey]||0) + 1;
+    }
+    State.anulaciones = { _loaded: true, byShop };
+  } catch(e){
+    State.anulaciones = { _loaded: 'error', byShop: {} };
+  }
+  const el = document.getElementById('anulacionesSection');
+  if (el) el.innerHTML = buildAnulacionesHTML(State.shop, State.from, State.to);
+}
+
+function buildAnulacionesHTML(shop, from, to){
+  if (!from || !to) return '<div class="empty-note">Selecciona un periodo.</div>';
+  if (State.anulaciones._loaded === 'loading') return '<div class="empty-note">Cargando…</div>';
+  if (State.anulaciones._loaded === 'error')   return '<div class="empty-note" style="color:var(--raspberry)">Error al cargar la hoja de Anulaciones.</div>';
+  if (!State.anulaciones._loaded)              return '<div class="empty-note">Cargando…</div>';
+
+  const days = []; let d = from; while(d<=to){ days.push(d); d=shiftDate(d,1); }
+  const shopsToShow = shop === 'all' ? SHOP_ORDER : [shop];
+  const byShop = State.anulaciones.byShop;
+
+  const tableRows = [];
+  for (const shopFull of shopsToShow){
+    for (const dd of days){
+      const mensajes = (byShop[shopFull]||{})[dd] || 0;
+      const t3anuls  = State.raw.t3.filter(r => r.dkey===dd && shopEq(r.shop,shopFull))
+                         .reduce((a,r)=>a+(isNaN(r.anulaciones)?0:r.anulaciones), 0);
+      if (mensajes===0 && t3anuls===0) continue;
+      tableRows.push({ date:dd, shop:shopFull, mensajes, t3anuls, diff:mensajes-t3anuls });
+    }
+  }
+
+  if (!tableRows.length) return '<div class="empty-note">Sin anulaciones en el periodo seleccionado.</div>';
+
+  const rows = tableRows.map(r => {
+    const col = r.diff===0?'':r.diff>0?'color:var(--raspberry);font-weight:700;':'color:var(--blueberry);font-weight:700;';
+    return `<tr>
+      <td>${dateLabel(r.date)}</td>
+      <td>${esc(r.shop.replace('Amorino ',''))}</td>
+      <td class="num">${r.mensajes}</td>
+      <td class="num">${r.t3anuls}</td>
+      <td class="num" style="${col}">${r.diff===0?'✓':r.diff>0?'+'+r.diff:r.diff}</td>
+    </tr>`;
+  }).join('');
+
+  return `<div style="overflow-x:auto;"><table>
+    <thead><tr>
+      <th>Fecha</th><th>Tienda</th>
+      <th class="num">Mensajes enviados</th>
+      <th class="num">Anulaciones POS</th>
+      <th class="num">Diferencia</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>
+  <div style="font-size:11px;color:var(--ink-soft);margin-top:10px;">
+    ✓ cuadra · <span style="color:var(--raspberry);">+N</span> más mensajes que POS · <span style="color:var(--blueberry);">−N</span> más POS que mensajes
+  </div>`;
+}
+
 function exportToExcel(){
   if (!State.raw || typeof XLSX === 'undefined') { alert('Cargando… inténtalo de nuevo.'); return; }
   const shop = State.shop, from = State.from, to = State.to;
@@ -1836,6 +1937,14 @@ function renderAll(){
   if (!State.raw) return;
   const shop = State.shop, from = State.from, to = State.to;
   const isRange = from !== to;
+
+  if (State.activeTab === 'anulaciones'){
+    document.getElementById('content').innerHTML = `
+      <div class="section-title"><span class="swatch" style="background:var(--raspberry)"></span>Anulaciones</div>
+      <div class="card" id="anulacionesSection">${buildAnulacionesHTML(shop, from, to)}</div>`;
+    loadAnulacionesIfNeeded();
+    return;
+  }
 
   if (State.activeTab === 'feedback'){
     document.getElementById('content').innerHTML = `
