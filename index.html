@@ -2475,11 +2475,11 @@ function renderEmployeesCard(shop, from, to){
         const labelEvery = days.length<=10?1:Math.ceil(days.length/10);
 
         // 20% reference line y position
-        const refY = toY(20);
+        const refY = toY(25);
         const avgY = !isNaN(avg) ? toY(avg) : null;
 
         const dots = pts.map((p,i)=>p[1]===null?'':`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3.5"
-          fill="${vals[i]>=20?'#4D7A3F':'#C84B5E'}" stroke="#fff" stroke-width="1.5">
+          fill="${vals[i]>=25?'#4D7A3F':'#C84B5E'}" stroke="#fff" stroke-width="1.5">
           <title>${dateLabel(days[i])}: ${fmtPct(vals[i])} (${sgByDay[i]} sg / ${tixByDay[i]} tix)</title></circle>`).join('');
         const xLabels = pts.map((p,i)=>(i%labelEvery===0||i===pts.length-1)?
           `<text x="${p[0].toFixed(1)}" y="${H-8}" font-size="9" fill="#766955" text-anchor="middle">${dateLabel(days[i]).slice(0,5)}</text>`:''
@@ -2509,7 +2509,7 @@ function renderEmployeesCard(shop, from, to){
             <!-- 20% reference line -->
             ${refY!==null?`<line x1="${padL}" y1="${refY.toFixed(1)}" x2="${W-padR}" y2="${refY.toFixed(1)}"
               stroke="#C84B5E" stroke-width="1.5" stroke-dasharray="6 3"/>
-            <text x="${W-padR-2}" y="${(refY-4).toFixed(1)}" font-size="9" fill="#C84B5E" text-anchor="end">20%</text>`:''}
+            <text x="${W-padR-2}" y="${(refY-4).toFixed(1)}" font-size="9" fill="#C84B5E" text-anchor="end">25%</text>`:''}
             <!-- Average line -->
             ${avgY!==null?`<line x1="${padL}" y1="${avgY.toFixed(1)}" x2="${W-padR}" y2="${avgY.toFixed(1)}"
               stroke="#5E6FA3" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>
@@ -2588,7 +2588,7 @@ function renderEmployeesCard(shop, from, to){
       </tr></thead>
       <tbody>
         ${filtered.map(r => {
-          const sugClass = isNaN(r.sugerenciasPct)?'':(r.sugerenciasPct>=20?'cell-good':'cell-bad');
+          const sugClass = isNaN(r.sugerenciasPct)?'':(r.sugerenciasPct>=25?'cell-good':'cell-bad');
           const helClass = isNaN(r.medHel)?'':(r.medHel>=5.20?'cell-good':'cell-bad');
           const key = empKey(r.shop, r.empleado);
           const isSelected = key === empSearch;
