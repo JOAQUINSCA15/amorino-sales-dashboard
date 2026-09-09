@@ -2529,6 +2529,19 @@ function renderEmployeesCard(shop, from, to){
       const avg    = validVals.length   ? validVals.reduce((a,b)=>a+b,0)/validVals.length : NaN;
       const avgMH  = validMedHel.length ? validMedHel.reduce((a,b)=>a+b,0)/validMedHel.length : NaN;
 
+      // Team benchmark per day (same shop, excluding ARCH)
+      const teamByDay = new Map();
+      State.raw.t3.filter(r => shopEq(r.shop, selShop) && inRange(r.dkey, from, to) && !/arch/i.test(r.empleado))
+        .forEach(r => {
+          if (!teamByDay.has(r.dkey)) teamByDay.set(r.dkey, {sg:0,tix:0,mhSum:0,mhTix:0});
+          const td = teamByDay.get(r.dkey);
+          if (!isNaN(r.sugerencias)) td.sg  += r.sugerencias;
+          if (!isNaN(r.tickets))     td.tix += r.tickets;
+          if (!isNaN(r.medHel) && !isNaN(r.tickets) && r.tickets>0){ td.mhSum+=r.medHel*r.tickets; td.mhTix+=r.tickets; }
+        });
+      const teamSugVals = days.map(d => { const t=teamByDay.get(d); return t&&t.tix>0?(t.sg/t.tix)*100:NaN; });
+      const teamMhVals  = days.map(d => { const t=teamByDay.get(d); return t&&t.mhTix>0?t.mhSum/t.mhTix:NaN; });
+
       // Store for download
       State.empTrendExport = days.map((d,i) => ({
         fecha: dateLabel(d),
@@ -2584,10 +2597,18 @@ function renderEmployeesCard(shop, from, to){
             ${refY!==null?`<line x1="${padL}" y1="${refY.toFixed(1)}" x2="${W-padR}" y2="${refY.toFixed(1)}"
               stroke="#C84B5E" stroke-width="1.5" stroke-dasharray="6 3"/>
             <text x="${W-padR-2}" y="${(refY-4).toFixed(1)}" font-size="9" fill="#C84B5E" text-anchor="end">25%</text>`:''}
-            <!-- Average line -->
+            <!-- Worker average line -->
             ${avgY!==null?`<line x1="${padL}" y1="${avgY.toFixed(1)}" x2="${W-padR}" y2="${avgY.toFixed(1)}"
-              stroke="#5E6FA3" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>
-            <text x="${padL+4}" y="${(avgY-4).toFixed(1)}" font-size="9" fill="#5E6FA3">media</text>`:''}
+              stroke="#5E6FA3" stroke-width="1" stroke-dasharray="3 3" opacity="0.7"/>
+            <text x="${padL+4}" y="${(avgY-4).toFixed(1)}" font-size="9" fill="#5E6FA3">media del trabajador</text>`:''}
+            <!-- Team benchmark line (excluding ARCH) -->
+            ${(() => {
+              const tpts = teamSugVals.map((v,i)=>[padL+i*stepX, toY(v)]);
+              const tpath = tpts.map((p,i)=>p[1]===null?'':(i===0||tpts[i-1][1]===null?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+              const first = tpts.find(p=>p[1]!==null);
+              return tpath.trim() ? `<path d="${tpath.trim()}" fill="none" stroke="#4D7A3F" stroke-width="1.5" stroke-dasharray="4 2" opacity="0.8"/>
+              ${first?`<text x="${padL+4}" y="${(first[1]-4).toFixed(1)}" font-size="9" fill="#4D7A3F">equipo (sin Arch)</text>`:''}` : '';
+            })()}
             <path d="${path.trim()}" fill="none" stroke="#5E6FA3" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
             ${dots}${xLabels}
           </svg>
@@ -2622,8 +2643,15 @@ function renderEmployeesCard(shop, from, to){
               <text x="${W-padR-2}" y="${(thrY-4).toFixed(1)}" font-size="9" fill="#C84B5E" text-anchor="end">5,10 €</text>`:''}
               ${avgMhY!==null?`<line x1="${padL}" y1="${avgMhY.toFixed(1)}" x2="${W-padR}" y2="${avgMhY.toFixed(1)}"
                 stroke="#8FA871" stroke-width="1" stroke-dasharray="3 3" opacity="0.7"/>
-              <text x="${padL+4}" y="${(avgMhY-4).toFixed(1)}" font-size="9" fill="#8FA871">media</text>`:''}
-              <path d="${mhPath.trim()}" fill="none" stroke="#8FA871" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+              <text x="${padL+4}" y="${(avgMhY-4).toFixed(1)}" font-size="9" fill="#8FA871">media del trabajador</text>`:''}
+              ${(() => {
+                const mhToY2 = v => isNaN(v)?null:padT+innerH-((v-mhMin)/mhRange)*innerH;
+                const tpts = teamMhVals.map((v,i)=>[padL+i*stepX, mhToY2(v)]);
+                const tpath = tpts.map((p,i)=>p[1]===null?'':(i===0||tpts[i-1][1]===null?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+                const first = tpts.find(p=>p[1]!==null);
+                return tpath.trim()?`<path d="${tpath.trim()}" fill="none" stroke="#4D7A3F" stroke-width="1.5" stroke-dasharray="4 2" opacity="0.8"/>
+                ${first?`<text x="${padL+4}" y="${(first[1]-4).toFixed(1)}" font-size="9" fill="#4D7A3F">equipo (sin Arch)</text>`:''}`:''
+              })()}              <path d="${mhPath.trim()}" fill="none" stroke="#8FA871" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
               ${mhDots}${xLabels}
             </svg>`;
           })()}
