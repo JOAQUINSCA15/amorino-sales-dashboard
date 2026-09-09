@@ -2539,8 +2539,9 @@ function renderEmployeesCard(shop, from, to){
           if (!isNaN(r.tickets))     td.tix += r.tickets;
           if (!isNaN(r.medHel) && !isNaN(r.tickets) && r.tickets>0){ td.mhSum+=r.medHel*r.tickets; td.mhTix+=r.tickets; }
         });
-      const teamSugVals = days.map(d => { const t=teamByDay.get(d); return t&&t.tix>0?(t.sg/t.tix)*100:NaN; });
-      const teamMhVals  = days.map(d => { const t=teamByDay.get(d); return t&&t.mhTix>0?t.mhSum/t.mhTix:NaN; });
+      const teamSugAll  = [...teamByDay.values()];
+      const teamSugFlat = (() => { const sg=teamSugAll.reduce((a,t)=>a+t.sg,0), tix=teamSugAll.reduce((a,t)=>a+t.tix,0); return tix>0?(sg/tix)*100:NaN; })();
+      const teamMhFlat  = (() => { const ms=teamSugAll.reduce((a,t)=>a+t.mhSum,0), mt=teamSugAll.reduce((a,t)=>a+t.mhTix,0); return mt>0?ms/mt:NaN; })();
 
       // Store for download
       State.empTrendExport = days.map((d,i) => ({
@@ -2551,111 +2552,16 @@ function renderEmployeesCard(shop, from, to){
         pct: isNaN(vals[i]) ? '' : +vals[i].toFixed(2),
         medHel: isNaN(medHels[i]) ? '' : +medHels[i].toFixed(2)
       }));
+
+      const toggleBtns = (prefix, labels) => labels.map(([key,color,label]) => `
+        <button data-empline="${prefix}_${key}" onclick="toggleEmpLine('${prefix}_${key}')"
+          style="font-size:10px;padding:3px 10px;border:1.5px solid ${color};border-radius:20px;
+          background:${color};color:#fff;cursor:pointer;font-family:'Inter',sans-serif;font-weight:600;
+          opacity:${empLineVis[prefix+'_'+key]?1:0.35};">${label}</button>`).join('');
+
+      const vis = key => `id="emp-line-${key}" style="${empLineVis[key]?'':'display:none'}"`;
+
       if (validVals.length >= 1){
-        const W=700, H=200, padL=38, padR=14, padT=14, padB=36;
-        const innerW=W-padL-padR, innerH=H-padT-padB;
-        const max=Math.max(...validVals, 25);
-        const stepX = days.length>1 ? innerW/(days.length-1) : 0;
-        const toY = v => isNaN(v)?null:padT+innerH-(v/max)*innerH;
-        const pts = vals.map((v,i)=>[padL+i*stepX, toY(v)]);
-        const path = pts.map((p,i)=>p[1]===null?'':(i===0||pts[i-1][1]===null?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
-        const labelEvery = days.length<=10?1:Math.ceil(days.length/10);
-
-        // 20% reference line y position
-        const refY = toY(25);
-        const avgY = !isNaN(avg) ? toY(avg) : null;
-
-        const dots = pts.map((p,i)=>p[1]===null?'':`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3.5"
-          fill="${vals[i]>=25?'#4D7A3F':'#C84B5E'}" stroke="#fff" stroke-width="1.5">
-          <title>${dateLabel(days[i])}: ${fmtPct(vals[i])} (${sgByDay[i]} sg / ${tixByDay[i]} tix)</title></circle>`).join('');
-        const xLabels = pts.map((p,i)=>(i%labelEvery===0||i===pts.length-1)?
-          `<text x="${p[0].toFixed(1)}" y="${H-8}" font-size="9" fill="#766955" text-anchor="middle">${dateLabel(days[i]).slice(0,5)}</text>`:''
-        ).join('');
-
-        // Y-axis labels
-        const yTicks = [0, 10, 20, 30, 40, 50].filter(v => v <= max+5);
-        const yAxisLabels = yTicks.map(v=>{
-          const y = toY(v); if(y===null) return '';
-          return `<line x1="${padL-4}" y1="${y.toFixed(1)}" x2="${padL}" y2="${y.toFixed(1)}" stroke="#ccc" stroke-width="1"/>
-          <line x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}" stroke="#f0e8d8" stroke-width="0.5"/>
-          <text x="${padL-6}" y="${(y+3).toFixed(1)}" font-size="9" fill="#999" text-anchor="end">${v}%</text>`;
-        }).join('');
-
-        trendHtml = `<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line);">
-          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
-            <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);">
-              ${esc(selName)} · ${esc(selShop.replace('Amorino ',''))} · ${validVals.length} días · media ${fmtPct(avg)}
-            </div>
-            <div style="font-size:10px;color:var(--ink-soft);margin-top:2px;">Un punto = un día de trabajo · sugerencias ÷ tickets de ese día</div>
-            <button onclick="downloadEmpTrend()"
-              style="font-size:12px;font-weight:600;color:var(--cocoa);background:var(--cream-2);
-              border:1px solid var(--line);border-radius:8px;padding:5px 12px;cursor:pointer;">⬇ Excel</button>
-          </div>
-          <svg viewBox="0 0 ${W} ${H}" style="width:100%;overflow:visible;">
-            ${yAxisLabels}
-            <!-- 20% reference line -->
-            ${refY!==null?`<line x1="${padL}" y1="${refY.toFixed(1)}" x2="${W-padR}" y2="${refY.toFixed(1)}"
-              stroke="#C84B5E" stroke-width="1.5" stroke-dasharray="6 3"/>
-            <text x="${W-padR-2}" y="${(refY-4).toFixed(1)}" font-size="9" fill="#C84B5E" text-anchor="end">25%</text>`:''}
-            <!-- Worker average line -->
-            ${avgY!==null?`<line x1="${padL}" y1="${avgY.toFixed(1)}" x2="${W-padR}" y2="${avgY.toFixed(1)}"
-              stroke="#5E6FA3" stroke-width="1" stroke-dasharray="3 3" opacity="0.7"/>
-            <text x="${padL+4}" y="${(avgY-4).toFixed(1)}" font-size="9" fill="#5E6FA3">media del trabajador</text>`:''}
-            <!-- Team benchmark line (excluding ARCH) -->
-            ${(() => {
-              const tpts = teamSugVals.map((v,i)=>[padL+i*stepX, toY(v)]);
-              const tpath = tpts.map((p,i)=>p[1]===null?'':(i===0||tpts[i-1][1]===null?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
-              const first = tpts.find(p=>p[1]!==null);
-              return tpath.trim() ? `<path d="${tpath.trim()}" fill="none" stroke="#4D7A3F" stroke-width="1.5" stroke-dasharray="4 2" opacity="0.8"/>
-              ${first?`<text x="${padL+4}" y="${(first[1]-4).toFixed(1)}" font-size="9" fill="#4D7A3F">equipo (sin Arch)</text>`:''}` : '';
-            })()}
-            <path d="${path.trim()}" fill="none" stroke="#5E6FA3" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-            ${dots}${xLabels}
-          </svg>
-          ${(() => {
-            if (validMedHel.length < 1) return '';
-            const MH_THRESH = 5.10;
-            const mhMax = Math.max(...validMedHel, MH_THRESH + 0.5);
-            const mhMin = Math.max(0, Math.min(...validMedHel, MH_THRESH) - 0.5);
-            const mhRange = mhMax - mhMin || 1;
-            const mhToY = v => isNaN(v) ? null : padT + innerH - ((v - mhMin) / mhRange) * innerH;
-            const mhPts = medHels.map((v,i) => [padL + i*stepX, mhToY(v)]);
-            const mhPath = mhPts.map((p,i) => p[1]===null?'':(i===0||mhPts[i-1][1]===null?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
-            const thrY = mhToY(MH_THRESH);
-            const avgMhY = mhToY(avgMH);
-            const mhTicks = [mhMin, MH_THRESH, mhMax].map(v=>+v.toFixed(2));
-            const mhYAxis = [...new Set(mhTicks)].map(v=>{
-              const y=mhToY(v); if(y===null) return '';
-              return `<line x1="${padL-4}" y1="${y.toFixed(1)}" x2="${padL}" y2="${y.toFixed(1)}" stroke="#ccc" stroke-width="1"/>
-              <line x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}" stroke="#f0e8d8" stroke-width="0.5"/>
-              <text x="${padL-6}" y="${(y+3).toFixed(1)}" font-size="9" fill="#999" text-anchor="end">${v.toFixed(2)}€</text>`;
-            }).join('');
-            const mhDots = mhPts.map((p,i)=>p[1]===null?'':`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3.5"
-              fill="${medHels[i]>=MH_THRESH?'#4D7A3F':'#C84B5E'}" stroke="#fff" stroke-width="1.5">
-              <title>${dateLabel(days[i])}: ${fmtEUR(medHels[i])}</title></circle>`).join('');
-            return `<div style="margin-top:14px;font-size:10px;color:var(--ink-soft);margin-bottom:6px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;">
-              Media de helado · media ${fmtEUR(avgMH)}
-            </div>
-            <svg viewBox="0 0 ${W} ${H}" style="width:100%;overflow:visible;">
-              ${mhYAxis}
-              ${thrY!==null?`<line x1="${padL}" y1="${thrY.toFixed(1)}" x2="${W-padR}" y2="${thrY.toFixed(1)}"
-                stroke="#C84B5E" stroke-width="1.5" stroke-dasharray="6 3"/>
-              <text x="${W-padR-2}" y="${(thrY-4).toFixed(1)}" font-size="9" fill="#C84B5E" text-anchor="end">5,10 €</text>`:''}
-              ${avgMhY!==null?`<line x1="${padL}" y1="${avgMhY.toFixed(1)}" x2="${W-padR}" y2="${avgMhY.toFixed(1)}"
-                stroke="#8FA871" stroke-width="1" stroke-dasharray="3 3" opacity="0.7"/>
-              <text x="${padL+4}" y="${(avgMhY-4).toFixed(1)}" font-size="9" fill="#8FA871">media del trabajador</text>`:''}
-              ${(() => {
-                const mhToY2 = v => isNaN(v)?null:padT+innerH-((v-mhMin)/mhRange)*innerH;
-                const tpts = teamMhVals.map((v,i)=>[padL+i*stepX, mhToY2(v)]);
-                const tpath = tpts.map((p,i)=>p[1]===null?'':(i===0||tpts[i-1][1]===null?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
-                const first = tpts.find(p=>p[1]!==null);
-                return tpath.trim()?`<path d="${tpath.trim()}" fill="none" stroke="#4D7A3F" stroke-width="1.5" stroke-dasharray="4 2" opacity="0.8"/>
-                ${first?`<text x="${padL+4}" y="${(first[1]-4).toFixed(1)}" font-size="9" fill="#4D7A3F">equipo (sin Arch)</text>`:''}`:''
-              })()}              <path d="${mhPath.trim()}" fill="none" stroke="#8FA871" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-              ${mhDots}${xLabels}
-            </svg>`;
-          })()}
-        </div>`;
       } else {
         trendHtml = `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line);font-size:12px;color:var(--ink-soft);">Sin datos suficientes para mostrar la trayectoria.</div>`;
       }
@@ -2717,6 +2623,15 @@ function downloadEmpTrend(){
   XLSX.utils.book_append_sheet(wb, ws, 'Sugerencias');
   const emp = empSearch ? empKeyName(empSearch).replace(/[^a-zA-Z0-9]/g,'_') : 'empleado';
   XLSX.writeFile(wb, `${emp}_sugerencias_diarias.xlsx`);
+}
+
+const empLineVis = {sug_red:true, sug_blue:true, sug_green:true, mh_red:true, mh_blue:true, mh_green:true};
+function toggleEmpLine(key){
+  empLineVis[key] = !empLineVis[key];
+  const el = document.getElementById('emp-line-'+key);
+  if (el) el.style.display = empLineVis[key] ? '' : 'none';
+  const btn = document.querySelector(`button[data-empline="${key}"]`);
+  if (btn) btn.style.opacity = empLineVis[key] ? '1' : '0.35';
 }
 
 function attachSortHandler(){
