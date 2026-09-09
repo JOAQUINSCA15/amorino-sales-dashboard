@@ -577,6 +577,7 @@
     <button class="main-tab" data-tab="eval">Evaluación del turno</button>
     <button class="main-tab" data-tab="feedback">Feedback turno</button>
     <button class="main-tab" data-tab="anulaciones">Anulaciones</button>
+    <button class="main-tab" data-tab="degustaciones">Degustaciones</button>
     <button class="main-tab print-btn no-print" onclick="exportToExcel()">⬇ Excel</button>
     <button class="main-tab print-btn no-print" onclick="window.print()">⬇ PDF</button>
   </div>
@@ -1274,6 +1275,71 @@ async function loadAnulacionesIfNeeded(){
   if (el) el.innerHTML = buildAnulacionesHTML(State.shop, State.from, State.to);
 }
 
+function buildDegustacionesHTML(shop, from, to){
+  if (!from || !to) return '<div class="empty-note">Selecciona un periodo.</div>';
+  if (!State.degustaciones._loaded) return '<div class="empty-note">Cargando degustaciones…</div>';
+  if (State.degustaciones._loaded === 'error') return '<div class="empty-note" style="color:var(--raspberry)">Error al cargar las degustaciones.</div>';
+
+  const days = []; let d = from; while(d<=to){ days.push(d); d=shiftDate(d,1); }
+  const shopsToShow = shop === 'all' ? SHOP_ORDER : [shop];
+  const isRange = from !== to;
+
+  // Count per shop per day
+  const byShopDay = {};
+  for (const shopFull of shopsToShow){
+    byShopDay[shopFull] = {};
+    const shopData = State.degustaciones[shopFull] || {};
+    for (const dd of days){
+      const dayData = shopData[dd] || {};
+      const total = Object.values(dayData).reduce((a,b)=>a+b, 0);
+      if (total > 0) byShopDay[shopFull][dd] = total;
+    }
+  }
+
+  // Totals per shop
+  const shopTotals = shopsToShow.map(s => ({
+    shop: s,
+    total: Object.values(byShopDay[s]||{}).reduce((a,b)=>a+b,0),
+    days: Object.keys(byShopDay[s]||{}).length
+  }));
+  const grandTotal = shopTotals.reduce((a,r)=>a+r.total, 0);
+
+  // Summary cards
+  const summaryCards = shopTotals.map(r => `
+    <div class="kpi">
+      <div class="kpi-scoop" style="background:var(--pistachio)"></div>
+      <div class="kpi-body">
+        <div class="kpi-label">${esc(r.shop.replace('Amorino ',''))}</div>
+        <div class="kpi-value">${r.total}</div>
+        ${isRange ? `<div class="kpi-sub">${r.days} día${r.days!==1?'s':''} con degusts.</div>` : ''}
+      </div>
+    </div>`).join('');
+
+  // Day-by-day table (only when range and multiple shops or single shop)
+  let tableHtml = '';
+  if (isRange){
+    const tableRows = [];
+    for (const dd of days){
+      for (const shopFull of shopsToShow){
+        const count = byShopDay[shopFull][dd];
+        if (!count) continue;
+        tableRows.push(`<tr><td>${dateLabel(dd)}</td><td>${esc(shopFull.replace('Amorino ',''))}</td><td class="num"><strong>${count}</strong></td></tr>`);
+      }
+    }
+    if (tableRows.length){
+      tableHtml = `<div class="section-title" style="margin-top:24px;"><span class="swatch" style="background:var(--pistachio)"></span>Detalle por día</div>
+        <div class="card"><div style="overflow-x:auto;"><table>
+          <thead><tr><th>Fecha</th><th>Tienda</th><th class="num">Degustaciones</th></tr></thead>
+          <tbody>${tableRows.join('')}</tbody>
+        </table></div></div>`;
+    }
+  }
+
+  return `<div class="kpi-section-label">Total periodo · ${grandTotal} degustación${grandTotal!==1?'es':''}</div>
+    <div class="kpi-row">${summaryCards}</div>
+    ${tableHtml}`;
+}
+
 function buildAnulacionesHTML(shop, from, to){
   if (!from || !to) return '<div class="empty-note">Selecciona un periodo.</div>';
   if (State.anulaciones._loaded === 'loading') return '<div class="empty-note">Cargando…</div>';
@@ -1937,6 +2003,14 @@ function renderAll(){
   if (!State.raw) return;
   const shop = State.shop, from = State.from, to = State.to;
   const isRange = from !== to;
+
+  if (State.activeTab === 'degustaciones'){
+    document.getElementById('content').innerHTML = `
+      <div class="section-title"><span class="swatch" style="background:var(--pistachio)"></span>Degustaciones</div>
+      <div class="card">${buildDegustacionesHTML(shop, from, to)}</div>`;
+    loadDegustacionesIfNeeded();
+    return;
+  }
 
   if (State.activeTab === 'anulaciones'){
     document.getElementById('content').innerHTML = `
