@@ -1791,15 +1791,23 @@ function loadViaJSONP_2(sheetId, sheetName){
 async function loadRadTabsIfNeeded(){
   if (State.radTabs !== null) return;
   State.radTabs = [];
-  try {
-    const res = await fetch(`https://spreadsheets.google.com/feeds/worksheets/${RADIOGRAFIAS_SHEET_ID}/public/basic?alt=json`);
-    if (!res.ok) return;
-    const data = await res.json();
-    State.radTabs = (data.feed.entry || []).map(e => e.title.$t);
-  } catch(e){ State.radTabs = []; }
-  // Re-render the eval section so the dropdown is populated
+  await new Promise((resolve) => {
+    const cbName = '__radTabsCb' + Date.now();
+    const s = document.createElement('script');
+    let done = false;
+    const cleanup = () => { delete window[cbName]; if(s.parentNode) s.parentNode.removeChild(s); };
+    window[cbName] = (data) => {
+      done = true; cleanup();
+      try { State.radTabs = (data.feed.entry||[]).map(e => e.title.$t); } catch(e){}
+      resolve();
+    };
+    setTimeout(() => { if(!done){ done=true; cleanup(); resolve(); } }, 8000);
+    s.onerror = () => { if(!done){ done=true; cleanup(); resolve(); } };
+    s.src = `https://spreadsheets.google.com/feeds/worksheets/${RADIOGRAFIAS_SHEET_ID}/public/basic?alt=json-in-script&callback=${cbName}`;
+    document.head.appendChild(s);
+  });
   const evalCard = document.getElementById('evalCard');
-  if (evalCard) {
+  if (evalCard && State.radTabs.length) {
     const isMulti = State.from !== State.to;
     evalCard.innerHTML = isMulti
       ? buildEvalMultiDayHTML(State.shop, State.from, State.to)
