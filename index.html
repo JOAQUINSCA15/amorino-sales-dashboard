@@ -1798,6 +1798,7 @@ function loadRadTabsIfNeeded(){
    '1 Diciembre 2025','8 Diciembre 2025','15 Diciembre 2025','22 Diciembre 2025']
     .forEach(t => tabs.add(t));
   MONTH_ES.forEach(m => tabs.add(`${m} 2026`));
+  tabs.add('2A Septiembre 2026');
   Object.keys(State.radiografia).forEach(t => tabs.add(t));
   State.radTabs = [...tabs];
 
