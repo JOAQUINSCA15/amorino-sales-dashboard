@@ -779,6 +779,7 @@ const State = {
   shop:'all', from:null, to:null, raw:null, loading:false, error:null, lastSync:null,
   weather:{}, weatherFetching:false,
   radiografia:{},
+  radOverride: null, // tab name override for eval section
   degustaciones:{ _loaded: false },
   feedback:{ _loaded: false, entries: [] },
   anulaciones:{ _loaded: false, byShop: {} },
@@ -988,6 +989,7 @@ document.getElementById('dateFrom').addEventListener('change', e => {
   if (!bounds) return;
   State.from = clampDate(e.target.value, bounds.min, bounds.max);
   if (State.from > State.to) State.to = State.from;
+  State.radOverride = null;
   document.getElementById('dateFrom').value = State.from;
   document.getElementById('dateTo').value = State.to;
   updatePresetHighlight(bounds);
@@ -1885,10 +1887,17 @@ function calcPersonnelCostForShop(shopKey, jsDay, radData){
 
 /* Core per-day eval content (no global controls) — used by both single and multi-day */
 function buildEvalDayContent(shop, dkey){
-  const tabName = getRadiografiaTab(dkey);
+  const autoTab = getRadiografiaTab(dkey);
+  const tabName = State.radOverride || autoTab;
   if (!tabName) return '<div class="empty-note">Sin radiografía disponible para esta fecha.</div>';
   const radData = State.radiografia[tabName];
   if (!radData) return '<div class="empty-note" style="padding:16px;">Cargando radiografía…</div>';
+
+  const overrideNote = State.radOverride && State.radOverride !== autoTab
+    ? ` <span style="color:var(--mango);font-weight:700;">(override)</span>` : '';
+  const radTabNote = `<div style="font-size:11px;color:var(--ink-soft);margin-bottom:14px;">
+    📋 Radiografía: <strong>${esc(tabName)}</strong>${overrideNote}
+  </div>`;
   const [y,m,d] = dkey.split('-').map(Number);
   const jsDay = new Date(y,m-1,d).getDay();
   const shopsToShow = shop === 'all' ? SHOP_ORDER : [shop];
@@ -1907,7 +1916,7 @@ function buildEvalDayContent(shop, dkey){
   const grandNetas = grandVentas/1.1;
   const grandRatio = grandNetas>0 ? grandTotalCost/grandNetas : NaN;
 
-  let html = '';
+  let html = radTabNote;
   if (shop==='all' && grandHasData){
     html += `<div class="eval-grand-total" style="margin-bottom:24px;">
       <strong>Total 5 tiendas</strong>
@@ -1970,6 +1979,24 @@ function buildEvalDayContent(shop, dkey){
 
 function buildEvalGlobalControls(){
   const costeHora = State.costeBruto * (1 + State.seguridadSocial / 100);
+
+  // Build list of known radiografía tabs
+  const knownTabs = [];
+  // 2025 special tabs
+  knownTabs.push('6 y 13 Octubre 2025','20 Octubre 2025',
+    '3 y 10 Noviembre 2025','17 y 24 Noviembre 2025',
+    '1 Diciembre 2025','8 Diciembre 2025','15 Diciembre 2025','22 Diciembre 2025');
+  // Monthly 2026+
+  const MONTH_ES_LOCAL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  for (const y of [2026, 2027]){
+    for (const m of MONTH_ES_LOCAL) knownTabs.push(`${m} ${y}`);
+  }
+  // Also add any already-loaded tabs
+  for (const t of Object.keys(State.radiografia)) if (!knownTabs.includes(t)) knownTabs.push(t);
+
+  const autoTab = State.from ? getRadiografiaTab(State.from) : null;
+  const selTab = State.radOverride || '';
+
   return `<div class="eval-global-controls">
     <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
       <div class="prod-control"><label>Coste bruto:</label>
@@ -1977,6 +2004,13 @@ function buildEvalGlobalControls(){
       <div class="prod-control"><label>Seg. Social:</label>
         <input type="number" id="ssInput" value="${State.seguridadSocial}" min="0" max="100" step="1"> %</div>
       <div class="prod-control" style="color:var(--ink);font-weight:700;">→ Total: ${fmtNum(costeHora,2)} €/h</div>
+      <div class="prod-control">
+        <label>Radiografía</label>
+        <select id="radOverrideSelect" style="min-width:200px;">
+          <option value="">Automático${autoTab?' ('+autoTab+')':''}</option>
+          ${knownTabs.map(t=>`<option value="${esc(t)}" ${selTab===t?'selected':''}>${esc(t)}</option>`).join('')}
+        </select>
+      </div>
     </div>
     <button class="btn no-print" style="background:var(--cocoa);font-size:12px;padding:7px 14px;" onclick="window.print()">⬇ Exportar PDF</button>
   </div>`;
@@ -2753,7 +2787,21 @@ function attachEvalHandlers(){
     });
   });
   // Hourly cost inputs (costeBruto + seguridadSocial)
-  const costeBrutoEl = document.getElementById('costeBrutoInput');
+  const radSel = document.getElementById('radOverrideSelect');
+  if (radSel) radSel.addEventListener('change', e => {
+    State.radOverride = e.target.value || null;
+    if (State.radOverride && State.radiografia[State.radOverride] === undefined){
+      fetchRadiografiaIfNeeded(State.from); // triggers load of override tab
+      State.radiografia[State.radOverride] = null; // mark as loading
+      loadViaJSONP_2(RADIOGRAFIAS_SHEET_ID, State.radOverride)
+        .then(json => {
+          State.radiografia[State.radOverride] = parseRadiografiaRows(gvizJsonToRows(json));
+          refreshEval();
+        }).catch(() => { State.radiografia[State.radOverride] = null; });
+    } else {
+      refreshEval();
+    }
+  });
   if (costeBrutoEl) costeBrutoEl.addEventListener('change', e => {
     const v = parseFloat(e.target.value);
     if (!isNaN(v) && v > 0) { State.costeBruto = v; refreshEval(); }
