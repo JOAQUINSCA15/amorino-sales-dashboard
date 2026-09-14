@@ -779,7 +779,8 @@ const State = {
   shop:'all', from:null, to:null, raw:null, loading:false, error:null, lastSync:null,
   weather:{}, weatherFetching:false,
   radiografia:{},
-  radOverride: null, // tab name override for eval section
+  radOverride: null,
+  radTabs: null, // null = not loaded, [...] = list of tab names
   degustaciones:{ _loaded: false },
   feedback:{ _loaded: false, entries: [] },
   anulaciones:{ _loaded: false, byShop: {} },
@@ -1787,6 +1788,21 @@ function loadViaJSONP_2(sheetId, sheetName){
   });
 }
 
+async function loadRadTabsIfNeeded(){
+  if (State.radTabs !== null) return;
+  State.radTabs = [];
+  try {
+    const res = await fetch(`https://spreadsheets.google.com/feeds/worksheets/${RADIOGRAFIAS_SHEET_ID}/public/basic?alt=json`);
+    if (!res.ok) return;
+    const data = await res.json();
+    State.radTabs = (data.feed.entry || []).map(e => e.title.$t);
+  } catch(e){}
+  // Re-render eval controls to populate dropdown
+  const ctrl = document.getElementById('evalGlobalControls');
+  if (ctrl) ctrl.outerHTML = buildEvalGlobalControls();
+  attachEvalHandlers();
+}
+
 async function fetchRadiografiaIfNeeded(dkey, updatePanel){
   if (!dkey) return;
   const tabName = getRadiografiaTab(dkey);
@@ -1980,24 +1996,12 @@ function buildEvalDayContent(shop, dkey){
 function buildEvalGlobalControls(){
   const costeHora = State.costeBruto * (1 + State.seguridadSocial / 100);
 
-  // Build list of known radiografía tabs
-  const knownTabs = [];
-  // 2025 special tabs
-  knownTabs.push('6 y 13 Octubre 2025','20 Octubre 2025',
-    '3 y 10 Noviembre 2025','17 y 24 Noviembre 2025',
-    '1 Diciembre 2025','8 Diciembre 2025','15 Diciembre 2025','22 Diciembre 2025');
-  // Monthly 2026+
-  const MONTH_ES_LOCAL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-  for (const y of [2026, 2027]){
-    for (const m of MONTH_ES_LOCAL) knownTabs.push(`${m} ${y}`);
-  }
-  // Also add any already-loaded tabs
-  for (const t of Object.keys(State.radiografia)) if (!knownTabs.includes(t)) knownTabs.push(t);
-
+  // Use dynamically loaded tab names, fall back to empty while loading
+  const knownTabs = State.radTabs || [];
   const autoTab = State.from ? getRadiografiaTab(State.from) : null;
   const selTab = State.radOverride || '';
 
-  return `<div class="eval-global-controls">
+  return `<div class="eval-global-controls" id="evalGlobalControls">
     <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
       <div class="prod-control"><label>Coste bruto:</label>
         <input type="number" id="costeBrutoInput" value="${State.costeBruto}" min="0.01" max="999" step="0.05"> €/h</div>
@@ -2077,6 +2081,7 @@ function renderAll(){
       days.forEach(dd => fetchRadiografiaIfNeeded(dd));
       loadDegustacionesIfNeeded();
     }
+    loadRadTabsIfNeeded();
     return;
   }
 
