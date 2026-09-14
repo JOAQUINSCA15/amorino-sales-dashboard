@@ -1788,47 +1788,20 @@ function loadViaJSONP_2(sheetId, sheetName){
   });
 }
 
-async function loadRadTabsIfNeeded(){
+function loadRadTabsIfNeeded(){
   if (State.radTabs !== null) return;
 
-  // Generate standard tabs from getRadiografiaTab patterns
+  // Set standard tabs immediately (sync) so dropdown shows right away
   const tabs = new Set();
-  // 2025 special tabs
   ['6 y 13 Octubre 2025','20 Octubre 2025',
    '3 y 10 Noviembre 2025','17 y 24 Noviembre 2025',
    '1 Diciembre 2025','8 Diciembre 2025','15 Diciembre 2025','22 Diciembre 2025']
     .forEach(t => tabs.add(t));
-  // 2026 monthly tabs
-  MONTH_ES.forEach((m,i) => tabs.add(`${m} 2026`));
-  // Already loaded tabs (e.g. special ones like "2A Septiembre 2026")
+  MONTH_ES.forEach(m => tabs.add(`${m} 2026`));
   Object.keys(State.radiografia).forEach(t => tabs.add(t));
-
   State.radTabs = [...tabs];
 
-  // Also try the JSONP feeds API — adds any special tabs not in the list
-  try {
-    const extra = await new Promise((resolve) => {
-      const cbName = '__radTabsCb' + Date.now();
-      const s = document.createElement('script');
-      let done = false;
-      const cleanup = () => { delete window[cbName]; if(s.parentNode) s.parentNode.removeChild(s); };
-      window[cbName] = (data) => {
-        done = true; cleanup();
-        try { resolve((data.feed.entry||[]).map(e => e.title.$t)); }
-        catch(e){ resolve([]); }
-      };
-      setTimeout(() => { if(!done){ done=true; cleanup(); resolve([]); } }, 5000);
-      s.onerror = () => { if(!done){ done=true; cleanup(); resolve([]); } };
-      s.src = `https://spreadsheets.google.com/feeds/worksheets/${RADIOGRAFIAS_SHEET_ID}/public/basic?alt=json-in-script&callback=${cbName}`;
-      document.head.appendChild(s);
-    });
-    if (extra.length) {
-      extra.forEach(t => tabs.add(t));
-      State.radTabs = [...tabs];
-    }
-  } catch(e){}
-
-  // Re-render eval card with populated dropdown
+  // Re-render eval card now with the populated dropdown
   const evalCard = document.getElementById('evalCard');
   if (evalCard) {
     const isMulti = State.from !== State.to;
@@ -1837,6 +1810,30 @@ async function loadRadTabsIfNeeded(){
       : `<div id="evalTurnoSection">${buildEvalTurnoHTML(State.shop, State.from)}</div>`;
     attachEvalHandlers();
   }
+
+  // Try JSONP feeds API in the background to add any special tabs
+  const cbName = '__radTabsCb' + Date.now();
+  const s = document.createElement('script');
+  window[cbName] = (data) => {
+    delete window[cbName]; if(s.parentNode) s.parentNode.removeChild(s);
+    try {
+      const extra = (data.feed.entry||[]).map(e => e.title.$t);
+      const before = State.radTabs.length;
+      extra.forEach(t => { if (!State.radTabs.includes(t)) State.radTabs.push(t); });
+      if (State.radTabs.length > before){
+        const sel = document.getElementById('radOverrideSelect');
+        if (sel){
+          const cur = sel.value;
+          State.radTabs.filter(t => !sel.querySelector(`option[value="${t}"]`))
+            .forEach(t => { const o=document.createElement('option'); o.value=t; o.textContent=t; sel.appendChild(o); });
+          sel.value = cur;
+        }
+      }
+    } catch(e){}
+  };
+  s.onerror = () => { delete window[cbName]; if(s.parentNode) s.parentNode.removeChild(s); };
+  s.src = `https://spreadsheets.google.com/feeds/worksheets/${RADIOGRAFIAS_SHEET_ID}/public/basic?alt=json-in-script&callback=${cbName}`;
+  document.head.appendChild(s);
 }
 
 async function fetchRadiografiaIfNeeded(dkey, updatePanel){
