@@ -1796,11 +1796,16 @@ async function loadRadTabsIfNeeded(){
     if (!res.ok) return;
     const data = await res.json();
     State.radTabs = (data.feed.entry || []).map(e => e.title.$t);
-  } catch(e){}
-  // Re-render eval controls to populate dropdown
-  const ctrl = document.getElementById('evalGlobalControls');
-  if (ctrl) ctrl.outerHTML = buildEvalGlobalControls();
-  attachEvalHandlers();
+  } catch(e){ State.radTabs = []; }
+  // Re-render the eval section so the dropdown is populated
+  const evalCard = document.getElementById('evalCard');
+  if (evalCard) {
+    const isMulti = State.from !== State.to;
+    evalCard.innerHTML = isMulti
+      ? buildEvalMultiDayHTML(State.shop, State.from, State.to)
+      : `<div id="evalTurnoSection">${buildEvalTurnoHTML(State.shop, State.from)}</div>`;
+    attachEvalHandlers();
+  }
 }
 
 async function fetchRadiografiaIfNeeded(dkey, updatePanel){
