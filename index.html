@@ -2840,6 +2840,7 @@ function attachEvalHandlers(){
       refreshEval();
     }
   });
+  const costeBrutoEl = document.getElementById('costeBrutoInput');
   if (costeBrutoEl) costeBrutoEl.addEventListener('change', e => {
     const v = parseFloat(e.target.value);
     if (!isNaN(v) && v > 0) { State.costeBruto = v; refreshEval(); }
