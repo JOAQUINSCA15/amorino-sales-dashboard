@@ -1420,9 +1420,9 @@ async function loadResenasIfNeeded(){
     const allRows = gvizJsonToRows(json).slice(1); // skip generic labels row
     const header = allRows[0] || [];
     const ci = {
-      fecha:     header.findIndex(h => /fecha/i.test(h)),
+      fecha:     0, // hardcoded: DateTime col header swallowed by gviz
       tienda:    header.findIndex(h => /tienda/i.test(h)),
-      valor:     header.findIndex(h => /valor/i.test(h)),
+      valor:     2, // hardcoded: Number col header swallowed by gviz
       nombre:    header.findIndex(h => /nombre/i.test(h)),
       comentario:header.findIndex(h => /comentario/i.test(h)),
     };
