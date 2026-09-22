@@ -1443,6 +1443,7 @@ async function loadResenasIfNeeded(){
       entries.push({ dkey, shop, rating, nombre: row[ci.nombre]||'', comentario: row[ci.comentario]||'' });
     }
     State.resenas = { _loaded: true, entries };
+    State.resenas._debug = { totalRows: allRows.length, header, ci, sample: allRows.slice(1,4).map(r=>r.slice(0,3)) };
   } catch(e){
     State.resenas = { _loaded: 'error', entries: [] };
   }
@@ -1460,7 +1461,16 @@ function buildResenasHTML(shop, from, to){
   const inPeriod = e => inRange(e.dkey, from, to) && (shop === 'all' || shopEq(e.shop, shop));
   const entries = State.resenas.entries.filter(inPeriod);
 
-  if (!entries.length) return '<div class="empty-note">Sin reseñas en el periodo seleccionado.</div>';
+  if (!entries.length){
+    const dbg = State.resenas._debug || {};
+    return `<div style="background:#f5f5f5;border-radius:8px;padding:10px;font-size:11px;font-family:monospace;white-space:pre-wrap;word-break:break-all;margin-bottom:12px;">
+totalRows: ${dbg.totalRows} · entries parsed: ${State.resenas.entries?.length}
+header: ${JSON.stringify(dbg.header)}
+ci: ${JSON.stringify(dbg.ci)}
+sample[0]: ${JSON.stringify((dbg.sample||[])[0])}
+sample[1]: ${JSON.stringify((dbg.sample||[])[1])}
+    </div><div class="empty-note">Sin reseñas en el periodo seleccionado.</div>`;
+  }
 
   // Aggregate per shop
   const agg = {};
