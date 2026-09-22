@@ -1503,7 +1503,42 @@ sample[1]: ${JSON.stringify((dbg.sample||[])[1])}
     </div></div>`;
   }).join('');
 
-  // Individual review cards (for single day or when ≤20 reviews)
+  // Daily count table per shop
+  let countTable = '';
+  if (from !== to){
+    const days=[]; let d=from; while(d<=to){days.push(d);d=shiftDate(d,1);}
+    // Only days that have at least one review
+    const activeDays = days.filter(dd => entries.some(e => e.dkey===dd));
+    if (activeDays.length){
+      const shopCols = shopsToShow.filter(s => agg[s].total > 0);
+      countTable = `<div style="margin-top:20px;">
+        <div class="kpi-section-label">Reseñas recibidas por día</div>
+        <div style="overflow-x:auto;"><table>
+          <thead><tr>
+            <th>Fecha</th>
+            ${shopCols.map(s=>`<th class="num">${esc(s.replace('Amorino ','').replace('Patio de los ',''))}</th>`).join('')}
+            <th class="num">Total</th>
+          </tr></thead>
+          <tbody>
+            ${activeDays.map(dd => {
+              const byShop = shopCols.map(s => entries.filter(e=>e.dkey===dd&&shopEq(e.shop,s)).length);
+              const total = byShop.reduce((a,b)=>a+b,0);
+              return `<tr>
+                <td>${dateLabel(dd)}</td>
+                ${byShop.map(n=>`<td class="num">${n||'—'}</td>`).join('')}
+                <td class="num"><strong>${total}</strong></td>
+              </tr>`;
+            }).join('')}
+            <tr style="border-top:2px solid var(--line);font-weight:700;">
+              <td>Total</td>
+              ${shopCols.map(s=>`<td class="num">${agg[s].total}</td>`).join('')}
+              <td class="num"><strong>${entries.length}</strong></td>
+            </tr>
+          </tbody>
+        </table></div>
+      </div>`;
+    }
+  }
   let reviewList = '';
   if (from === to || entries.length <= 20){
     reviewList = `<div style="margin-top:20px;display:flex;flex-direction:column;gap:10px;">
@@ -1543,6 +1578,7 @@ sample[1]: ${JSON.stringify((dbg.sample||[])[1])}
   return `<div class="kpi-section-label">Valoración media · ${rangeLabel(from,to)} · ${entries.length} reseña${entries.length!==1?'s':''}</div>
     <div class="kpi-row">${cards}</div>
     ${chartHtml}
+    ${countTable}
     ${reviewList}`;
 }
 
