@@ -1416,7 +1416,7 @@ async function loadResenasIfNeeded(){
   if (State.resenas._loaded) return;
   State.resenas._loaded = 'loading';
   try {
-    const json = await loadViaJSONP(RESENAS_SHEET_ID);
+    const json = await loadViaJSONP_3(RESENAS_SHEET_ID, '0');
     const allRows = gvizJsonToRows(json).slice(1); // skip generic labels row
     const header = allRows[0] || [];
     const ci = {
