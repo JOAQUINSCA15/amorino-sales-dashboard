@@ -464,13 +464,17 @@
 
 <script>
 (function(){
-  const PW = 'perotelocomes';
+  const HASH = 'd1342cee9b25b8a13362124399011f9e21af94ae58a20c3375859798a5d27496';
   const KEY = 'am_auth';
-  function checkPw(){
+  async function checkPw(){
     const val = document.getElementById('pwInput').value;
-    if (val === PW){
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(val));
+    const hash = Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+    if (hash === HASH){
       sessionStorage.setItem(KEY, '1');
       document.getElementById('loginScreen').style.display = 'none';
+      const app = document.getElementById('app');
+      if (app) app.style.visibility = 'visible';
     } else {
       document.getElementById('pwError').textContent = 'Contraseña incorrecta';
       document.getElementById('pwInput').value = '';
@@ -481,22 +485,10 @@
   if (sessionStorage.getItem(KEY) === '1'){
     document.getElementById('loginScreen').style.display = 'none';
   } else {
-    // Hide app until authenticated
     document.addEventListener('DOMContentLoaded', () => {
       const app = document.getElementById('app');
       if (app) app.style.visibility = 'hidden';
-      document.getElementById('loginScreen').style.display = 'flex';
-      document.getElementById('loginScreen').addEventListener('transitionend', () => {});
     });
-    // Reveal app after login
-    const orig = window.checkPw;
-    window.checkPw = function(){
-      orig();
-      if (sessionStorage.getItem('am_auth') === '1'){
-        const app = document.getElementById('app');
-        if (app) app.style.visibility = 'visible';
-      }
-    };
   }
 })();
 </script>
