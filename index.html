@@ -1776,33 +1776,54 @@ async function loadComboIfNeeded(){
   if (State.combo._loaded) return;
   State.combo._loaded = 'loading';
   try {
-    const json = await loadViaJSONP_3(COMBO_SHEET_ID, '0');
+    // Use sheet name (not gid) so it works regardless of tab position
+    const json = await loadViaJSONP_bySheet(COMBO_SHEET_ID, 'combo_planificacion');
     const allRows = json.table.rows || [];
-    const header  = (json.table.cols || []).map(c => c.label || '');
-    // Hardcode column indices (gviz swallows some headers)
+    // Column indices: tienda(0) fecha(1) dia(2) horas(3) turnos(4) empleados(5) semana(6)
     const ci = { tienda:0, fecha:1, dia:2, horas:3, turnos:4, empleados:5, semana:6 };
     const rows = [];
     for (const r of allRows){
       const cv = r.c || [];
-      const get = i => { const x = cv[i]; return x ? (x.v ?? x.f ?? '') : ''; };
+      // gviz returns dates as v:"Date(2026,9,5)" — prefer f (formatted) for dates
+      const get = i => {
+        const x = cv[i];
+        if (!x) return '';
+        // If v is a string starting with "Date(" it's a date — use f or reconstruct
+        if (typeof x.v === 'string' && x.v.startsWith('Date(')) return x.f || x.v;
+        return x.v ?? x.f ?? '';
+      };
       const tienda = String(get(ci.tienda)).trim();
-      const fecha  = String(get(ci.fecha)).trim();
-      const dia    = String(get(ci.dia)).trim();
-      const horas  = parseFloat(String(get(ci.horas)).replace(',','.')) || 0;
+      if (!tienda || tienda === 'tienda' || tienda === 'Tienda') continue;
+      const fecha    = String(get(ci.fecha)).trim();
+      const dia      = String(get(ci.dia)).trim();
+      const horas    = parseFloat(String(get(ci.horas)).replace(',','.')) || 0;
       const turnos   = parseInt(get(ci.turnos))  || 0;
       const empNames = String(get(ci.empleados)).trim();
-      // empleados column holds a comma-separated list of names; count non-empty entries
-      const emps = empNames ? empNames.split(',').filter(n => n.trim()).length : 0;
-      const semana = String(get(ci.semana)).trim();
-      if (!tienda || tienda === 'Tienda') continue;
+      const emps     = empNames ? empNames.split(',').filter(n => n.trim()).length : 0;
+      const semana   = String(get(ci.semana)).trim();
       rows.push({ tienda, fecha, dia, horas, turnos, emps, semana });
     }
     State.combo = { _loaded: true, rows };
   } catch(e){
+    console.error('Combo load error:', e);
     State.combo = { _loaded: 'error', rows: [] };
   }
   const el = document.getElementById('comboSection');
   if (el) el.innerHTML = buildComboHTML();
+}
+
+function loadViaJSONP_bySheet(sheetId, sheetName){
+  return new Promise((resolve, reject) => {
+    const cbName = '__gvizCb' + (jsonpCounter++);
+    const scriptEl = document.createElement('script');
+    let settled = false;
+    function cleanup(){ delete window[cbName]; if(scriptEl.parentNode) scriptEl.parentNode.removeChild(scriptEl); clearTimeout(timer); }
+    window[cbName] = json => { if(settled) return; settled=true; cleanup(); if(!json||json.status==='error') reject(new Error('gviz error')); else resolve(json); };
+    const timer = setTimeout(()=>{ if(settled) return; settled=true; cleanup(); reject(new Error('Timeout')); }, 15000);
+    scriptEl.src = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json;responseHandler:${cbName}&sheet=${encodeURIComponent(sheetName)}&headers=1&_=${Date.now()}`;
+    scriptEl.onerror = ()=>{ if(settled) return; settled=true; cleanup(); reject(new Error('Load error')); };
+    document.head.appendChild(scriptEl);
+  });
 }
 
 function buildComboHTML(){
