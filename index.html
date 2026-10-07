@@ -1848,17 +1848,19 @@ function buildComboHTML(){
 
   const weekRows = rows.filter(r => r.semana === selSemana);
 
-  // Build grid: shop × day
-  const grid = {}; // shop → { dia: {horas, turnos, emps} }
+  // Build grid: shop × day (normalise dia key to NFC so lookups are consistent)
+  const _norm = s => String(s).normalize('NFC');
+  const grid = {}; // shop → { diaNFC: {horas, turnos, emps} }
   const diasEnSemana = new Set();
   for (const r of weekRows){
     if (!grid[r.tienda]) grid[r.tienda] = {};
-    grid[r.tienda][r.dia] = { horas: r.horas, turnos: r.turnos, emps: r.emps, fecha: r.fecha };
-    diasEnSemana.add(r.dia);
+    const diaN = _norm(r.dia);
+    grid[r.tienda][diaN] = { horas: r.horas, turnos: r.turnos, emps: r.emps, fecha: r.fecha };
+    diasEnSemana.add(diaN);
   }
 
   // Order days Mon→Sun
-  const dias = COMBO_DAY_NAMES.filter(d => diasEnSemana.has(d));
+  const dias = COMBO_DAY_NAMES.map(_norm).filter(d => diasEnSemana.has(d));
 
   // Week total per shop
   const shopTotals = {};
@@ -1912,7 +1914,9 @@ function buildComboHTML(){
   const dayTotals = dias.map(d =>
     COMBO_SHOP_ORDER.reduce((s, sh) => s + (grid[sh]?.[d]?.horas || 0), 0)
   );
-  const grandTotal = dayTotals.reduce((s,v) => s + v, 0);
+  // grandTotal from shopTotals (robust even if dias is partially empty)
+  const grandTotal = Object.values(shopTotals).reduce((s,v) => s + v, 0);
+  const dayGrandFromGrid = dayTotals.reduce((s,v) => s + v, 0); // used in day totals cell
 
   tbody += `<tr style="border-top:2px solid var(--line);background:rgba(91,58,41,0.04);">
     <td style="${shopStyle}color:var(--ink-soft);font-weight:600;">Total día</td>
@@ -1921,8 +1925,9 @@ function buildComboHTML(){
   </tr>`;
 
   // KPI summary row
-  const maxDay = dias[dayTotals.indexOf(Math.max(...dayTotals))];
-  const avgDaily = (grandTotal / dias.length).toFixed(1);
+  const maxDayIdx = dayTotals.length ? dayTotals.indexOf(Math.max(...dayTotals)) : -1;
+  const maxDay = maxDayIdx >= 0 ? dias[maxDayIdx] : '—';
+  const avgDaily = dias.length > 0 ? (grandTotal / dias.length).toFixed(1) : '—';
 
   const kpis = [
     { label:'Total horas semana', val: grandTotal.toFixed(1)+'h', color:'var(--cocoa)' },
