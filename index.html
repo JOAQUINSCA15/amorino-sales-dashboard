@@ -464,7 +464,7 @@
 
 <script>
 (function(){
-  const HASH = 'd1342cee9b25b8a13362124399011f9e21af94ae58a20c3375859798a5d27496';
+  const HASH = '6b709c197ec64ebfab482d5d0bc89cb24fa97866d671e62b4906b289920121ae';
   const KEY = 'am_auth';
   async function checkPw(){
     const val = document.getElementById('pwInput').value;
@@ -570,6 +570,7 @@
     <button class="main-tab" data-tab="feedback">Feedback turno</button>
     <button class="main-tab" data-tab="anulaciones">Anulaciones</button>
     <button class="main-tab" data-tab="resenas">Reseñas</button>
+    <button class="main-tab" data-tab="combo">Planificación</button>
     <button class="main-tab" data-tab="degustaciones">Degustaciones</button>
     <button class="main-tab print-btn no-print" onclick="exportToExcel()">⬇ Excel</button>
     <button class="main-tab print-btn no-print" onclick="window.print()">⬇ PDF</button>
@@ -778,6 +779,7 @@ const State = {
   feedback:{ _loaded: false, entries: [] },
   anulaciones:{ _loaded: false, byShop: {} },
   resenas: { _loaded: false, entries: [] },
+  combo:   { _loaded: false, rows: [] },
   activeTab: 'panel',
   productividadByShop: {
     'Amorino Sevilla Avenida':       110,
@@ -1811,6 +1813,177 @@ function buildWeatherKPIsHTML(from, to){
   </div>`;
 }
 
+/* ================= COMBO PLANIFICACIÓN ================= */
+// Sheet ID de la hoja "Amorino Operaciones" (tab Combo_Planning, gid 0)
+// Cámbialo por el ID real una vez crees la hoja y ejecutes el Apps Script.
+const COMBO_SHEET_ID = 'PENDIENTE_SHEET_ID';
+
+const COMBO_SHOP_ORDER = [
+  'Amorino Avenida',
+  'Amorino Catedral',
+  'Amorino Alcázar',
+  'Amorino Plaza Nueva',
+  'Amorino Naranjos',
+];
+const COMBO_DAY_NAMES = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+
+async function loadComboIfNeeded(){
+  if (State.combo._loaded) return;
+  State.combo._loaded = 'loading';
+  try {
+    const json = await loadViaJSONP_3(COMBO_SHEET_ID, '0');
+    const allRows = json.table.rows || [];
+    const header  = (json.table.cols || []).map(c => c.label || '');
+    // Hardcode column indices (gviz swallows some headers)
+    const ci = { tienda:0, fecha:1, dia:2, horas:3, turnos:4, empleados:5, semana:6 };
+    const rows = [];
+    for (const r of allRows){
+      const cv = r.c || [];
+      const get = i => { const x = cv[i]; return x ? (x.v ?? x.f ?? '') : ''; };
+      const tienda = String(get(ci.tienda)).trim();
+      const fecha  = String(get(ci.fecha)).trim();
+      const dia    = String(get(ci.dia)).trim();
+      const horas  = parseFloat(get(ci.horas)) || 0;
+      const turnos = parseInt(get(ci.turnos))  || 0;
+      const emps   = parseInt(get(ci.empleados)) || 0;
+      const semana = String(get(ci.semana)).trim();
+      if (!tienda || tienda === 'Tienda') continue;
+      rows.push({ tienda, fecha, dia, horas, turnos, emps, semana });
+    }
+    State.combo = { _loaded: true, rows };
+  } catch(e){
+    State.combo = { _loaded: 'error', rows: [] };
+  }
+  const el = document.getElementById('comboSection');
+  if (el) el.innerHTML = buildComboHTML();
+}
+
+function buildComboHTML(){
+  if (COMBO_SHEET_ID === 'PENDIENTE_SHEET_ID'){
+    return `<div class="empty-note" style="padding:32px 0;">
+      <strong>Falta configurar la hoja de Combo.</strong><br><br>
+      1. Crea la hoja "Amorino Operaciones" en Google Sheets y compártela públicamente.<br>
+      2. Pega el Apps Script de Combo y ejecuta <code>syncComboPlanning()</code>.<br>
+      3. Reemplaza <code>COMBO_SHEET_ID</code> en el dashboard con el ID de esa hoja.
+    </div>`;
+  }
+  if (State.combo._loaded === 'loading') return '<div class="empty-note">Cargando planificación…</div>';
+  if (State.combo._loaded === 'error')   return '<div class="empty-note" style="color:var(--raspberry)">Error al cargar Combo. Verifica que la hoja esté compartida públicamente.</div>';
+  if (!State.combo._loaded)              return '<div class="empty-note">Cargando planificación…</div>';
+
+  const rows = State.combo.rows;
+  if (!rows.length) return '<div class="empty-note">No hay datos de planificación en la hoja.</div>';
+
+  // Group by semana → for selector
+  const semanas = [...new Set(rows.map(r => r.semana))].sort();
+  const selSemana = State.comboSemana || semanas[semanas.length - 1];
+
+  const weekRows = rows.filter(r => r.semana === selSemana);
+
+  // Build grid: shop × day
+  const grid = {}; // shop → { dia: {horas, turnos, emps} }
+  const diasEnSemana = new Set();
+  for (const r of weekRows){
+    if (!grid[r.tienda]) grid[r.tienda] = {};
+    grid[r.tienda][r.dia] = { horas: r.horas, turnos: r.turnos, emps: r.emps, fecha: r.fecha };
+    diasEnSemana.add(r.dia);
+  }
+
+  // Order days Mon→Sun
+  const dias = COMBO_DAY_NAMES.filter(d => diasEnSemana.has(d));
+
+  // Week total per shop
+  const shopTotals = {};
+  for (const shop of COMBO_SHOP_ORDER){
+    shopTotals[shop] = (grid[shop] ? Object.values(grid[shop]).reduce((s,v) => s + v.horas, 0) : 0);
+  }
+
+  // Semana selector
+  let semanaSelect = '';
+  if (semanas.length > 1){
+    semanaSelect = `<select onchange="State.comboSemana=this.value;document.getElementById('comboSection').innerHTML=buildComboHTML();"
+      style="font-size:13px;font-weight:600;padding:6px 28px 6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--white);appearance:none;
+      background-image:url(\\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23766955'/%3E%3C/svg%3E\\");
+      background-repeat:no-repeat;background-position:right 10px center;cursor:pointer;margin-bottom:16px;">
+      ${semanas.map(s => `<option value="${s}" ${s===selSemana?'selected':''}>${s}</option>`).join('')}
+    </select>`;
+  } else {
+    semanaSelect = `<div style="font-size:13px;color:var(--ink-soft);margin-bottom:16px;">Semana del ${selSemana}</div>`;
+  }
+
+  // Table
+  const colStyle = 'padding:10px 14px;text-align:right;font-size:13px;white-space:nowrap;';
+  const hdrStyle = 'padding:8px 14px;font-size:11px;letter-spacing:0.07em;text-transform:uppercase;color:var(--ink-soft);font-weight:600;text-align:right;white-space:nowrap;';
+  const shopStyle = 'padding:10px 14px;font-size:13px;font-weight:600;white-space:nowrap;text-align:left;';
+
+  let thead = `<tr>
+    <th style="${hdrStyle}text-align:left;">Tienda</th>
+    ${dias.map(d => `<th style="${hdrStyle}">${d}</th>`).join('')}
+    <th style="${hdrStyle}color:var(--ink);">Total sem.</th>
+  </tr>`;
+
+  let tbody = '';
+  for (const shop of COMBO_SHOP_ORDER){
+    const shortName = shop.replace('Amorino ','');
+    const shopGrid  = grid[shop] || {};
+    const total     = shopTotals[shop];
+    tbody += `<tr style="border-top:1px solid var(--line);">
+      <td style="${shopStyle}">${shortName}</td>
+      ${dias.map(d => {
+        const cell = shopGrid[d];
+        if (!cell) return `<td style="${colStyle}color:var(--line);">—</td>`;
+        const h = cell.horas.toFixed(1);
+        const bg = cell.horas < 1 ? 'color:var(--ink-soft);' : '';
+        return `<td style="${colStyle}${bg}" title="${cell.emps} empleado(s), ${cell.turnos} turno(s)">${h}h</td>`;
+      }).join('')}
+      <td style="${colStyle}font-weight:700;color:var(--cocoa);">${total.toFixed(1)}h</td>
+    </tr>`;
+  }
+
+  // Day totals row
+  const dayTotals = dias.map(d =>
+    COMBO_SHOP_ORDER.reduce((s, sh) => s + (grid[sh]?.[d]?.horas || 0), 0)
+  );
+  const grandTotal = dayTotals.reduce((s,v) => s + v, 0);
+
+  tbody += `<tr style="border-top:2px solid var(--line);background:rgba(91,58,41,0.04);">
+    <td style="${shopStyle}color:var(--ink-soft);font-weight:600;">Total día</td>
+    ${dayTotals.map(t => `<td style="${colStyle}font-weight:700;">${t.toFixed(1)}h</td>`).join('')}
+    <td style="${colStyle}font-weight:800;color:var(--cocoa);">${grandTotal.toFixed(1)}h</td>
+  </tr>`;
+
+  // KPI summary row
+  const maxDay = dias[dayTotals.indexOf(Math.max(...dayTotals))];
+  const avgDaily = (grandTotal / dias.length).toFixed(1);
+
+  const kpis = [
+    { label:'Total horas semana', val: grandTotal.toFixed(1)+'h', color:'var(--cocoa)' },
+    { label:'Media horas/día',    val: avgDaily+'h',              color:'var(--blueberry)' },
+    { label:'Día más cargado',    val: maxDay,                    color:'var(--raspberry)' },
+    { label:'Tiendas planificadas', val: COMBO_SHOP_ORDER.filter(s=>shopTotals[s]>0).length+'/5', color:'var(--pistachio)' },
+  ];
+
+  const kpiHTML = `<div class="kpi-row" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px;">
+    ${kpis.map(k=>`<div class="kpi-card">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value" style="color:${k.color};font-size:28px;">${k.val}</div>
+    </div>`).join('')}
+  </div>`;
+
+  return `
+    ${semanaSelect}
+    ${kpiHTML}
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>${thead}</thead>
+        <tbody>${tbody}</tbody>
+      </table>
+    </div>
+    <p style="font-size:11px;color:var(--ink-soft);margin-top:12px;">
+      Datos sincronizados desde Combo. Pasa el cursor sobre las horas para ver nº de empleados y turnos.
+    </p>`;
+}
+
 /* ================= EVALUACIÓN DEL TURNO ================= */
 const RADIOGRAFIAS_SHEET_ID = '1b2QhZCIKoMWwNFG051O-Hj0zx4y5Zi3sxPdM9_68ozo';
 const DEGU_SHEET_ID = '13y3fRZCYUG722bhRwsNziRw5O1gXClSqqIV14EEyyPs';
@@ -2310,6 +2483,17 @@ function renderAll(){
       loadDegustacionesIfNeeded();
     }
     loadRadTabsIfNeeded();
+    return;
+  }
+
+  if (State.activeTab === 'combo'){
+    document.getElementById('content').innerHTML = `
+      <div class="section-title"><span class="swatch" style="background:var(--pistachio)"></span>Planificación Combo
+        <button onclick="State.combo={_loaded:false,rows:[]};loadComboIfNeeded();"
+          style="font-size:11px;font-weight:600;background:none;border:1px solid var(--line);border-radius:8px;padding:4px 10px;cursor:pointer;margin-left:12px;color:var(--ink-soft);">↻ Actualizar</button>
+      </div>
+      <div class="card" id="comboSection">${buildComboHTML()}</div>`;
+    loadComboIfNeeded();
     return;
   }
 
