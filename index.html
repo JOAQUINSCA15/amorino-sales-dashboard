@@ -1,0 +1,3295 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Amorino · Panel de Ventas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --cream:#FBF5EA;
+    --cream-2:#F2E8D3;
+    --ink:#2B2117;
+    --ink-soft:#766955;
+    --pistachio:#8FA871;
+    --raspberry:#C84B5E;
+    --mango:#E3A038;
+    --cocoa:#5B3A29;
+    --blueberry:#5E6FA3;
+    --line:#E6D8BB;
+    --white:#FFFFFF;
+    --shadow: 0 2px 14px rgba(91,58,41,0.07);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--cream);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    font-variant-numeric:tabular-nums;
+    -webkit-font-smoothing:antialiased;
+  }
+  #app{max-width:1280px;margin:0 auto;padding:0 24px 64px;}
+
+  /* ---------- Topbar ---------- */
+  .topbar{
+    position:sticky;top:0;z-index:30;
+    background:rgba(251,245,234,0.92);
+    backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line);
+    padding:18px 24px;
+    margin:0 -24px 28px;
+  }
+  .topbar-inner{max-width:1280px;margin:0 auto;display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap;}
+  .brand{display:flex;align-items:baseline;gap:12px;}
+  .brand-mark{
+    width:30px;height:30px;border-radius:50% 50% 50% 4px;
+    background:conic-gradient(var(--raspberry) 0deg 90deg, var(--mango) 90deg 180deg, var(--pistachio) 180deg 270deg, var(--blueberry) 270deg 360deg);
+    flex:none;
+  }
+  .brand h1{
+    font-family:'Fraunces',serif;font-style:italic;font-weight:600;
+    font-size:28px;margin:0;letter-spacing:-0.5px;
+  }
+  .brand .eyebrow{
+    font-size:11px;letter-spacing:0.14em;text-transform:uppercase;
+    color:var(--ink-soft);font-weight:600;margin-top:2px;
+  }
+  .controls{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  .field{display:flex;flex-direction:column;gap:4px;}
+  .field label{font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:600;}
+  select{
+    font-family:'Inter',sans-serif;font-size:14px;font-weight:600;color:var(--ink);
+    background:var(--white);border:1px solid var(--line);border-radius:9px;
+    padding:8px 30px 8px 12px;appearance:none;cursor:pointer;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23766955'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 12px center;
+    min-width:150px;
+  }
+  select:focus{outline:2px solid var(--blueberry);outline-offset:1px;}
+  input[type="date"]{
+    font-family:'Inter',sans-serif;font-size:14px;font-weight:600;color:var(--ink);
+    background:var(--white);border:1px solid var(--line);border-radius:9px;
+    padding:7px 10px;cursor:pointer;min-width:140px;
+  }
+  input[type="date"]:focus{outline:2px solid var(--blueberry);outline-offset:1px;}
+  .preset-row{display:flex;gap:8px;flex-wrap:wrap;}
+  .preset-btn{
+    font-family:'Inter',sans-serif;font-size:12px;font-weight:600;color:var(--cocoa);
+    background:var(--cream-2);border:1px solid var(--line);border-radius:20px;
+    padding:6px 14px;cursor:pointer;transition:background .15s;
+  }
+  .preset-btn:hover{background:var(--white);}
+  .preset-btn.active{background:var(--cocoa);color:var(--white);border-color:var(--cocoa);}
+  .btn{
+    font-family:'Inter',sans-serif;font-weight:700;font-size:13.5px;color:var(--white);
+    background:var(--cocoa);border:none;border-radius:9px;padding:10px 18px;
+    cursor:pointer;display:flex;align-items:center;gap:8px;transition:opacity .15s;
+  }
+  .btn:hover{opacity:.88;}
+  .btn:focus-visible{outline:2px solid var(--blueberry);outline-offset:2px;}
+  .btn .dot{width:7px;height:7px;border-radius:50%;background:#8AE08C;}
+  .btn .dot.busy{background:var(--mango);animation:pulse 1s infinite;}
+  .sync-note{font-size:11px;color:var(--ink-soft);margin-top:4px;text-align:right;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+  /* ---------- Status banner ---------- */
+  .banner{
+    border-radius:12px;padding:16px 20px;margin-bottom:24px;font-size:14px;
+    border:1px solid var(--line);background:var(--white);box-shadow:var(--shadow);
+  }
+  .banner.error{border-color:#E3B0AE;background:#FBEFEE;color:#8A2E2E;}
+  .banner h3{margin:0 0 6px;font-size:15px;}
+  .banner ul{margin:8px 0 0;padding-left:18px;}
+  .banner code{background:rgba(0,0,0,.06);padding:1px 5px;border-radius:4px;}
+
+  /* ---------- Section ---------- */
+  .section-title{
+    font-family:'Fraunces',serif;font-weight:600;font-size:20px;margin:40px 0 16px;
+    display:flex;align-items:center;gap:10px;
+  }
+  .section-title .swatch{width:11px;height:11px;border-radius:3px;}
+
+  /* ---------- KPI scoops ---------- */
+  .kpi-row{display:grid;grid-template-columns:repeat(7,1fr);gap:14px;}
+  .kpi-section-label{font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;margin-top:24px;}
+  @media (max-width:1100px){.kpi-row{grid-template-columns:repeat(4,1fr);}}
+  @media (max-width:980px){.kpi-row{grid-template-columns:repeat(3,1fr);}}
+  @media (max-width:560px){.kpi-row{grid-template-columns:repeat(2,1fr);}}
+  .kpi{display:flex;flex-direction:column;align-items:stretch;}
+  .kpi-scoop{
+    height:14px;border-radius:50% 50% 7px 7px;margin:0 10px -1px;
+  }
+  .kpi-body{
+    background:var(--white);border:1px solid var(--line);border-radius:7px 7px 14px 14px;
+    box-shadow:var(--shadow);padding:16px 14px 14px;text-align:left;
+  }
+  .kpi-label{font-size:11px;color:var(--ink-soft);font-weight:600;letter-spacing:0.03em;margin-bottom:6px;min-height:28px;}
+  .kpi-value{font-family:'Fraunces',serif;font-weight:700;font-size:22px;letter-spacing:-0.3px;}
+  .kpi-value.small{font-size:18px;}
+  .kpi-sub{font-size:11px;color:var(--ink-soft);margin-top:3px;}
+  .kpi-sub.pos{color:#4D7A3F;font-weight:700;}
+  .kpi-sub.neg{color:var(--raspberry);font-weight:700;}
+
+  /* ---------- Cards / grid ---------- */
+  .grid-2{display:grid;grid-template-columns:1.6fr 1fr;gap:18px;}
+  @media (max-width:880px){.grid-2{grid-template-columns:1fr;}}
+  .card{background:var(--white);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:20px 22px;}
+  .card h3{font-family:'Fraunces',serif;font-weight:600;font-size:16px;margin:0 0 4px;}
+  .card .hint{font-size:12px;color:var(--ink-soft);margin-bottom:16px;}
+  .empty-note{font-size:13px;color:var(--ink-soft);padding:24px 0;text-align:center;}
+
+  /* ---------- Hourly bars ---------- */
+  .hbars{display:flex;align-items:flex-end;gap:5px;height:200px;padding-top:18px;}
+  .eval-table{width:100%;border-collapse:collapse;font-size:13px;}
+  .eval-table thead th{text-align:left;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);font-weight:700;padding:0 8px 8px;border-bottom:1px solid var(--line);}
+  .eval-table tbody td{padding:7px 8px;border-bottom:1px solid var(--cream-2);}
+  .eval-table tr.ev-pos td{background:rgba(79,122,63,0.09);}
+  .eval-table tr.ev-neg td{background:rgba(94,111,163,0.1);}
+  .eval-table tbody tr:hover td{filter:brightness(0.95);}
+  td.cell-good{background:rgba(79,122,63,0.10);}
+  td.cell-bad {background:rgba(200,75,94,0.10);}
+  .eval-shop-block{margin-bottom:28px;}
+  .eval-shop-title{font-family:'Fraunces',serif;font-size:14px;font-weight:700;margin:0 0 10px;}
+  .prod-control{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-soft);margin-bottom:14px;}
+  .prod-control input{width:68px;padding:4px 8px;border:1px solid var(--line);border-radius:6px;font-size:13px;font-family:'Inter',sans-serif;}
+  .prod-control input:focus{outline:2px solid var(--blueberry);outline-offset:1px;}
+  .series-svg{width:100%;height:240px;overflow:visible;}
+  .series-dot{transition:r .15s;cursor:default;}
+  .series-dot:hover{r:5.5;}
+  .hbar-col{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;min-width:0;}
+  .hbar{width:100%;border-radius:6px 6px 2px 2px;background:linear-gradient(180deg,var(--raspberry),#A8394A);position:relative;min-height:3px;cursor:default;}
+  .hbar:hover{background:linear-gradient(180deg,var(--mango),#C77E1C);}
+  .hbar-axis{font-size:9.5px;color:var(--ink-soft);margin-top:6px;writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);height:34px;}
+
+  /* ---------- Donut ---------- */
+  .donut-wrap{display:flex;align-items:center;gap:20px;flex-wrap:wrap;justify-content:center;}
+  .donut{width:160px;height:160px;border-radius:50%;flex:none;position:relative;}
+  .donut::after{
+    content:'';position:absolute;inset:26px;border-radius:50%;background:var(--white);
+    display:flex;
+  }
+  .donut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;}
+  .donut-center .v{font-family:'Fraunces',serif;font-weight:700;font-size:17px;}
+  .donut-center .l{font-size:9.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.05em;}
+  .legend{display:flex;flex-direction:column;gap:8px;min-width:160px;}
+  .legend-row{display:flex;align-items:center;gap:8px;font-size:13px;}
+  .legend-sw{width:10px;height:10px;border-radius:3px;flex:none;}
+  .legend-row .pct{margin-left:auto;font-weight:700;}
+
+  /* ---------- Flavors ranking ---------- */
+  .rank-list{display:flex;flex-direction:column;gap:10px;}
+  .rank-row{display:grid;grid-template-columns:22px 1fr auto;align-items:center;gap:10px;font-size:13.5px;}
+  .rank-num{font-family:'Fraunces',serif;font-weight:700;color:var(--ink-soft);font-size:13px;}
+  .rank-bar-wrap{background:var(--cream-2);border-radius:6px;height:9px;overflow:hidden;}
+  .rank-bar{height:100%;border-radius:6px;background:linear-gradient(90deg,var(--pistachio),#6E8C52);}
+  .rank-name{grid-column:2/3;margin-bottom:3px;}
+  .rank-val{font-weight:700;font-size:12.5px;}
+  .rank-item{display:flex;flex-direction:column;}
+
+  /* ---------- Employees table ---------- */
+  table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  thead th{
+    text-align:left;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--ink-soft);font-weight:700;padding:0 10px 10px;border-bottom:1px solid var(--line);
+  }
+  tbody td{padding:10px 10px;border-bottom:1px solid var(--cream-2);}
+  tbody tr:hover{background:var(--cream-2);}
+  tr.emp-row{cursor:pointer;}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}
+  .emp-name{font-weight:700;}
+  .shop-tag{font-size:10.5px;color:var(--ink-soft);}
+  .sort-select{margin-bottom:14px;}
+
+  /* ---------- Ultimos ---------- */
+  .tickets-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;}
+  @media (max-width:980px){.tickets-grid{grid-template-columns:repeat(2,1fr);}}
+  .ticket-card{background:var(--white);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow);}
+  .ticket-card h4{font-family:'Fraunces',serif;font-size:13.5px;margin:0 0 10px;font-weight:700;}
+  .ticket-row{display:flex;justify-content:space-between;font-size:13px;padding:5px 0;border-bottom:1px dashed var(--cream-2);}
+  .ticket-row:last-child{border-bottom:none;}
+  .ticket-row .t-idx{color:var(--ink-soft);}
+  .ticket-row.latest{font-weight:700;color:var(--raspberry);}
+  .tape-list{display:flex;flex-direction:column;gap:0;max-width:340px;}
+
+  footer{margin-top:48px;font-size:12px;color:var(--ink-soft);text-align:center;border-top:1px solid var(--line);padding-top:18px;}
+  footer a{color:var(--blueberry);}
+
+  .skeleton{height:120px;border-radius:14px;background:linear-gradient(90deg,var(--cream-2) 25%,var(--white) 37%,var(--cream-2) 63%);background-size:400% 100%;animation:shimmer 1.4s infinite;}
+  /* ===== DEBUG (temporary) ===== */
+  #debugBtn{position:fixed;bottom:16px;right:16px;z-index:9999;background:#333;color:#fff;border:none;border-radius:8px;padding:10px 16px;font-size:13px;cursor:pointer;}
+  #debugOut{position:fixed;bottom:60px;right:16px;z-index:9999;background:#fff;border:1px solid #ccc;border-radius:8px;padding:12px;font-size:11px;max-width:340px;max-height:300px;overflow-y:auto;display:none;white-space:pre-wrap;word-break:break-all;box-shadow:0 4px 20px rgba(0,0,0,.2);}
+  .tab-bar{
+    display:flex;align-items:center;gap:6px;
+    padding:0 24px;margin:0 -24px 24px;
+    border-bottom:2px solid var(--line);background:rgba(251,245,234,0.92);
+  }
+  .main-tab{
+    font-family:'Inter',sans-serif;font-size:13px;font-weight:600;
+    color:var(--ink-soft);background:none;border:none;
+    padding:12px 18px;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;
+    transition:color .15s, border-color .15s;
+  }
+  .main-tab:hover{color:var(--ink);}
+  .main-tab.active{color:var(--cocoa);border-bottom-color:var(--cocoa);}
+  .main-tab.print-btn{margin-left:auto;color:var(--ink-soft);font-size:12px;}
+  .main-tab.print-btn:hover{color:var(--ink);}
+
+  .eval-day-block{margin-bottom:36px;}
+  .eval-day-header{font-family:'Fraunces',serif;font-size:18px;font-weight:700;
+    padding:10px 0 10px;margin-bottom:14px;border-bottom:2px solid var(--line);}
+  @media print{.eval-day-block{page-break-inside:avoid;page-break-after:always;}}
+
+  /* ===== EVAL ENHANCEMENTS ===== */
+  .eval-global-controls{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--line);}
+  .eval-cost-row{display:flex;flex-wrap:wrap;gap:16px;font-size:12.5px;color:var(--ink-soft);padding:10px 2px 0;border-top:1px dashed var(--line);margin-top:8px;}
+  .eval-cost-row strong{color:var(--ink);}
+  .eval-grand-total{
+    display:flex;flex-wrap:wrap;align-items:center;gap:16px;
+    background:var(--cocoa);color:var(--white);
+    border-radius:12px;padding:14px 18px;margin-top:20px;font-size:13px;
+  }
+  .eval-grand-total strong{color:var(--white);}
+  .eval-grand-total > strong:first-child{font-family:'Fraunces',serif;font-size:15px;margin-right:8px;}
+
+  /* ===== PRINT / PDF ===== */
+  .print-only{display:none;}
+  .print-header{margin-bottom:24px;}
+  .print-header-inner{display:flex;align-items:flex-start;justify-content:space-between;}
+  .print-brand{display:flex;align-items:center;gap:12px;}
+  .print-brand-mark{
+    width:36px;height:36px;border-radius:50% 50% 50% 4px;flex:none;
+    background:conic-gradient(#C84B5E 0deg 90deg,#E3A038 90deg 180deg,#8FA871 180deg 270deg,#5E6FA3 270deg 360deg);
+  }
+  .print-brand-name{font-family:'Fraunces',serif;font-style:italic;font-size:28px;font-weight:600;line-height:1.1;}
+  .print-brand-sub{font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-soft);margin-top:2px;}
+  .print-meta-block{text-align:right;}
+  .print-meta-label{font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-soft);}
+  .print-meta-value{font-size:13px;font-weight:600;margin-top:3px;}
+  .print-divider{height:2px;background:linear-gradient(90deg,var(--raspberry),var(--mango),var(--pistachio));border-radius:2px;margin-top:14px;}
+
+  @media print{
+    .print-only{display:block !important;}
+    .no-print,.topbar,.tab-bar,footer,#weatherKPIs,.preset-row,.sync-note{display:none !important;}
+
+    /* Use system fonts — avoids embedding web fonts */
+    body, *, input, select, button { font-family: Arial, Helvetica, sans-serif !important; }
+    .brand h1, .print-brand-name, .eval-day-header, .eval-shop-title,
+    .kpi-value, .card h3, .section-title, .rank-num, .ticket-card h4,
+    .donut-center .v { font-family: Georgia, 'Times New Roman', serif !important; }
+
+    /* Scale down to reduce rasterised surface area */
+    body { zoom: 0.82; }
+
+    /* Minimal spacing */
+    body{background:#fff;font-size:10px;margin:0;padding:0;}
+    #app{max-width:100%;padding:6px 14px 14px;}
+
+    /* Flatten eval coloured rows to text-only indicators — biggest size win */
+    tr.ev-pos td { background: none !important; }
+    tr.ev-neg td { background: none !important; }
+    tr.ev-pos td:last-child strong::before { content: '▲ '; color: #4D7A3F; }
+    tr.ev-neg td:last-child strong::before { content: '▼ '; color: #5E6FA3; }
+    td.cell-good { background: none !important; }
+    td.cell-bad  { background: none !important; }
+
+    /* Flatten eval grand total bar */
+    .eval-grand-total {
+      background: none !important;
+      color: var(--ink) !important;
+      border: 1.5px solid #333;
+      border-radius: 6px;
+    }
+    .eval-grand-total strong { color: var(--ink) !important; }
+
+    /* Hide print header when printing from eval tab */
+    body.eval-active .print-header { display: none !important; }
+    /* Don't add a blank page after the last day block */
+    .eval-day-block:last-child { page-break-after: auto !important; }
+
+    /* Compact cards */
+    .card{box-shadow:none;border:1px solid #ccc;break-inside:avoid;margin-bottom:8px;padding:10px 12px;}
+    .kpi-scoop{display:none;}
+    .kpi-body{border:1px solid #e0d8c8;border-radius:6px;padding:8px;}
+    .kpi-row{grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:6px;}
+    .kpi-section-label{margin:10px 0 4px;font-size:8px;}
+    .section-title{margin:10px 0 6px;font-size:12px;page-break-after:avoid;}
+    .grid-2{grid-template-columns:1fr 1fr;gap:8px;}
+    .eval-table{font-size:10px;}
+    .eval-table thead th{font-size:9px;padding:0 6px 6px;}
+    .eval-table tbody td{padding:5px 6px;}
+    .eval-shop-block{margin-bottom:16px;}
+    .eval-cost-row{font-size:9px;gap:8px;padding:6px 0 0;}
+    .eval-global-controls{padding-bottom:10px;margin-bottom:10px;}
+    .prod-control{display:none;}
+    .eval-day-header{font-size:14px;padding:6px 0;margin-bottom:8px;}
+    .series-svg{height:120px !important;}
+    .hbars{height:100px;}
+    .tickets-grid{grid-template-columns:repeat(3,1fr);}
+    a{color:inherit;text-decoration:none;}
+    @page{margin:1cm;size:A4 landscape;}
+  }
+
+  @keyframes shimmer{0%{background-position:100% 0;}100%{background-position:0 0;}}
+
+  /* ===== MOBILE — iPhone ===== */
+  @media (max-width:520px){
+    #app{padding:0 10px 48px;}
+
+    /* Topbar */
+    .topbar{padding:10px 14px 8px;margin:0 -10px 20px;}
+    .topbar-inner{flex-direction:column;align-items:flex-start;gap:8px;}
+    .brand h1{font-size:22px;}
+    .brand .eyebrow{font-size:9.5px;}
+    .brand-mark{width:22px;height:22px;}
+    .controls{display:grid;grid-template-columns:1fr 1fr;gap:7px;width:100%;}
+    .controls .field{width:100%;}
+    .controls .field-wide{grid-column:1/-1;}
+    select,input[type="date"]{width:100%;min-width:unset;font-size:13px;padding:7px 8px;}
+    .btn{justify-content:center;width:100%;padding:10px;}
+    .preset-row{overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px;-webkit-overflow-scrolling:touch;gap:5px;}
+    .preset-btn{white-space:nowrap;flex-shrink:0;font-size:11px;padding:5px 10px;}
+    .sync-note{font-size:10px;}
+
+    /* KPIs */
+    .kpi-section-label{margin-top:14px;margin-bottom:6px;}
+    .kpi-row{grid-template-columns:repeat(2,1fr) !important;gap:8px;}
+    .kpi-scoop{margin:0 8px -1px;}
+    .kpi-body{padding:10px 10px 8px;}
+    .kpi-label{font-size:9.5px;min-height:24px;}
+    .kpi-value{font-size:18px;}
+    .kpi-value.small{font-size:15px;}
+    .kpi-sub{font-size:10px;}
+
+    /* Section titles */
+    .section-title{font-size:15px;margin:22px 0 8px;}
+    .section-title .swatch{width:9px;height:9px;}
+
+    /* Cards */
+    .card{padding:14px 12px;border-radius:12px;}
+    .card h3{font-size:14px;}
+    .hint{font-size:11px;}
+    .grid-2{grid-template-columns:1fr !important;gap:12px;}
+
+    /* Hourly bars */
+    .hbars{height:140px;gap:3px;}
+    .hbar-axis{font-size:8px;height:26px;}
+
+    /* Series SVG */
+    .series-svg{height:auto !important;}
+
+    /* Donut */
+    .donut-wrap{flex-direction:column;align-items:center;gap:14px;}
+    .legend{min-width:unset;width:100%;}
+    .legend-row{font-size:12px;}
+
+    /* Employee / Flavor tables */
+    table{font-size:12px;}
+    thead th{font-size:9.5px;padding:0 6px 8px;}
+    tbody td{padding:8px 6px;}
+    .sort-select{font-size:12px;}
+    .emp-name{font-size:12px;}
+    .shop-tag{font-size:9.5px;}
+
+    /* Rank list */
+    .rank-row{font-size:12px;gap:6px;}
+    .rank-num{font-size:11px;}
+    .rank-val{font-size:11px;}
+
+    /* Eval table */
+    .eval-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+    .eval-table{min-width:340px;font-size:12px;}
+    .eval-table thead th{font-size:9.5px;padding:0 6px 7px;}
+    .eval-table tbody td{padding:7px 6px;}
+    .eval-shop-title{font-size:13px;}
+    .prod-control{flex-wrap:wrap;font-size:11px;}
+    .prod-control input{width:58px;font-size:12px;}
+
+    /* Tickets */
+    .tickets-grid{grid-template-columns:repeat(2,1fr) !important;}
+    .ticket-card{padding:12px;}
+    .ticket-card h4{font-size:12px;}
+    .ticket-row{font-size:12px;}
+    .tape-list{max-width:100%;}
+
+    /* Footer */
+    footer{font-size:10px;}
+    footer a{word-break:break-all;}
+
+    /* Tab bar on mobile */
+    .tab-bar{padding:0 10px;gap:0;}
+    .main-tab{font-size:12px;padding:10px 12px;}
+    .main-tab.print-btn{font-size:11px;padding:10px 8px;}
+
+    /* Eval mobile */
+    .eval-global-controls{flex-direction:column;align-items:flex-start;}
+    .eval-cost-row{gap:8px;font-size:11.5px;}
+    .eval-grand-total{font-size:11.5px;gap:8px;padding:10px 12px;}
+  }
+</style>
+<script src="historical_sales.js"></script>
+<script src="historical_sug.js"></script>
+<script src="historical_medh.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<!-- Password protection handled by Netlify (site settings → Access control) -->
+
+<div id="app">
+
+  <!-- Print header: hidden on screen, visible in PDF export -->
+  <div class="print-header print-only" id="printHeader">
+    <div class="print-header-inner">
+      <div class="print-brand">
+        <div class="print-brand-mark"></div>
+        <div>
+          <div class="print-brand-name">Amorino</div>
+          <div class="print-brand-sub">Panel de Ventas · Sevilla</div>
+        </div>
+      </div>
+      <div class="print-meta-block">
+        <div class="print-meta-label">Informe generado</div>
+        <div class="print-meta-value" id="printMeta">—</div>
+      </div>
+    </div>
+    <div class="print-divider"></div>
+  </div>
+
+  <button id="debugBtn" onclick="
+    const out = document.getElementById('debugOut');
+    const rows = State.raw ? State.raw.t1.filter(r => r.dkey === State.from) : [];
+    const shopVal = State.shop;
+    let txt = 'Date: ' + State.from + '\nShop filter: [' + shopVal + ']\n\nt1 rows for this date:\n';
+    if (!rows.length) { txt += '(none found)'; }
+    else { rows.forEach(r => { txt += '[' + r.shop + '] ventas=' + r.ventas + '\n  shop===filter: ' + (r.shop===shopVal) + '\n  shopEq: ' + shopEq(r.shop,shopVal) + '\n'; }); }
+    out.textContent = txt;
+    out.style.display = out.style.display === 'none' ? 'block' : 'none';
+  ">🔍 Debug</button>
+  <div id="debugOut"></div>
+
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <div class="brand-mark"></div>
+        <div>
+          <h1>Amorino</h1>
+          <div class="eyebrow">Panel de ventas · 5 tiendas</div>
+        </div>
+      </div>
+      <div class="controls">
+        <div class="field field-wide">
+          <label for="shopSelect">Tienda</label>
+          <select id="shopSelect"></select>
+        </div>
+        <div class="field">
+          <label for="dateFrom">Desde</label>
+          <input type="date" id="dateFrom">
+        </div>
+        <div class="field">
+          <label for="dateTo">Hasta</label>
+          <input type="date" id="dateTo">
+        </div>
+        <div class="field field-wide">
+          <label>&nbsp;</label>
+          <button class="btn" id="refreshBtn"><span class="dot" id="statusDot"></span><span id="refreshLabel">Actualizar</span></button>
+        </div>
+      </div>
+    </div>
+    <div class="topbar-inner" style="margin-top:10px;">
+      <div class="preset-row" id="presetRow">
+        <button class="preset-btn" data-preset="today">Hoy</button>
+        <button class="preset-btn" data-preset="7d">Últimos 7 días</button>
+        <button class="preset-btn" data-preset="30d">Últimos 30 días</button>
+        <button class="preset-btn" data-preset="month">Mes en curso</button>
+        <button class="preset-btn" data-preset="all">Todo el periodo</button>
+      </div>
+      <div class="sync-note" id="syncNote">Cargando datos…</div>
+    </div>
+  </div>
+  <div class="tab-bar" id="mainTabBar">
+    <button class="main-tab active" data-tab="panel">Panel</button>
+    <button class="main-tab" data-tab="eval">Evaluación del turno</button>
+    <button class="main-tab" data-tab="feedback">Feedback turno</button>
+    <button class="main-tab" data-tab="anulaciones">Anulaciones</button>
+    <button class="main-tab" data-tab="resenas">Reseñas</button>
+    <button class="main-tab" data-tab="combo">Planificación</button>
+    <button class="main-tab" data-tab="degustaciones">Degustaciones</button>
+    <button class="main-tab print-btn no-print" onclick="exportToExcel()">⬇ Excel</button>
+    <button class="main-tab print-btn no-print" onclick="window.print()">⬇ PDF</button>
+  </div>
+
+  <div id="content">
+    <div class="skeleton"></div>
+  </div>
+
+  <footer>
+    Datos en vivo desde Google Sheets (Table1, Table 2, Table 3, Table 5, Table 6, Ultimos) · Se actualiza automáticamente cada 5 minutos
+  </footer>
+</div>
+
+<script>
+/* ================= CONFIG ================= */
+const SHEET_ID = '10M-nDp0_McsiShRHMHnjccJsb03avGDvPGwdY8cj598';
+const TABS = { t1:'Table1', t2:'Table 2', t3:'Table 3', t5:'Table 5', t6:'Table 6', ult:'Ultimos' };
+const SHOP_ORDER = ['Amorino Sevilla Avenida','Amorino Patio de los Naranjos','Amorino Catedral','Amorino Plaza Nueva','Amorino Alcázar'];
+const FLAVOR_COLORS = ['#C84B5E','#8FA871','#E3A038','#5E6FA3','#5B3A29','#B07AA8','#4D9E96','#D17C3C'];
+const AUTO_REFRESH_MS = 5 * 60 * 1000;
+
+/* ================= UTILS ================= */
+function parseNum(raw){
+  if (raw === null || raw === undefined) return NaN;
+  let s = String(raw).trim();
+  if (s === '' || s === '-') return NaN;
+  if (/\?/.test(s)) return NaN;
+  s = s.replace(/€/g,'').replace(/%/g,'').replace(/Lt\.?/gi,'').trim();
+  if (s === '') return NaN;
+  let neg = false;
+  if (s.startsWith('-')) { neg = true; s = s.slice(1); }
+  const lastComma = s.lastIndexOf(','), lastDot = s.lastIndexOf('.');
+  const lastSep = Math.max(lastComma, lastDot);
+  let intPart, decPart;
+  if (lastSep === -1){ intPart = s; decPart=''; }
+  else {
+    const tail = s.slice(lastSep+1);
+    if (/^\d{1,2}$/.test(tail)){ intPart = s.slice(0,lastSep).replace(/[.,]/g,''); decPart = tail; }
+    else { intPart = s.replace(/[.,]/g,''); decPart=''; }
+  }
+  const numStr = (intPart || '0') + (decPart ? '.'+decPart : '');
+  const num = parseFloat(numStr);
+  return isNaN(num) ? NaN : (neg ? -num : num);
+}
+/* Normalize both sides before comparing shop names — handles Unicode
+   NFC/NFD differences (e.g. á as U+00E1 vs a + combining accent)
+   that would cause exact === to silently fail. */
+function shopEq(a, b){
+  return (a||'').trim().normalize('NFC') === (b||'').trim().normalize('NFC');
+}
+
+function normDate(s){
+  if (!s) return null;
+  const str = String(s).trim();
+  if (!str) return null;
+  // ISO format already: YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+  // dd/MM/yyyy or d/M/yy (slash-separated)
+  if (str.includes('/')) {
+    const parts = str.split('/');
+    if (parts.length !== 3) return null;
+    let [d,m,y] = parts.map(p=>p.trim());
+    if (!d || !m || !y) return null;
+    d = d.padStart(2,'0'); m = m.padStart(2,'0');
+    if (y.length === 2) y = '20'+y;
+    return `${y}-${m}-${d}`;
+  }
+  // Sheets date serial number returned as a number
+  if (/^\d+$/.test(str)) {
+    const serial = parseInt(str, 10);
+    // Sheets epoch: Dec 30 1899
+    const ms = (serial - 25569) * 86400000;
+    const dt = new Date(ms);
+    if (isNaN(dt.getTime())) return null;
+    return dt.getUTCFullYear() + '-' +
+      String(dt.getUTCMonth()+1).padStart(2,'0') + '-' +
+      String(dt.getUTCDate()).padStart(2,'0');
+  }
+  return null;
+}
+function dateLabel(key){
+  if (!key) return '';
+  const [y,m,d] = key.split('-');
+  return `${d}/${m}/${y}`;
+}
+function shiftDate(dkey, days){
+  const [y,m,d] = dkey.split('-').map(Number);
+  const dt = new Date(y, m-1, d);
+  dt.setDate(dt.getDate()+days);
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+}
+function monthStart(dkey){ const [y,m] = dkey.split('-'); return `${y}-${m}-01`; }
+function clampDate(dkey, min, max){ if (dkey < min) return min; if (dkey > max) return max; return dkey; }
+function inRange(dkey, from, to){ return !!dkey && (!from || dkey >= from) && (!to || dkey <= to); }
+function rangeLabel(from, to){ return from === to ? dateLabel(from) : `${dateLabel(from)} → ${dateLabel(to)}`; }
+function fmtEUR(n){ return isNaN(n) ? '—' : n.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'; }
+function fmtInt(n){ return isNaN(n) ? '—' : Math.round(n).toLocaleString('es-ES'); }
+function fmtPct(n,d=1){ return isNaN(n) ? '—' : n.toLocaleString('es-ES',{minimumFractionDigits:d,maximumFractionDigits:d})+' %'; }
+function fmtNum(n,d=2){ return isNaN(n) ? '—' : n.toLocaleString('es-ES',{minimumFractionDigits:d,maximumFractionDigits:d}); }
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function hourOrderKey(h){
+  const start = parseInt(String(h).split('-')[0], 10);
+  if (isNaN(start)) return 999;
+  return start < 11 ? start + 24 : start;
+}
+
+function parseCSV(text){
+  const rows = []; let row = []; let field=''; let inQuotes=false;
+  for (let i=0;i<text.length;i++){
+    const c = text[i];
+    if (inQuotes){
+      if (c === '"'){ if (text[i+1] === '"'){ field+='"'; i++; } else inQuotes=false; }
+      else field += c;
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ',') { row.push(field); field=''; }
+      else if (c === '\n') { row.push(field); rows.push(row); row=[]; field=''; }
+      else if (c === '\r') { /* skip */ }
+      else field += c;
+    }
+  }
+  if (field.length || row.length){ row.push(field); rows.push(row); }
+  return rows;
+}
+function dedupe(rows, keyFn){
+  const map = new Map(); const order = [];
+  rows.forEach(r => { const k = keyFn(r); if (!map.has(k)) order.push(k); map.set(k, r); });
+  return order.map(k => map.get(k));
+}
+let jsonpCounter = 0;
+function loadViaJSONP(sheetName){
+  return new Promise((resolve, reject) => {
+    const cbName = '__gvizCb' + (jsonpCounter++);
+    const scriptEl = document.createElement('script');
+    let settled = false;
+    function cleanup(){
+      delete window[cbName];
+      if (scriptEl.parentNode) scriptEl.parentNode.removeChild(scriptEl);
+      clearTimeout(timer);
+    }
+    window[cbName] = (json) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      if (!json || json.status === 'error'){
+        const msg = (json && json.errors && json.errors[0] && json.errors[0].detailed_message) || 'Respuesta no válida para ' + sheetName;
+        reject(new Error(msg));
+      } else {
+        resolve(json);
+      }
+    };
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error('Tiempo de espera agotado cargando "' + sheetName + '"'));
+    }, 15000);
+    scriptEl.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json;responseHandler:${cbName}&sheet=${encodeURIComponent(sheetName)}&_=${Date.now()}`;
+    scriptEl.onerror = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error('No se pudo cargar la pestaña "' + sheetName + '" (revisa el nombre exacto y los permisos de uso compartido)'));
+    };
+    document.head.appendChild(scriptEl);
+  });
+}
+function gvizJsonToRows(json){
+  const cols = (json.table.cols || []).map(c => c.label || c.id || '');
+  const rows = (json.table.rows || []).map(r => {
+    const cells = r.c || [];
+    return cols.map((_, i) => {
+      const cell = cells[i];
+      if (!cell) return '';
+      const v = (cell.f !== undefined && cell.f !== null) ? cell.f : cell.v;
+      return v === null || v === undefined ? '' : String(v);
+    });
+  });
+  return [cols, ...rows];
+}
+
+/* historical_sales.js loaded externally */
+
+/* historical_medh.js loaded externally */
+
+/* historical_sug.js loaded externally */
+
+/* Lookup historical previous-year sales for a given shop+date */
+const HIST_SHOP_KEY = {
+  'Amorino Sevilla Avenida'      : 'Amorino Sevilla Avenida',
+  'Amorino Patio de los Naranjos': 'Amorino Patio de los Naranjos',
+  'Amorino Plaza Nueva'          : 'Amorino Plaza Nueva',
+  'Amorino Alcázar'              : 'Amorino Alcázar',
+  'Amorino Catedral'             : 'Amorino Catedral',
+};
+
+/* ================= STATE ================= */
+const State = {
+  shop:'all', from:null, to:null, raw:null, loading:false, error:null, lastSync:null,
+  weather:{}, weatherFetching:false,
+  radiografia:{},
+  radOverride: null,
+  radTabs: null, // null = not loaded, [...] = list of tab names
+  degustaciones:{ _loaded: false },
+  feedback:{ _loaded: false, entries: [] },
+  anulaciones:{ _loaded: false, byShop: {} },
+  resenas: { _loaded: false, entries: [] },
+  combo:   { _loaded: false, rows: [] },
+  activeTab: 'panel',
+  productividadByShop: {
+    'Amorino Sevilla Avenida':       110,
+    'Amorino Patio de los Naranjos': 110,
+    'Amorino Plaza Nueva':           110,
+    'Amorino Alcázar':               110,
+    'Amorino Catedral':              110,
+  },
+  costeBruto: 10.95,
+  seguridadSocial: 32,
+};
+
+/* Sevilla coordinates for weather */
+const WEATHER_LAT = 37.39, WEATHER_LON = -5.98;
+const RAIN_THRESHOLD = 0;
+
+/* ================= DATA LOADING ================= */
+async function fetchTab(name){
+  const json = await loadViaJSONP(name);
+  return gvizJsonToRows(json);
+}
+
+async function loadData(){
+  State.loading = true; State.error = null;
+  document.getElementById('statusDot').classList.add('busy');
+  document.getElementById('syncNote').textContent = 'Actualizando…';
+  try {
+    const entries = Object.entries(TABS);
+    const results = await Promise.all(entries.map(([k,name]) => fetchTab(name).then(rows => [k, rows])));
+    const rowsByKey = Object.fromEntries(results);
+
+    const t1 = dedupe(
+      rowsByKey.t1.slice(1).filter(r => r[0] && r[0] !== 'Shop').map(r => ({
+        shop:(r[0]||"").trim().normalize("NFC"), dkey:normDate(r[1]), horario:r[2], ventas:parseNum(r[3]), tickets:parseNum(r[4]), vt:parseNum(r[5])
+      })),
+      r => `${r.shop}|${r.dkey}|${r.horario}`
+    );
+
+    const t2 = dedupe(
+      rowsByKey.t2.slice(1).filter(r => r[0] && r[0] !== 'Shop').map(r => ({
+        shop:(r[0]||"").trim().normalize("NFC"), dkey:normDate(r[1]),
+        ticketsKioskoMes:parseNum(r[2]), totalMesKiosko:parseNum(r[3]),
+        ticketsKioskoDia:parseNum(r[4]), totalDiaKiosko:parseNum(r[5]),
+        ticketsTotal:parseNum(r[6]), ticketMedio:parseNum(r[7]), ticketMedioGelato:parseNum(r[8]),
+        clienteMedio:parseNum(r[9]), litrosDia:parseNum(r[10]), sugerenciasPct:parseNum(r[11]),
+        totalMesEnCurso:parseNum(r[12]), totalMesAnoAnterior:parseNum(r[13]), diferenciaPct:parseNum(r[14]),
+        totalAno:parseNum(r[15]), totalAnoAnterior:parseNum(r[16])
+      })),
+      r => `${r.shop}|${r.dkey}`
+    );
+
+    const t3 = dedupe(
+      rowsByKey.t3.slice(1).filter(r => r[0] && r[0] !== 'Shop').map(r => ({
+        shop:(r[0]||"").trim().normalize("NFC"), dkey:normDate(r[1]), empleado:(r[2]||'').trim(),
+        ticketMedio:parseNum(r[3]), tickets:parseNum(r[4]), sugerencias:parseNum(r[5]),
+        anulaciones:parseNum(r[6]), descuentos:parseNum(r[7]), medHel:parseNum(r[8]), sugerenciasPct:parseNum(r[9])
+      })),
+      r => `${r.shop}|${r.dkey}|${r.empleado}`
+    );
+
+    const t5 = dedupe(
+      rowsByKey.t5.slice(1).filter(r => r[0] && r[0] !== 'Shop').map(r => ({
+        shop:(r[0]||"").trim().normalize("NFC"), dkey:normDate(r[1]), sabor:(r[2]||'').trim(), unidades:parseNum(r[3])
+      })),
+      r => `${r.shop}|${r.dkey}|${r.sabor}`
+    );
+
+    const t6 = dedupe(
+      rowsByKey.t6.slice(1).filter(r => r[0] && r[0] !== 'Shop').map(r => ({
+        shop:(r[0]||"").trim().normalize("NFC"), dkey:normDate(r[1]), forma:(r[2]||'').trim(), pct:parseNum(r[3]),
+        base:parseNum(r[4]), iva:parseNum(r[5]), total:parseNum(r[6]), pctTotal:parseNum(r[7])
+      })),
+      r => `${r.shop}|${r.dkey}|${r.forma}`
+    );
+
+    const ult = dedupe(
+      rowsByKey.ult.slice(1).filter(r => r[0] && r[0] !== 'Shop').map(r => ({
+        shop:(r[0]||"").trim().normalize("NFC"), dkey:normDate(r[1]), tickets:[r[2],r[3],r[4],r[5],r[6],r[7],r[8],r[9],r[10],r[11]].map(x => (x||'').trim()).filter(Boolean)
+      })),
+      r => `${r.shop}|${r.dkey}`
+    );
+
+    // ---- Historical cutover: use Excel data up to and including 2026-05-30 ----
+    const HIST_CUTOVER = '2026-05-30';
+    // Remove sheet rows for dates within historical coverage (avoid double-counting)
+    const t1Live = t1.filter(r => !r.dkey || r.dkey > HIST_CUTOVER);
+    // Synthesise one row per shop per day from embedded historical
+    const t1Hist = [];
+    for (const [shop, days] of Object.entries(HISTORICAL_SALES_ALL)){
+      for (const [dkey, ventas] of Object.entries(days)){
+        if (dkey <= HIST_CUTOVER){
+          t1Hist.push({shop:(shop||'').trim().normalize('NFC'), dkey, horario:'Total diario', ventas, tickets:NaN, vt:NaN});
+        }
+      }
+    }
+    const t1Final = [...t1Hist, ...t1Live];
+
+    State.raw = { t1:t1Final, t2, t3, t5, t6, ult };
+
+    // Build fast lookup indexes to avoid repeated O(n) scans in hot render paths
+    State.t1ByDkey = {};
+    for (const r of t1Final){ if(!State.t1ByDkey[r.dkey]) State.t1ByDkey[r.dkey]=[]; State.t1ByDkey[r.dkey].push(r); }
+    State.t2ByDkey = {};
+    for (const r of t2){ if(!State.t2ByDkey[r.dkey]) State.t2ByDkey[r.dkey]=[]; State.t2ByDkey[r.dkey].push(r); }
+    State.lastSync = new Date();
+
+    const shopsFound = Array.from(new Set(t2.map(r => r.shop)));
+    const orderedShops = SHOP_ORDER.filter(s => shopsFound.includes(s)).concat(shopsFound.filter(s => !SHOP_ORDER.includes(s)));
+    State.shops = orderedShops;
+
+    populateShopSelect();
+    syncDateBounds(true);
+    renderAll();
+    document.getElementById('syncNote').textContent = 'Última sincronización: ' + State.lastSync.toLocaleTimeString('es-ES');
+  } catch (err) {
+    State.error = err;
+    renderError(err);
+    document.getElementById('syncNote').textContent = 'Error de sincronización';
+  } finally {
+    State.loading = false;
+    document.getElementById('statusDot').classList.remove('busy');
+  }
+}
+
+function getDatesForShop(shop){
+  if (!State.raw) return [];
+  const t1pool = shop === 'all' ? State.raw.t1 : State.raw.t1.filter(r => shopEq(r.shop, shop));
+  const t2pool = shop === 'all' ? State.raw.t2 : State.raw.t2.filter(r => shopEq(r.shop, shop));
+  const allKeys = [...t1pool.map(r => r.dkey), ...t2pool.map(r => r.dkey)].filter(Boolean);
+
+  // Also include dates from embedded historical sales so the date picker
+  // allows selection back to May 2025 even if the sheet only starts later.
+  const shopsForHist = shop === 'all' ? Object.keys(HISTORICAL_SALES_ALL) : [shop];
+  for (const s of shopsForHist){
+    const hist = HISTORICAL_SALES_ALL[s];
+    if (hist) allKeys.push(...Object.keys(hist));
+  }
+
+  const keys = Array.from(new Set(allKeys));
+  keys.sort((a,b) => b.localeCompare(a));
+  return keys;
+}
+
+/* ================= UI: selects ================= */
+function populateShopSelect(){
+  const sel = document.getElementById('shopSelect');
+  const prev = State.shop;
+  sel.innerHTML = '<option value="all">Todas las tiendas</option>' +
+    State.shops.map(s => `<option value="${esc(s)}">${esc(s.replace('Amorino ',''))}</option>`).join('');
+  sel.value = State.shops.some(s => shopEq(s, prev)) || prev === 'all' ? prev : 'all';
+  State.shop = sel.value;
+}
+
+function dateBoundsForShop(shop){
+  const dates = getDatesForShop(shop);
+  if (!dates.length) return null;
+  return { min: dates[dates.length-1], max: dates[0] };
+}
+
+function syncDateBounds(resetToLatest){
+  const bounds = dateBoundsForShop(State.shop);
+  const fromEl = document.getElementById('dateFrom'), toEl = document.getElementById('dateTo');
+  if (!bounds){
+    State.from = State.to = null;
+    fromEl.value = toEl.value = '';
+    return;
+  }
+  fromEl.min = toEl.min = bounds.min;
+  fromEl.max = toEl.max = bounds.max;
+  if (resetToLatest || !State.from || !State.to){
+    State.from = bounds.max;
+    State.to = bounds.max;
+  } else {
+    State.from = clampDate(State.from, bounds.min, bounds.max);
+    State.to = clampDate(State.to, bounds.min, bounds.max);
+  }
+  fromEl.value = State.from;
+  toEl.value = State.to;
+  updatePresetHighlight(bounds);
+}
+
+function updatePresetHighlight(bounds){
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  if (!bounds) return;
+  let match = null;
+  if (State.from === bounds.max && State.to === bounds.max) match = 'today';
+  else if (State.from === bounds.min && State.to === bounds.max) match = 'all';
+  else if (State.to === bounds.max && State.from === clampDate(shiftDate(bounds.max,-6), bounds.min, bounds.max)) match = '7d';
+  else if (State.to === bounds.max && State.from === clampDate(shiftDate(bounds.max,-29), bounds.min, bounds.max)) match = '30d';
+  else if (State.to === bounds.max && State.from === clampDate(monthStart(bounds.max), bounds.min, bounds.max)) match = 'month';
+  if (match){
+    const btn = document.querySelector(`.preset-btn[data-preset="${match}"]`);
+    if (btn) btn.classList.add('active');
+  }
+}
+
+document.getElementById('shopSelect').addEventListener('change', e => {
+  State.shop = e.target.value;
+  syncDateBounds(false);
+  renderAll();
+});
+document.getElementById('dateFrom').addEventListener('change', e => {
+  const bounds = dateBoundsForShop(State.shop);
+  if (!bounds) return;
+  State.from = clampDate(e.target.value, bounds.min, bounds.max);
+  if (State.from > State.to) State.to = State.from;
+  State.radOverride = null;
+  document.getElementById('dateFrom').value = State.from;
+  document.getElementById('dateTo').value = State.to;
+  updatePresetHighlight(bounds);
+  renderAll();
+});
+document.getElementById('dateTo').addEventListener('change', e => {
+  const bounds = dateBoundsForShop(State.shop);
+  if (!bounds) return;
+  State.to = clampDate(e.target.value, bounds.min, bounds.max);
+  if (State.to < State.from) State.from = State.to;
+  document.getElementById('dateFrom').value = State.from;
+  document.getElementById('dateTo').value = State.to;
+  updatePresetHighlight(bounds);
+  renderAll();
+});
+document.getElementById('presetRow').addEventListener('click', e => {
+  const btn = e.target.closest('.preset-btn');
+  if (!btn) return;
+  const bounds = dateBoundsForShop(State.shop);
+  if (!bounds) return;
+  const preset = btn.dataset.preset;
+  if (preset === 'today'){ State.from = bounds.max; State.to = bounds.max; }
+  else if (preset === '7d'){ State.from = clampDate(shiftDate(bounds.max,-6), bounds.min, bounds.max); State.to = bounds.max; }
+  else if (preset === '30d'){ State.from = clampDate(shiftDate(bounds.max,-29), bounds.min, bounds.max); State.to = bounds.max; }
+  else if (preset === 'month'){ State.from = clampDate(monthStart(bounds.max), bounds.min, bounds.max); State.to = bounds.max; }
+  else if (preset === 'all'){ State.from = bounds.min; State.to = bounds.max; }
+  document.getElementById('dateFrom').value = State.from;
+  document.getElementById('dateTo').value = State.to;
+  updatePresetHighlight(bounds);
+  renderAll();
+});
+document.getElementById('refreshBtn').addEventListener('click', loadData);
+
+/* ================= RENDER ================= */
+function renderError(err){
+  document.getElementById('content').innerHTML = `
+    <div class="banner error">
+      <h3>No se han podido cargar los datos del Google Sheet</h3>
+      <p>${esc(err.message || String(err))}</p>
+      <p>Comprueba lo siguiente y pulsa "Actualizar":</p>
+      <ul>
+        <li>La hoja debe compartirse como <code>Cualquier persona con el enlace · Lector</code>.</li>
+        <li>Las pestañas deben llamarse exactamente: <code>Table1</code>, <code>Table 2</code>, <code>Table 3</code>, <code>Table 5</code>, <code>Table 6</code>, <code>Ultimos</code>.</li>
+        <li>Si el enlace cambió, dime la nueva URL del Google Sheet.</li>
+      </ul>
+    </div>`;
+}
+
+const FEEDBACK_SHEET_ID = '1AQvTb1r05hHABwyPCySz7ItWUy2bPrca1Nf2WKaWdcA';
+const FEEDBACK_GID      = '1693008984';
+
+/* Map messy form shop names → canonical shop names (may return multiple) */
+function normFeedbackShop(raw){
+  const strip = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const s = strip((raw||'').trim().toLowerCase());
+  if (!s || s === 'p') return [];
+  if (/andy.semanal|mantenimiento|prevenci|ruslan|cucinella|penarand/i.test(s)) return [];
+  const results = [];
+  const parts = s.split(/\s+y\s+|\s*[,\/&]\s*/);
+  for (let part of parts){
+    part = part.trim().replace(/\s*[\(\[].*[\)\]]\s*$/, '').trim();
+    if (!part || part === 'p') continue;
+    if      (/^al[cgxzbqd]/.test(part) || /alc[ao]?[sz]?ar/.test(part))  results.push('Amorino Alcázar');
+    else if (/^pn/.test(part) || /plaza\s*nuev/.test(part))               results.push('Amorino Plaza Nueva');
+    else if (/^c[ao]?[ta]e?dr/.test(part) || /ctae/.test(part))           results.push('Amorino Catedral');
+    else if (/n[as]ranjo|naran/.test(part))                                results.push('Amorino Patio de los Naranjos');
+    else if (/aven/.test(part) || /^avei/.test(part))                      results.push('Amorino Sevilla Avenida');
+  }
+  return [...new Set(results)];
+}
+
+function parseFeedbackTimestamp(s){
+  if (!s) return null;
+  const str = String(s).trim();
+  let year, month0, day, hour = 12;
+
+  // 1. gviz raw: Date(2026,6,7,13,25,13) — month is 0-indexed
+  let m = str.match(/^Date\((\d{4}),(\d{1,2}),(\d{1,2})(?:,(\d{1,2}))?/);
+  if (m){
+    year=+m[1]; month0=+m[2]; day=+m[3]; hour=+(m[4]??12);
+    const dt = new Date(year, month0, day);
+    if (hour < 6) dt.setDate(dt.getDate()-1);
+    return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  }
+
+  // 2. DD/MM/YYYY H:MM[:SS] [am/pm / a.m. / p. m.] — or date-only DD/MM/YYYY
+  m = str.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[\s,]+(\d{1,2}):(\d{2})(?::\d{2})?\s*(a\.?\s*m\.?|p\.?\s*m\.?|am|pm)?)?/i);
+  if (m){
+    day=+m[1]; month0=+m[2]-1; year=+m[3]; hour=+(m[4]??12);
+    const ampm = (m[6]||'').toLowerCase().replace(/[\s.]/g,'');
+    if (ampm==='pm' && hour!==12) hour+=12;
+    if (ampm==='am' && hour===12) hour=0;
+    const dt = new Date(year, month0, day);
+    if (m[4] && hour < 6) dt.setDate(dt.getDate()-1); // midnight rule only when time present
+    return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  }
+
+  // 3. ISO: YYYY-MM-DD HH:MM
+  m = str.match(/^(\d{4})-(\d{2})-(\d{2})[\sT]+(\d{1,2}):/);
+  if (m){
+    year=+m[1]; month0=+m[2]-1; day=+m[3]; hour=+m[4];
+    const dt = new Date(year, month0, day);
+    if (hour < 6) dt.setDate(dt.getDate()-1);
+    return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  }
+
+  return null;
+}
+
+
+/* Load feedback data: State.feedback = { _loaded, entries: [{dkey, shops[], nombre, tienda, personas, andyManana, andyNoche, quienAndy}] } */
+async function loadFeedbackIfNeeded(){
+  if (State.feedback._loaded) return;
+  State.feedback._loaded = 'loading';
+  try {
+    const json = await loadViaJSONP_3(FEEDBACK_SHEET_ID, FEEDBACK_GID);
+    const allRows = gvizJsonToRows(json);
+    // allRows[0] = generic gviz labels ["A","B","C",...] (headers=0 mode)
+    // allRows[1] = actual sheet header row, BUT col 0 ("Marca temporal") is empty
+    //              because gviz types it as DATETIME and swallows the text label
+    // allRows[2+] = actual data
+    const header = allRows[1] || [];
+    const dataRows = allRows.slice(2);
+    const ci = {
+      ts: 0, // hardcoded: always column A (Marca temporal) in Google Forms
+      datos:   1, // hardcoded: "Por favor, detalle cualquier dato reseñable..."
+      nombre:  header.findIndex(h => /nombre/i.test(h)),
+      tienda:  header.findIndex(h => /tienda/i.test(h)),
+      personas:header.findIndex(h => /coincidi/i.test(h)),
+      andyMan: header.findIndex(h => /mañana.*hecho|hecho.*mañana/i.test(h)),
+      andyNoc: header.findIndex(h => /anoche/i.test(h)),
+      quienA:  header.findIndex(h => /qui[eé]n.*andy/i.test(h)),
+    };
+    const entries = [];
+    for (const row of dataRows){
+      if (!row[ci.ts]) continue;
+      const dkey = parseFeedbackTimestamp(row[ci.ts]);
+      if (!dkey) continue;
+      const shops = normFeedbackShop(row[ci.tienda]);
+      if (!shops.length) continue;
+      entries.push({ dkey, shops, nombre: row[ci.nombre]||'', tienda: row[ci.tienda]||'',
+        datos: row[ci.datos]||'',
+        personas: row[ci.personas]||'', andyManana: row[ci.andyMan]||'',
+        andyNoche: row[ci.andyNoc]||'', quienAndy: row[ci.quienA]||'' });
+    }
+    State.feedback = { _loaded: true, entries };
+    State.feedback._debug = {
+      totalRows: allRows.length, header: header.slice(0,6), ci,
+      sample: dataRows.slice(0,3).map(r => ({ts: r[0], tienda: r[ci.tienda > 0 ? ci.tienda : 3]}))
+    };
+  } catch(e){
+    State.feedback = { _loaded: 'error', entries: [] };
+  }
+  const el = document.getElementById('feedbackSection');
+  if (el) el.innerHTML = buildFeedbackHTML(State.shop, State.from, State.to);
+}
+
+/* JSONP loader using gid instead of sheet name */
+function loadViaJSONP_3(sheetId, gid){
+  return new Promise((resolve, reject) => {
+    const cbName = '__gvizCb' + (jsonpCounter++);
+    const scriptEl = document.createElement('script');
+    let settled = false;
+    function cleanup(){ delete window[cbName]; if(scriptEl.parentNode) scriptEl.parentNode.removeChild(scriptEl); clearTimeout(timer); }
+    window[cbName] = json => { if(settled) return; settled=true; cleanup(); if(!json||json.status==='error') reject(new Error('Error feedback')); else resolve(json); };
+    const timer = setTimeout(()=>{ if(settled) return; settled=true; cleanup(); reject(new Error('Timeout feedback')); }, 15000);
+    scriptEl.src = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json;responseHandler:${cbName}&gid=${gid}&headers=0&_=${Date.now()}`;
+    scriptEl.onerror = ()=>{ if(settled) return; settled=true; cleanup(); reject(new Error('Load error feedback')); };
+    document.head.appendChild(scriptEl);
+  });
+}
+
+function buildFeedbackHTML(shop, from, to){
+  if (!from) return '<div class="empty-note">Selecciona un periodo para ver el feedback.</div>';
+  if (State.feedback._loaded === 'loading')  return '<div class="empty-note">Cargando feedback…</div>';
+  if (State.feedback._loaded === 'error')    return '<div class="empty-note" style="color:var(--raspberry)">Error al cargar el feedback. Comprueba que la hoja esté compartida públicamente.</div>';
+  if (!State.feedback._loaded)               return '<div class="empty-note">Cargando feedback…</div>';
+
+  const entries = State.feedback.entries;
+  const shopsToShow = shop === 'all' ? SHOP_ORDER : [shop];
+  const isRange = from !== to;
+
+  if (!isRange){
+    /* ---- Single day: show full detail cards ---- */
+    const dayEntries = entries.filter(e => e.dkey === from && e.shops.some(s => shop === 'all' || shopEq(s, shop)));
+    if (!dayEntries.length) return `<div class="empty-note">Sin registros de feedback para ${dateLabel(from)}.</div>`;
+    return dayEntries.map(e => `
+      <div class="card" style="margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+          <div>
+            <div style="font-family:'Fraunces',serif;font-weight:700;font-size:15px;">${esc(e.nombre)}</div>
+            <div style="font-size:12px;color:var(--ink-soft);margin-top:2px;">${esc(e.tienda)}</div>
+          </div>
+          <div style="font-size:12px;color:var(--ink-soft);">${dateLabel(e.dkey)}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px;">
+          <div><span style="font-weight:700;color:var(--ink-soft);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;">Personas en turno</span><div style="margin-top:4px;">${esc(e.personas)||'—'}</div></div>
+          <div><span style="font-weight:700;color:var(--ink-soft);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;">¿Quién hace Andy mañana?</span><div style="margin-top:4px;">${esc(e.quienAndy)||'—'}</div></div>
+          <div><span style="font-weight:700;color:var(--ink-soft);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;">Andy mañana hecho</span><div style="margin-top:4px;">${esc(e.andyManana)||'—'}</div></div>
+          <div><span style="font-weight:700;color:var(--ink-soft);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;">Andy anoche</span><div style="margin-top:4px;">${esc(e.andyNoche)||'—'}</div></div>
+          ${e.datos ? `<div style="grid-column:1/-1;"><span style="font-weight:700;color:var(--ink-soft);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;">Datos reseñables</span><div style="margin-top:4px;">${esc(e.datos)}</div></div>` : ''}
+        </div>
+      </div>`).join('');
+  }
+
+  /* ---- Range: checklist table ---- */
+  const days = []; let d = from; while(d<=to){ days.push(d); d=shiftDate(d,1); }
+
+  // Build lookup: {dkey: Set(shopFull)}
+  const lookup = {};
+  for (const e of entries){
+    if (!inRange(e.dkey, from, to)) continue;
+    if (!lookup[e.dkey]) lookup[e.dkey] = new Set();
+    for (const s of e.shops) lookup[e.dkey].add(s);
+  }
+
+  const shopCols = shopsToShow.map(s => s.replace('Amorino ',''));
+  const rows = days.map(dd => {
+    const haveDic = lookup[dd] || new Set();
+    const cells = shopsToShow.map(s => {
+      const has = [...haveDic].some(hs => shopEq(hs, s));
+      return `<td style="text-align:center;font-size:16px;">${has ? '✅' : '<span style="color:var(--line)">—</span>'}</td>`;
+    });
+    return `<tr><td style="font-size:13px;padding:7px 10px;">${dateLabel(dd)}</td>${cells.join('')}</tr>`;
+  });
+
+  return `<div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr>
+        <th style="text-align:left;padding:0 10px 10px;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);border-bottom:1px solid var(--line);">Fecha</th>
+        ${shopCols.map(s=>`<th style="text-align:center;padding:0 10px 10px;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);border-bottom:1px solid var(--line);">${esc(s)}</th>`).join('')}
+      </tr></thead>
+      <tbody>${rows.join('')}</tbody>
+    </table>
+  </div>`;
+}
+/* ================= ANULACIONES ================= */
+const ANULACIONES_SHEET_ID = '1387CUa_LkCmuLPCz2KXzFOgbuqfaqVDKRngklwcsAsE';
+const ANULACIONES_GID = '0';
+
+function normAnulacionSender(raw){
+  const s = (raw||'').trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+  if (s.includes('catedral'))  return 'Amorino Catedral';
+  if (s.includes('naranjo'))   return 'Amorino Patio de los Naranjos';
+  if (s.includes('plaza'))     return 'Amorino Plaza Nueva';
+  if (s.includes('alcaz'))     return 'Amorino Alcázar';
+  if (s.includes('avenida'))   return 'Amorino Sevilla Avenida';
+  return null;
+}
+
+function parseAnulacionTimestamp(s){
+  if (!s) return null;
+  const str = String(s).trim();
+  const m = str.match(/(?:^|[^0-9])(20\d{2})-(\d{2})-(\d{2})[\sT]+(\d{1,2}):/);
+  if (m){
+    const [,y,mo,d,h] = m;
+    const dt = new Date(+y, +mo-1, +d);
+    if (+h < 6) dt.setDate(dt.getDate()-1);
+    return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  }
+  return null;
+}
+
+async function loadAnulacionesIfNeeded(){
+  if (State.anulaciones._loaded) return;
+  State.anulaciones._loaded = 'loading';
+  try {
+    const json = await loadViaJSONP_3(ANULACIONES_SHEET_ID, ANULACIONES_GID);
+    const allRows = gvizJsonToRows(json);
+    const dataRows = allRows.slice(2);
+    const byShop = {};
+    for (const row of dataRows){
+      const dkey = parseAnulacionTimestamp(row[0]);
+      if (!dkey) continue;
+      const shop = normAnulacionSender(row[1]);
+      if (!shop) continue;
+      if (!byShop[shop]) byShop[shop] = {};
+      byShop[shop][dkey] = (byShop[shop][dkey]||0) + 1;
+    }
+    State.anulaciones = { _loaded: true, byShop };
+  } catch(e){
+    State.anulaciones = { _loaded: 'error', byShop: {} };
+  }
+  const el = document.getElementById('anulacionesSection');
+  if (el) el.innerHTML = buildAnulacionesHTML(State.shop, State.from, State.to);
+}
+
+function buildDegustacionesHTML(shop, from, to){
+  if (!from || !to) return '<div class="empty-note">Selecciona un periodo.</div>';
+  if (!State.degustaciones._loaded) return '<div class="empty-note">Cargando degustaciones…</div>';
+  if (State.degustaciones._loaded === 'error') return '<div class="empty-note" style="color:var(--raspberry)">Error al cargar las degustaciones.</div>';
+
+  const days = []; let d = from; while(d<=to){ days.push(d); d=shiftDate(d,1); }
+  const shopsToShow = shop === 'all' ? SHOP_ORDER : [shop];
+  const isRange = from !== to;
+
+  // Count per shop per day
+  const byShopDay = {};
+  for (const shopFull of shopsToShow){
+    byShopDay[shopFull] = {};
+    const shopData = State.degustaciones[shopFull] || {};
+    for (const dd of days){
+      const dayData = shopData[dd] || {};
+      const total = Object.values(dayData).reduce((a,b)=>a+b, 0);
+      if (total > 0) byShopDay[shopFull][dd] = total;
+    }
+  }
+
+  // Totals per shop
+  const shopTotals = shopsToShow.map(s => ({
+    shop: s,
+    total: Object.values(byShopDay[s]||{}).reduce((a,b)=>a+b,0),
+    days: Object.keys(byShopDay[s]||{}).length
+  }));
+  const grandTotal = shopTotals.reduce((a,r)=>a+r.total, 0);
+
+  // Summary cards
+  const summaryCards = shopTotals.map(r => `
+    <div class="kpi">
+      <div class="kpi-scoop" style="background:var(--pistachio)"></div>
+      <div class="kpi-body">
+        <div class="kpi-label">${esc(r.shop.replace('Amorino ',''))}</div>
+        <div class="kpi-value">${r.total}</div>
+        ${isRange ? `<div class="kpi-sub">${r.days} día${r.days!==1?'s':''} con degusts.</div>` : ''}
+      </div>
+    </div>`).join('');
+
+  // Day-by-day table (only when range and multiple shops or single shop)
+  let tableHtml = '';
+  if (isRange){
+    const tableRows = [];
+    for (const dd of days){
+      for (const shopFull of shopsToShow){
+        const count = byShopDay[shopFull][dd];
+        if (!count) continue;
+        tableRows.push(`<tr><td>${dateLabel(dd)}</td><td>${esc(shopFull.replace('Amorino ',''))}</td><td class="num"><strong>${count}</strong></td></tr>`);
+      }
+    }
+    if (tableRows.length){
+      tableHtml = `<div class="section-title" style="margin-top:24px;"><span class="swatch" style="background:var(--pistachio)"></span>Detalle por día</div>
+        <div class="card"><div style="overflow-x:auto;"><table>
+          <thead><tr><th>Fecha</th><th>Tienda</th><th class="num">Degustaciones</th></tr></thead>
+          <tbody>${tableRows.join('')}</tbody>
+        </table></div></div>`;
+    }
+  }
+
+  return `<div class="kpi-section-label">Total periodo · ${grandTotal} degustación${grandTotal!==1?'es':''}</div>
+    <div class="kpi-row">${summaryCards}</div>
+    ${tableHtml}`;
+}
+
+function buildAnulacionesHTML(shop, from, to){
+  if (!from || !to) return '<div class="empty-note">Selecciona un periodo.</div>';
+  if (State.anulaciones._loaded === 'loading') return '<div class="empty-note">Cargando…</div>';
+  if (State.anulaciones._loaded === 'error')   return '<div class="empty-note" style="color:var(--raspberry)">Error al cargar la hoja de Anulaciones.</div>';
+  if (!State.anulaciones._loaded)              return '<div class="empty-note">Cargando…</div>';
+
+  const days = []; let d = from; while(d<=to){ days.push(d); d=shiftDate(d,1); }
+  const shopsToShow = shop === 'all' ? SHOP_ORDER : [shop];
+  const byShop = State.anulaciones.byShop;
+
+  const tableRows = [];
+  for (const shopFull of shopsToShow){
+    for (const dd of days){
+      const mensajes = (byShop[shopFull]||{})[dd] || 0;
+      const t3anuls  = State.raw.t3.filter(r => r.dkey===dd && shopEq(r.shop,shopFull))
+                         .reduce((a,r)=>a+(isNaN(r.anulaciones)?0:r.anulaciones), 0);
+      if (mensajes===0 && t3anuls===0) continue;
+      tableRows.push({ date:dd, shop:shopFull, mensajes, t3anuls, diff:mensajes-t3anuls });
+    }
+  }
+
+  if (!tableRows.length) return '<div class="empty-note">Sin anulaciones en el periodo seleccionado.</div>';
+
+  const rows = tableRows.map(r => {
+    const col = r.diff===0?'':r.diff>0?'color:var(--raspberry);font-weight:700;':'color:var(--blueberry);font-weight:700;';
+    return `<tr>
+      <td>${dateLabel(r.date)}</td>
+      <td>${esc(r.shop.replace('Amorino ',''))}</td>
+      <td class="num">${r.mensajes}</td>
+      <td class="num">${r.t3anuls}</td>
+      <td class="num" style="${col}">${r.diff===0?'✓':r.diff>0?'+'+r.diff:r.diff}</td>
+    </tr>`;
+  }).join('');
+
+  return `<div style="overflow-x:auto;"><table>
+    <thead><tr>
+      <th>Fecha</th><th>Tienda</th>
+      <th class="num">Mensajes enviados</th>
+      <th class="num">Anulaciones POS</th>
+      <th class="num">Diferencia</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>
+  <div style="font-size:11px;color:var(--ink-soft);margin-top:10px;">
+    ✓ cuadra · <span style="color:var(--raspberry);">+N</span> más mensajes que POS · <span style="color:var(--blueberry);">−N</span> más POS que mensajes
+  </div>`;
+}
+
+/* ================= RESEÑAS ================= */
+const RESENAS_SHEET_ID = '1WciU9k6vFFDH83kMYLgYxD5QqXn2qNVU3MAclucIhv8';
+
+const LOCATION_ID_MAP = {
+  '123386528852042231':  'Amorino Alcázar',
+  '6246560184725653009': 'Amorino Catedral',
+  '6264780500978400148': 'Amorino Sevilla Avenida',
+  '321448525196187294':  'Amorino Patio de los Naranjos',
+  '325734853743664299':  'Amorino Plaza Nueva',
+};
+
+function normResenaShop(raw){
+  // Try to extract location ID from path: accounts/.../locations/ID/reviews/...
+  const m = String(raw||'').match(/\/locations\/(\d+)/);
+  if (m && LOCATION_ID_MAP[m[1]]) return LOCATION_ID_MAP[m[1]];
+  // Fallback: direct shop name match
+  return (raw||'').trim().normalize('NFC') || null;
+}
+
+async function loadResenasIfNeeded(){
+  if (State.resenas._loaded) return;
+  State.resenas._loaded = 'loading';
+  try {
+    const json = await loadViaJSONP_3(RESENAS_SHEET_ID, '0');
+    const allRows = gvizJsonToRows(json).slice(1); // skip generic labels row
+    const header = allRows[0] || [];
+    const ci = {
+      fecha:     0, // hardcoded: DateTime col header swallowed by gviz
+      tienda:    header.findIndex(h => /tienda/i.test(h)),
+      valor:     2, // hardcoded: Number col header swallowed by gviz
+      nombre:    header.findIndex(h => /nombre/i.test(h)),
+      comentario:header.findIndex(h => /comentario/i.test(h)),
+    };
+    const entries = [];
+    for (const row of allRows.slice(1)){
+      const raw = row[ci.fecha] || '';
+      // Handle multiple formats: ISO, gviz DD/M/YYYY HH:MM:SS, gviz Date()
+      let dkey = null;
+      const s = String(raw).trim();
+      let m;
+      if ((m = s.match(/^(\d{4}-\d{2}-\d{2})/)))                          dkey = m[1];
+      else if ((m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/)))            dkey = `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+      else if ((m = s.match(/^Date\((\d{4}),(\d+),(\d+)/)))                dkey = `${m[1]}-${String(+m[2]+1).padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+      if (!dkey) continue;
+      const shop = normResenaShop(row[ci.tienda]);
+      if (!shop) continue;
+      const rating = parseFloat(row[ci.valor]);
+      entries.push({ dkey, shop, rating, nombre: row[ci.nombre]||'', comentario: row[ci.comentario]||'' });
+    }
+    State.resenas = { _loaded: true, entries };
+    State.resenas._debug = { totalRows: allRows.length, header, ci, sample: allRows.slice(1,4).map(r=>r.slice(0,3)) };
+  } catch(e){
+    State.resenas = { _loaded: 'error', entries: [] };
+  }
+  const el = document.getElementById('resenasSection');
+  if (el) el.innerHTML = buildResenasHTML(State.shop, State.from, State.to);
+}
+
+function buildResenasHTML(shop, from, to){
+  if (!from || !to) return '<div class="empty-note">Selecciona un periodo.</div>';
+  if (State.resenas._loaded === 'loading') return '<div class="empty-note">Cargando reseñas…</div>';
+  if (State.resenas._loaded === 'error')   return '<div class="empty-note" style="color:var(--raspberry)">Error al cargar las reseñas. Comprueba que la hoja esté compartida públicamente.</div>';
+  if (!State.resenas._loaded)              return '<div class="empty-note">Cargando reseñas…</div>';
+
+  const shopsToShow = shop === 'all' ? SHOP_ORDER : [shop];
+  const inPeriod = e => inRange(e.dkey, from, to) && (shop === 'all' || shopEq(e.shop, shop));
+  const entries = State.resenas.entries.filter(inPeriod);
+
+  if (!entries.length){
+    const dbg = State.resenas._debug || {};
+    return `<div style="background:#f5f5f5;border-radius:8px;padding:10px;font-size:11px;font-family:monospace;white-space:pre-wrap;word-break:break-all;margin-bottom:12px;">
+totalRows: ${dbg.totalRows} · entries parsed: ${State.resenas.entries?.length}
+header: ${JSON.stringify(dbg.header)}
+ci: ${JSON.stringify(dbg.ci)}
+sample[0]: ${JSON.stringify((dbg.sample||[])[0])}
+sample[1]: ${JSON.stringify((dbg.sample||[])[1])}
+    </div><div class="empty-note">Sin reseñas en el periodo seleccionado.</div>`;
+  }
+
+  // Aggregate per shop
+  const agg = {};
+  for (const s of shopsToShow){
+    const se = entries.filter(e => shopEq(e.shop, s));
+    const validRatings = se.map(e => e.rating).filter(r => !isNaN(r));
+    agg[s] = {
+      total: se.length,
+      avg: validRatings.length ? validRatings.reduce((a,b)=>a+b,0)/validRatings.length : NaN,
+      entries: se
+    };
+  }
+
+  const starBar = avg => {
+    if (isNaN(avg)) return '—';
+    const full = Math.floor(avg), half = avg-full >= 0.5 ? 1 : 0;
+    return '★'.repeat(full) + (half?'½':'') + '☆'.repeat(5-full-half) + ` ${avg.toFixed(1)}`;
+  };
+  const starColor = avg => isNaN(avg)?'var(--ink-soft)':avg>=4?'#4D7A3F':avg>=3?'var(--mango)':'var(--raspberry)';
+
+  // KPI cards
+  const cards = shopsToShow.map(s => {
+    const r = agg[s];
+    const abbr = s.replace('Amorino ','').replace('Patio de los ','');
+    const col = starColor(r.avg);
+    return `<div class="kpi"><div class="kpi-scoop" style="background:${col}"></div><div class="kpi-body">
+      <div class="kpi-label">${esc(abbr)}</div>
+      <div class="kpi-value small" style="color:${col}">${starBar(r.avg)}</div>
+      <div class="kpi-sub">${r.total} reseña${r.total!==1?'s':''}</div>
+    </div></div>`;
+  }).join('');
+
+  // Daily count table per shop
+  let countTable = '';
+  if (from !== to){
+    const days=[]; let d=from; while(d<=to){days.push(d);d=shiftDate(d,1);}
+    // Only days that have at least one review
+    const activeDays = days.filter(dd => entries.some(e => e.dkey===dd));
+    if (activeDays.length){
+      const shopCols = shopsToShow.filter(s => agg[s].total > 0);
+      countTable = `<div style="margin-top:20px;">
+        <div class="kpi-section-label">Reseñas recibidas por día</div>
+        <div style="overflow-x:auto;"><table>
+          <thead><tr>
+            <th>Fecha</th>
+            ${shopCols.map(s=>`<th class="num">${esc(s.replace('Amorino ','').replace('Patio de los ',''))}</th>`).join('')}
+            <th class="num">Total</th>
+          </tr></thead>
+          <tbody>
+            ${activeDays.map(dd => {
+              const byShop = shopCols.map(s => entries.filter(e=>e.dkey===dd&&shopEq(e.shop,s)).length);
+              const total = byShop.reduce((a,b)=>a+b,0);
+              return `<tr>
+                <td>${dateLabel(dd)}</td>
+                ${byShop.map(n=>`<td class="num">${n||'—'}</td>`).join('')}
+                <td class="num"><strong>${total}</strong></td>
+              </tr>`;
+            }).join('')}
+            <tr style="border-top:2px solid var(--line);font-weight:700;">
+              <td>Total</td>
+              ${shopCols.map(s=>`<td class="num">${agg[s].total}</td>`).join('')}
+              <td class="num"><strong>${entries.length}</strong></td>
+            </tr>
+          </tbody>
+        </table></div>
+      </div>`;
+    }
+  }
+  let reviewList = '';
+  if (from === to || entries.length <= 20){
+    reviewList = `<div style="margin-top:20px;display:flex;flex-direction:column;gap:10px;">
+      ${entries.sort((a,b)=>b.dkey.localeCompare(a.dkey)).map(e => `
+        <div style="padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--white);">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px;">
+            <div style="font-weight:700;font-size:13px;">${esc(e.nombre)}</div>
+            <div style="font-size:12px;color:${starColor(e.rating)};font-weight:700;white-space:nowrap;">${'★'.repeat(Math.round(e.rating))}${'☆'.repeat(5-Math.round(e.rating))}</div>
+          </div>
+          <div style="font-size:11px;color:var(--ink-soft);margin-bottom:6px;">${esc(e.shop.replace('Amorino ',''))} · ${dateLabel(e.dkey)}</div>
+          ${e.comentario ? `<div style="font-size:12px;color:var(--ink);line-height:1.5;">${esc(e.comentario.slice(0,300))}${e.comentario.length>300?'…':''}</div>` : ''}
+        </div>`).join('')}
+    </div>`;
+  }
+
+  // Trend chart (daily review count)
+  let chartHtml = '';
+  if (from !== to){
+    const days=[]; let d=from; while(d<=to){days.push(d);d=shiftDate(d,1);}
+    const totals=days.map(dd=>entries.filter(e=>e.dkey===dd).length);
+    if(totals.some(v=>v>0)){
+      const maxT=Math.max(...totals,1);
+      const W=700,H=120,pL=10,pR=10,pT=8,pB=28,iW=W-pL-pR,iH=H-pT-pB;
+      const sx=days.length>1?iW/(days.length-1):0;
+      const pts=totals.map((v,i)=>[pL+i*sx,pT+iH-(v/maxT)*iH]);
+      const path=pts.map((p,i)=>(i===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+      const le=days.length<=10?1:Math.ceil(days.length/8);
+      chartHtml=`<div style="margin-top:16px;"><div class="kpi-section-label">Reseñas por día</div>
+        <svg viewBox="0 0 ${W} ${H}" style="width:100%;overflow:visible;">
+          <path d="${path}" fill="none" stroke="var(--mango)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+          ${pts.map((p,i)=>totals[i]>0?`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="var(--mango)" stroke="#fff" stroke-width="1.5"><title>${dateLabel(days[i])}: ${totals[i]}</title></circle>`:'').join('')}
+          ${pts.map((p,i)=>(i%le===0||i===pts.length-1)?`<text x="${p[0].toFixed(1)}" y="${H-6}" font-size="9" fill="#766955" text-anchor="middle">${dateLabel(days[i]).slice(0,5)}</text>`:'').join('')}
+        </svg></div>`;
+    }
+  }
+
+  return `<div class="kpi-section-label">Valoración media · ${rangeLabel(from,to)} · ${entries.length} reseña${entries.length!==1?'s':''}</div>
+    <div class="kpi-row">${cards}</div>
+    ${chartHtml}
+    ${countTable}
+    ${reviewList}`;
+}
+
+function exportToExcel(){
+  if (!State.raw || typeof XLSX === 'undefined') { alert('Cargando… inténtalo de nuevo.'); return; }
+  const shop = State.shop, from = State.from, to = State.to;
+  const inScope = r => inRange(r.dkey, from, to) && (shop === 'all' || shopEq(r.shop, shop));
+
+  // Aggregate t1 to daily totals per shop
+  const map = new Map();
+  for (const r of t1ForRange(from, to, shop)){
+    const key = `${r.dkey}||${r.shop}`;
+    if (!map.has(key)) map.set(key, { dkey: r.dkey, shop: r.shop, ventas: 0 });
+    if (!isNaN(r.ventas)) map.get(key).ventas += r.ventas;
+  }
+  const rows = [...map.values()].sort((a,b) => a.dkey.localeCompare(b.dkey) || a.shop.localeCompare(b.shop));
+
+  const data = [['Fecha','Tienda','Ventas (€)']];
+  for (const r of rows) data.push([dateLabel(r.dkey), r.shop, +r.ventas.toFixed(2)]);
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), 'Ventas diarias');
+  const shopLabel = shop==='all' ? 'Todas' : shop.replace('Amorino ','');
+  XLSX.writeFile(wb, `Amorino_${shopLabel}_${from}_${to}.xlsx`);
+}
+
+/* Fast range lookups using dkey indexes — avoids O(n) full-array scan per render */
+function t1ForRange(from, to, shop){
+  const result = []; let d = from;
+  while(d <= to){ for(const r of (State.t1ByDkey[d]||[])){ if(shop==='all'||shopEq(r.shop,shop)) result.push(r); } d=shiftDate(d,1); }
+  return result;
+}
+function t2ForRange(from, to, shop){
+  const result = []; let d = from;
+  while(d <= to){ for(const r of (State.t2ByDkey[d]||[])){ if(shop==='all'||shopEq(r.shop,shop)) result.push(r); } d=shiftDate(d,1); }
+  return result;
+}
+
+function prevYearKey(dkey){
+  const [y,m,d] = dkey.split('-');
+  return `${parseInt(y,10)-1}-${m}-${d}`;
+}
+function getPrevYearTotalForShop(dkey, shop){
+  const pkey = prevYearKey(dkey);
+  // 1. Try Google Sheet data (covers 2026+ for future comparison years)
+  if (State.raw){
+    if (shop === 'all'){
+      const rows = State.t1ByDkey[pkey] || [];
+      if (rows.length){ const s = rows.reduce((a,r)=>a+(isNaN(r.ventas)?0:r.ventas),0); if(s>0) return s; }
+    } else {
+      const rows = (State.t1ByDkey[pkey]||[]).filter(r => shopEq(r.shop, shop));
+      if (rows.length){ const s = rows.reduce((a,r)=>a+(isNaN(r.ventas)?0:r.ventas),0); if(s>0) return s; }
+    }
+  }
+  // 2. Fall back to historical constants (May 2025 – May 2026)
+  if (shop === 'all'){
+    let total = 0, found = 0;
+    for (const fullName of Object.keys(HISTORICAL_SALES_ALL)){
+      const v = HISTORICAL_SALES_ALL[fullName][pkey];
+      if (v !== undefined){ total += v; found++; }
+    }
+    return found > 0 ? total : NaN;
+  } else {
+    const hist = HISTORICAL_SALES_ALL[shop];
+    if (hist && hist[pkey] !== undefined) return hist[pkey];
+    return NaN;
+  }
+}
+
+/* Previous year sugerencias % — same lookup priority as sales */
+function getPrevYearSugForShop(from, to, shop){
+  // Collect (pct, tickets) pairs for the prev-year period from t2, then fall back to historical
+  const days = []; let d = from; while(d<=to){ days.push(d); d=shiftDate(d,1); }
+  let sumWeightedPct = 0, sumTickets = 0;
+  for (const dd of days){
+    const pkey = prevYearKey(dd);
+    // 1. Try live sheet (t2)
+    const t2rows = (State.t2ByDkey[pkey]||[]).filter(r => shop==='all' || shopEq(r.shop,shop));
+    if (t2rows.length){
+      for (const r of t2rows){
+        if (!isNaN(r.sugerenciasPct) && !isNaN(r.ticketsTotal)){
+          sumWeightedPct += r.sugerenciasPct * r.ticketsTotal;
+          sumTickets += r.ticketsTotal;
+        }
+      }
+      continue;
+    }
+    // 2. Fall back to embedded historical
+    const shopsToCheck = shop === 'all' ? Object.keys(HISTORICAL_SUG_ALL) : [shop];
+    for (const s of shopsToCheck){
+      const hist = HISTORICAL_SUG_ALL[s];
+      if (!hist || hist[pkey] === undefined) continue;
+      // Weight by 1 (we don't have historical ticket counts, so equal weight per shop-day)
+      sumWeightedPct += hist[pkey];
+      sumTickets += 1;
+    }
+  }
+  return sumTickets > 0 ? sumWeightedPct / sumTickets : NaN;
+}
+/* Media de helado YoY — matched-days comparison.
+   Only includes a day in BOTH averages if prev-year data exists for it,
+   so current and previous are always computed on the same set of days.
+   Returns {current, previous, matchedDays, totalDays} */
+function getMatchedMedHelComparison(from, to, shop){
+  const days = []; let d = from; while(d<=to){ days.push(d); d=shiftDate(d,1); }
+  const shopsToCheck = shop === 'all' ? Object.keys(HISTORICAL_MEDH_ALL) : [shop];
+
+  let curW=0, curT=0, prevW=0, prevT=0, matched=0;
+
+  for (const dd of days){
+    const pkey = prevYearKey(dd);
+
+    // --- Previous year value for this day ---
+    let prevVal = NaN, prevTix = 0;
+    // 1. Live sheet t2
+    const t2prev = (State.t2ByDkey[pkey]||[]).filter(r => shop==='all' || shopEq(r.shop,shop));
+    for (const r of t2prev){
+      if (!isNaN(r.ticketMedioGelato) && !isNaN(r.ticketsTotal) && r.ticketsTotal > 0){
+        prevW += r.ticketMedioGelato * r.ticketsTotal;
+        prevT += r.ticketsTotal;
+        prevTix += r.ticketsTotal;
+      }
+    }
+    if (t2prev.length === 0){
+      // 2. Embedded historical (no ticket counts — weight equally per shop)
+      let hSum=0, hN=0;
+      for (const s of shopsToCheck){
+        const hist = HISTORICAL_MEDH_ALL[s];
+        if (hist && hist[pkey] !== undefined){ hSum += hist[pkey]; hN++; }
+      }
+      if (hN > 0){ prevVal = hSum/hN; prevW += prevVal; prevT += 1; prevTix = 1; }
+    } else {
+      prevTix = t2prev.reduce((a,r)=>a+(!isNaN(r.ticketsTotal)?r.ticketsTotal:0),0);
+    }
+
+    // --- Current year value for this day (only if prev exists) ---
+    const hasPrev = prevTix > 0 || (() => {
+      for (const s of shopsToCheck){
+        const hist = HISTORICAL_MEDH_ALL[s];
+        if (hist && hist[pkey] !== undefined) return true;
+      }
+      return false;
+    })();
+
+    if (!hasPrev) continue; // skip: no prev data → exclude this day from both sides
+
+    const t2cur = State.raw.t2.filter(r => r.dkey === dd && (shop === 'all' || shopEq(r.shop, shop)));
+    for (const r of t2cur){
+      if (!isNaN(r.ticketMedioGelato) && !isNaN(r.ticketsTotal) && r.ticketsTotal > 0){
+        curW += r.ticketMedioGelato * r.ticketsTotal;
+        curT += r.ticketsTotal;
+      }
+    }
+    matched++;
+  }
+
+  return {
+    current:  curT  > 0 ? curW/curT  : NaN,
+    previous: prevT > 0 ? prevW/prevT : NaN,
+    matchedDays: matched,
+    totalDays: days.length
+  };
+}
+
+async function fetchWeatherIfNeeded(from, to){
+  if (!from || !to || State.weatherFetching) return;
+  // Build list of dates needed: current period + same period last year
+  const days = []; let d = from; while(d<=to){ days.push(d); d=shiftDate(d,1); }
+  const prevDays = days.map(d => prevYearKey(d));
+  const allNeeded = [...days, ...prevDays];
+  const missing = allNeeded.filter(d => !State.weather[d]);
+  if (!missing.length) return;
+  State.weatherFetching = true;
+  missing.sort();
+  const wFrom = missing[0], wTo = missing[missing.length-1];
+  function parseW(data){
+    if (!data.daily) return;
+    data.daily.time.forEach((dkey,i) => {
+      const tempMax = data.daily.temperature_2m_max[i];
+      const precip  = data.daily.precipitation_sum[i];
+      if (!State.weather[dkey]) State.weather[dkey] = { tempMax, precip, rain: precip > RAIN_THRESHOLD };
+    });
+  }
+  try { const r = await fetch(`https://archive-api.open-meteo.com/v1/archive?latitude=${WEATHER_LAT}&longitude=${WEATHER_LON}&start_date=${wFrom}&end_date=${wTo}&daily=temperature_2m_max,precipitation_sum&timezone=Europe%2FMadrid`); if(r.ok) parseW(await r.json()); } catch(e){}
+  try {
+    const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${WEATHER_LAT}&longitude=${WEATHER_LON}&daily=temperature_2m_max,precipitation_sum&timezone=Europe%2FMadrid&past_days=92&forecast_days=1`);
+    if(r.ok){ const data = await r.json(); if(data.daily) data.daily.time.forEach((dkey,i) => {
+      if(dkey<wFrom||dkey>wTo) return;
+      State.weather[dkey] = { tempMax:data.daily.temperature_2m_max[i], precip:data.daily.precipitation_sum[i], rain:data.daily.precipitation_sum[i]>RAIN_THRESHOLD };
+    }); }
+  } catch(e){}
+  State.weatherFetching = false;
+  const el = document.getElementById('weatherKPIs');
+  if (el) el.innerHTML = buildWeatherKPIsHTML(State.from, State.to);
+}
+
+function buildWeatherKPIsHTML(from, to){
+  if (!from || !to) return '';
+  const isRange = from !== to;
+  const days = []; let d = from; while(d<=to){ days.push(d); d=shiftDate(d,1); }
+  const prevDays = days.map(d => prevYearKey(d));
+
+  const wDays     = days.map(d => State.weather[d]).filter(w => w && w.tempMax !== null && w.tempMax !== undefined);
+  const wPrevDays = prevDays.map(d => State.weather[d]).filter(w => w && w.tempMax !== null && w.tempMax !== undefined);
+
+  if (!wDays.length) return `<div style="font-size:12px;color:var(--ink-soft);padding:8px 0;">Cargando datos meteorológicos…</div>`;
+
+  function weatherStats(wArr, dArr){
+    if (!wArr.length) return null;
+    if (isRange){
+      const rainy = wArr.filter(w=>w.rain).length;
+      const avgT  = wArr.reduce((a,w)=>a+w.tempMax,0)/wArr.length;
+      const maxT  = Math.max(...wArr.map(w=>w.tempMax));
+      return { rainVal:`${rainy} día${rainy!==1?'s':''} de ${dArr.length}`, tempVal:`Media ${avgT.toFixed(1)}° · Máx ${maxT.toFixed(1)}°`, rainy };
+    } else {
+      const w = wArr[0];
+      return { rainVal: w.rain ? `Sí · ${w.precip.toFixed(1)} mm` : 'No', tempVal:`${w.tempMax.toFixed(1)} °C`, rainy: w.rain ? 1 : 0 };
+    }
+  }
+
+  const cur  = weatherStats(wDays, days);
+  const prev = wPrevDays.length ? weatherStats(wPrevDays, prevDays) : null;
+
+  const rainColor = cur.rainy > 0 ? '#5E6FA3' : '#E3A038';
+
+  function card(label, curVal, prevVal, scoop){
+    return `<div class="kpi"><div class="kpi-scoop" style="background:${scoop}"></div><div class="kpi-body">
+      <div class="kpi-label">${label}</div>
+      <div class="kpi-value small">${esc(curVal)}</div>
+      ${prevVal ? `<div class="kpi-sub">Año ant.: ${esc(prevVal)}</div>` : ''}
+    </div></div>`;
+  }
+
+  return `<div class="kpi-section-label" style="margin-top:18px;">Meteorología · Sevilla</div>
+  <div class="kpi-row" style="grid-template-columns:repeat(2,1fr);max-width:420px;">
+    ${card(isRange?'Días de lluvia':'Lluvia', cur.rainVal, prev?.rainVal, rainColor)}
+    ${card(isRange?'Temperatura máx.':'Temp. máx. del día', cur.tempVal, prev?.tempVal, 'var(--raspberry)')}
+  </div>`;
+}
+
+/* ================= COMBO PLANIFICACIÓN ================= */
+// Sheet ID de la hoja "Amorino Operaciones" (tab Combo_Planning, gid 0)
+// Cámbialo por el ID real una vez crees la hoja y ejecutes el Apps Script.
+const COMBO_SHEET_ID = '14kP6Fyxb9IRdg47vxHSOtDjZ7r8n5gkdZ0e2TwYbDc8';
+
+const COMBO_SHOP_ORDER = [
+  'Amorino Avenida',
+  'Amorino Catedral',
+  'Amorino Alcázar',
+  'Amorino Plaza Nueva',
+  'Amorino Naranjos',
+];
+const COMBO_DAY_NAMES = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+
+async function loadComboIfNeeded(){
+  if (State.combo._loaded) return;
+  State.combo._loaded = 'loading';
+  try {
+    // Use sheet name (not gid) so it works regardless of tab position
+    const json = await loadViaJSONP_bySheet(COMBO_SHEET_ID, 'combo_planificacion');
+    const allRows = json.table.rows || [];
+    // Column indices: tienda(0) fecha(1) dia(2) horas(3) turnos(4) empleados(5) semana(6)
+    const ci = { tienda:0, fecha:1, dia:2, horas:3, turnos:4, empleados:5, semana:6 };
+    const rows = [];
+    for (const r of allRows){
+      const cv = r.c || [];
+      // gviz returns dates as v:"Date(2026,9,5)" — prefer f (formatted) for dates
+      const get = i => {
+        const x = cv[i];
+        if (!x) return '';
+        // If v is a string starting with "Date(" it's a date — use f or reconstruct
+        if (typeof x.v === 'string' && x.v.startsWith('Date(')) return x.f || x.v;
+        return x.v ?? x.f ?? '';
+      };
+      const tienda = String(get(ci.tienda)).trim();
+      if (!tienda || tienda === 'tienda' || tienda === 'Tienda') continue;
+      const fecha    = String(get(ci.fecha)).trim();
+      const dia      = String(get(ci.dia)).trim();
+      const horas    = parseFloat(String(get(ci.horas)).replace(',','.')) || 0;
+      const turnos   = parseInt(get(ci.turnos))  || 0;
+      const empNames = String(get(ci.empleados)).trim();
+      const emps     = empNames ? empNames.split(',').filter(n => n.trim()).length : 0;
+      const semana   = String(get(ci.semana)).trim();
+      rows.push({ tienda, fecha, dia, horas, turnos, emps, semana });
+    }
+    State.combo = { _loaded: true, rows };
+  } catch(e){
+    console.error('Combo load error:', e);
+    State.combo = { _loaded: 'error', rows: [] };
+  }
+  const el = document.getElementById('comboSection');
+  if (el) el.innerHTML = buildComboHTML();
+}
+
+function loadViaJSONP_bySheet(sheetId, sheetName){
+  return new Promise((resolve, reject) => {
+    const cbName = '__gvizCb' + (jsonpCounter++);
+    const scriptEl = document.createElement('script');
+    let settled = false;
+    function cleanup(){ delete window[cbName]; if(scriptEl.parentNode) scriptEl.parentNode.removeChild(scriptEl); clearTimeout(timer); }
+    window[cbName] = json => { if(settled) return; settled=true; cleanup(); if(!json||json.status==='error') reject(new Error('gviz error')); else resolve(json); };
+    const timer = setTimeout(()=>{ if(settled) return; settled=true; cleanup(); reject(new Error('Timeout')); }, 15000);
+    scriptEl.src = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json;responseHandler:${cbName}&sheet=${encodeURIComponent(sheetName)}&headers=1&_=${Date.now()}`;
+    scriptEl.onerror = ()=>{ if(settled) return; settled=true; cleanup(); reject(new Error('Load error')); };
+    document.head.appendChild(scriptEl);
+  });
+}
+
+function buildComboHTML(){
+  if (COMBO_SHEET_ID === 'PENDIENTE_SHEET_ID'){
+    return `<div class="empty-note" style="padding:32px 0;">
+      <strong>Falta configurar la hoja de Combo.</strong><br><br>
+      1. Crea la hoja "Amorino Operaciones" en Google Sheets y compártela públicamente.<br>
+      2. Pega el Apps Script de Combo y ejecuta <code>syncComboPlanning()</code>.<br>
+      3. Reemplaza <code>COMBO_SHEET_ID</code> en el dashboard con el ID de esa hoja.
+    </div>`;
+  }
+  if (State.combo._loaded === 'loading') return '<div class="empty-note">Cargando planificación…</div>';
+  if (State.combo._loaded === 'error')   return '<div class="empty-note" style="color:var(--raspberry)">Error al cargar Combo. Verifica que la hoja esté compartida públicamente.</div>';
+  if (!State.combo._loaded)              return '<div class="empty-note">Cargando planificación…</div>';
+
+  const rows = State.combo.rows;
+  if (!rows.length) return '<div class="empty-note">No hay datos de planificación en la hoja.</div>';
+
+  // Group by semana → for selector
+  const semanas = [...new Set(rows.map(r => r.semana))].sort();
+  const selSemana = State.comboSemana || semanas[semanas.length - 1];
+
+  const weekRows = rows.filter(r => r.semana === selSemana);
+
+  // Build grid: shop × day (normalise dia key to NFC so lookups are consistent)
+  const _norm = s => String(s).normalize('NFC');
+  const grid = {}; // shop → { diaNFC: {horas, turnos, emps} }
+  const diasEnSemana = new Set();
+  for (const r of weekRows){
+    if (!grid[r.tienda]) grid[r.tienda] = {};
+    const diaN = _norm(r.dia);
+    grid[r.tienda][diaN] = { horas: r.horas, turnos: r.turnos, emps: r.emps, fecha: r.fecha };
+    diasEnSemana.add(diaN);
+  }
+
+  // Order days Mon→Sun
+  const dias = COMBO_DAY_NAMES.map(_norm).filter(d => diasEnSemana.has(d));
+
+  // Week total per shop
+  const shopTotals = {};
+  for (const shop of COMBO_SHOP_ORDER){
+    shopTotals[shop] = (grid[shop] ? Object.values(grid[shop]).reduce((s,v) => s + v.horas, 0) : 0);
+  }
+
+  // Semana selector
+  let semanaSelect = '';
+  if (semanas.length > 1){
+    semanaSelect = `<select onchange="State.comboSemana=this.value;document.getElementById('comboSection').innerHTML=buildComboHTML();"
+      style="font-size:13px;font-weight:600;padding:6px 28px 6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--white);appearance:none;
+      background-image:url(\\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23766955'/%3E%3C/svg%3E\\");
+      background-repeat:no-repeat;background-position:right 10px center;cursor:pointer;margin-bottom:16px;">
+      ${semanas.map(s => `<option value="${s}" ${s===selSemana?'selected':''}>${s}</option>`).join('')}
+    </select>`;
+  } else {
+    semanaSelect = `<div style="font-size:13px;color:var(--ink-soft);margin-bottom:16px;">Semana del ${selSemana}</div>`;
+  }
+
+  // Table
+  const colStyle = 'padding:10px 14px;text-align:right;font-size:13px;white-space:nowrap;';
+  const hdrStyle = 'padding:8px 14px;font-size:11px;letter-spacing:0.07em;text-transform:uppercase;color:var(--ink-soft);font-weight:600;text-align:right;white-space:nowrap;';
+  const shopStyle = 'padding:10px 14px;font-size:13px;font-weight:600;white-space:nowrap;text-align:left;';
+
+  let thead = `<tr>
+    <th style="${hdrStyle}text-align:left;">Tienda</th>
+    ${dias.map(d => `<th style="${hdrStyle}">${d}</th>`).join('')}
+    <th style="${hdrStyle}color:var(--ink);">Total sem.</th>
+  </tr>`;
+
+  let tbody = '';
+  for (const shop of COMBO_SHOP_ORDER){
+    const shortName = shop.replace('Amorino ','');
+    const shopGrid  = grid[shop] || {};
+    const total     = shopTotals[shop];
+    tbody += `<tr style="border-top:1px solid var(--line);">
+      <td style="${shopStyle}">${shortName}</td>
+      ${dias.map(d => {
+        const cell = shopGrid[d];
+        if (!cell) return `<td style="${colStyle}color:var(--line);">—</td>`;
+        const h = cell.horas.toFixed(1);
+        const bg = cell.horas < 1 ? 'color:var(--ink-soft);' : '';
+        return `<td style="${colStyle}${bg}" title="${cell.emps} empleado(s), ${cell.turnos} turno(s)">${h}h</td>`;
+      }).join('')}
+      <td style="${colStyle}font-weight:700;color:var(--cocoa);">${total.toFixed(1)}h</td>
+    </tr>`;
+  }
+
+  // Day totals row
+  const dayTotals = dias.map(d =>
+    COMBO_SHOP_ORDER.reduce((s, sh) => s + (grid[sh]?.[d]?.horas || 0), 0)
+  );
+  // grandTotal from shopTotals (robust even if dias is partially empty)
+  const grandTotal = Object.values(shopTotals).reduce((s,v) => s + v, 0);
+  const dayGrandFromGrid = dayTotals.reduce((s,v) => s + v, 0); // used in day totals cell
+
+  tbody += `<tr style="border-top:2px solid var(--line);background:rgba(91,58,41,0.04);">
+    <td style="${shopStyle}color:var(--ink-soft);font-weight:600;">Total día</td>
+    ${dayTotals.map(t => `<td style="${colStyle}font-weight:700;">${t.toFixed(1)}h</td>`).join('')}
+    <td style="${colStyle}font-weight:800;color:var(--cocoa);">${grandTotal.toFixed(1)}h</td>
+  </tr>`;
+
+  // KPI summary row
+  const maxDayIdx = dayTotals.length ? dayTotals.indexOf(Math.max(...dayTotals)) : -1;
+  const maxDay = maxDayIdx >= 0 ? dias[maxDayIdx] : '—';
+  const avgDaily = dias.length > 0 ? (grandTotal / dias.length).toFixed(1) : '—';
+
+  const kpis = [
+    { label:'Total horas semana', val: grandTotal.toFixed(1)+'h', color:'var(--cocoa)' },
+    { label:'Media horas/día',    val: avgDaily+'h',              color:'var(--blueberry)' },
+    { label:'Día más cargado',    val: maxDay,                    color:'var(--raspberry)' },
+    { label:'Tiendas planificadas', val: COMBO_SHOP_ORDER.filter(s=>shopTotals[s]>0).length+'/5', color:'var(--pistachio)' },
+  ];
+
+  const kpiHTML = `<div class="kpi-row" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px;">
+    ${kpis.map(k=>`<div class="kpi-card">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value" style="color:${k.color};font-size:28px;">${k.val}</div>
+    </div>`).join('')}
+  </div>`;
+
+  return `
+    ${semanaSelect}
+    ${kpiHTML}
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>${thead}</thead>
+        <tbody>${tbody}</tbody>
+      </table>
+    </div>
+    <p style="font-size:11px;color:var(--ink-soft);margin-top:12px;">
+      Datos sincronizados desde Combo. Pasa el cursor sobre las horas para ver nº de empleados y turnos.
+    </p>`;
+}
+
+/* ================= EVALUACIÓN DEL TURNO ================= */
+const RADIOGRAFIAS_SHEET_ID = '1b2QhZCIKoMWwNFG051O-Hj0zx4y5Zi3sxPdM9_68ozo';
+const DEGU_SHEET_ID = '13y3fRZCYUG722bhRwsNziRw5O1gXClSqqIV14EEyyPs';
+const DEGU_SHOP_MAP = {
+  // Names as they appear in the actual sheet
+  'amorino avenida':              'Amorino Sevilla Avenida',
+  'avenida tienda':               'Amorino Sevilla Avenida', // fallback
+  'amorino naranjos':             'Amorino Patio de los Naranjos',
+  'amorino sevilla plaza nueva':  'Amorino Plaza Nueva',
+  'amorino alcázar':              'Amorino Alcázar',
+  'amorino sevilla catedral':     'Amorino Catedral',
+  'amorino catedral':             'Amorino Catedral',
+};
+function normDeguShop(raw){
+  return DEGU_SHOP_MAP[(raw||'').trim().toLowerCase().normalize('NFC')] || null;
+}
+function parseMarcaTemporal(s){
+  if (!s) return null;
+  const str = String(s).trim();
+  // ISO format: YYYY-MM-DD HH:MM:SS  (Google Forms with ISO locale)
+  let m = str.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2}):/);
+  if (m) return { dkey:`${m[1]}-${m[2]}-${m[3]}`, hour:parseInt(m[4],10) };
+  // Fallback: DD/MM/YYYY HH:MM:SS
+  m = str.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):/);
+  if (m) return { dkey:`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`, hour:parseInt(m[4],10) };
+  return null;
+}
+async function loadDegustacionesIfNeeded(){
+  if (State.degustaciones._loaded) return;
+  State.degustaciones._loaded = 'loading';
+  try {
+    const json = await loadViaJSONP_2(DEGU_SHEET_ID, 'Data');
+    const rows = gvizJsonToRows(json).slice(1); // skip header row
+    // cols: 0=Marca temporal, 1=TIENDA, 2=FOTO, 3=PRODUCTO UTILIZADO
+    for (const row of rows){
+      const shop = normDeguShop(row[1]);
+      if (!shop) continue;
+      const p = parseMarcaTemporal(row[0]);
+      if (!p) continue;
+      if (!State.degustaciones[shop]) State.degustaciones[shop] = {};
+      if (!State.degustaciones[shop][p.dkey]) State.degustaciones[shop][p.dkey] = {};
+      State.degustaciones[shop][p.dkey][p.hour] = (State.degustaciones[shop][p.dkey][p.hour]||0) + 1;
+    }
+    State.degustaciones._loaded = true;
+  } catch(e){
+    State.degustaciones._loaded = 'error';
+  }
+  // Re-render eval section if open
+  const el = document.getElementById('evalTurnoSection');
+  if (el) { el.innerHTML = buildEvalTurnoHTML(State.shop, State.from); attachEvalHandlers(); }
+}
+function getDeguCount(shopFull, dkey, horario){
+  if (State.degustaciones._loaded !== true) return 0;
+  const day = (State.degustaciones[shopFull]||{})[dkey];
+  if (!day) return 0;
+  const mins = slotToMins(horario);
+  if (!mins) return 0;
+  let h = Math.floor(mins.start / 60);
+  if (h >= 24) h -= 24;
+  return day[h] || 0;
+}
+const MONTH_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const SHOP_RAD_KEY = {
+  'Amorino Sevilla Avenida':       'AVENIDA',
+  'Amorino Patio de los Naranjos': 'NARANJOS',
+  'Amorino Plaza Nueva':           'PLAZA NUEVA',
+  'Amorino Alcázar':               'ALCÁZAR',
+  'Amorino Catedral':              'CATEDRAL'
+};
+const RAD_DAYS    = ['LUNES','MARTES','MIÉRCOLES','JUEVES','VIERNES','SÁBADO','DOMINGO'];
+const RAD_DAYS_JS = [1, 2, 3, 4, 5, 6, 0]; // JS getDay() Mon–Sun
+
+function getRadiografiaTab(dkey){
+  const [y,m,d] = dkey.split('-').map(Number);
+  if (y >= 2026) return MONTH_ES[m-1] + ' ' + y;
+  if (y === 2025){
+    if (m === 10){ return d <= 19 ? '6 y 13 Octubre 2025' : '20 Octubre 2025'; }
+    if (m === 11){ return d <= 16 ? '3 y 10 Noviembre 2025' : '17 y 24 Noviembre 2025'; }
+    if (m === 12){
+      if (d <= 7)  return '1 Diciembre 2025';
+      if (d <= 14) return '8 Diciembre 2025';
+      if (d <= 21) return '15 Diciembre 2025';
+      return '22 Diciembre 2025';
+    }
+  }
+  return null;
+}
+
+/* Convert a slot label like "10-11", "10:30-11:00", "00-01" → {start, end} minutes
+   Hours < 7 are treated as 24+ to handle post-midnight slots. */
+function slotToMins(s){
+  s = String(s).trim().replace(/\s/g,'');
+  const parts = s.split('-');
+  if (parts.length !== 2) return null;
+  const parseT = t => {
+    let h, m = 0;
+    if (t.includes(':')){ const [a,b]=t.split(':'); h=parseInt(a,10); m=parseInt(b,10)||0; }
+    else h = parseInt(t, 10);
+    if (isNaN(h)) return null;
+    if (h < 7) h += 24;
+    return h*60 + m;
+  };
+  const s2 = parseT(parts[0]), e2 = parseT(parts[1]);
+  if (s2===null || e2===null) return null;
+  return {start:s2, end: e2 <= s2 ? e2+1440 : e2};
+}
+
+/* Parse the 2D rows from a radiografía sheet into:
+   { SHOP_KEY: { jsDay: [{slot, staff}] } } */
+function parseRadiografiaRows(rows){
+  const result = {};
+  const SHOP_KEYS = Object.values(SHOP_RAD_KEY);
+  let currentShop = null, dayColMap = null, inData = false;
+  for (const row of rows){
+    const shopFound = SHOP_KEYS.find(k => row.some(c => String(c).trim() === k));
+    if (shopFound){
+      currentShop = shopFound;
+      result[currentShop] = {0:[],1:[],2:[],3:[],4:[],5:[],6:[]};
+      inData = false; dayColMap = null;
+      continue;
+    }
+    if (!inData && row.some(c => String(c).trim() === 'LUNES')){
+      dayColMap = {};
+      row.forEach((cell,i) => {
+        const di = RAD_DAYS.indexOf(String(cell).trim());
+        if (di !== -1) dayColMap[RAD_DAYS_JS[di]] = i + 1;
+      });
+      inData = true;
+      continue;
+    }
+    if (!currentShop || !inData || !dayColMap) continue;
+    const timeLabel = String(row[1]||'').trim();
+    if (!timeLabel || !timeLabel.match(/[\-:]/)) continue;
+    for (const [jsDay, colIdx] of Object.entries(dayColMap)){
+      const rawVal = String(row[colIdx]||'').trim().replace(',','.');
+      const staff = parseFloat(rawVal);
+      if (!isNaN(staff)) result[currentShop][parseInt(jsDay)].push({slot:timeLabel, staff});
+    }
+  }
+  return result;
+}
+
+/* Load a tab from a different sheet using JSONP */
+function loadViaJSONP_2(sheetId, sheetName){
+  return new Promise((resolve, reject) => {
+    const cbName = '__gvizCb' + (jsonpCounter++);
+    const scriptEl = document.createElement('script');
+    let settled = false;
+    function cleanup(){ delete window[cbName]; if(scriptEl.parentNode) scriptEl.parentNode.removeChild(scriptEl); clearTimeout(timer); }
+    window[cbName] = json => {
+      if(settled) return; settled=true; cleanup();
+      if(!json || json.status==='error') reject(new Error('Error: '+sheetName)); else resolve(json);
+    };
+    const timer = setTimeout(()=>{ if(settled) return; settled=true; cleanup(); reject(new Error('Timeout: '+sheetName)); }, 15000);
+    scriptEl.src = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json;responseHandler:${cbName}&sheet=${encodeURIComponent(sheetName)}&headers=0&_=${Date.now()}`;
+    scriptEl.onerror = ()=>{ if(settled) return; settled=true; cleanup(); reject(new Error('Load error: '+sheetName)); };
+    document.head.appendChild(scriptEl);
+  });
+}
+
+function loadRadTabsIfNeeded(){
+  if (State.radTabs !== null) return;
+
+  // Set standard tabs immediately (sync) so dropdown shows right away
+  const tabs = new Set();
+  ['6 y 13 Octubre 2025','20 Octubre 2025',
+   '3 y 10 Noviembre 2025','17 y 24 Noviembre 2025',
+   '1 Diciembre 2025','8 Diciembre 2025','15 Diciembre 2025','22 Diciembre 2025']
+    .forEach(t => tabs.add(t));
+  MONTH_ES.forEach(m => tabs.add(`${m} 2026`));
+  tabs.add('2A Septiembre 2026');
+  Object.keys(State.radiografia).forEach(t => tabs.add(t));
+  State.radTabs = [...tabs];
+
+  // Re-render eval card now with the populated dropdown
+  const evalCard = document.getElementById('evalCard');
+  if (evalCard) {
+    const isMulti = State.from !== State.to;
+    evalCard.innerHTML = isMulti
+      ? buildEvalMultiDayHTML(State.shop, State.from, State.to)
+      : `<div id="evalTurnoSection">${buildEvalTurnoHTML(State.shop, State.from)}</div>`;
+    attachEvalHandlers();
+  }
+
+  // Try JSONP feeds API in the background to add any special tabs
+  const cbName = '__radTabsCb' + Date.now();
+  const s = document.createElement('script');
+  window[cbName] = (data) => {
+    delete window[cbName]; if(s.parentNode) s.parentNode.removeChild(s);
+    try {
+      const extra = (data.feed.entry||[]).map(e => e.title.$t);
+      const before = State.radTabs.length;
+      extra.forEach(t => { if (!State.radTabs.includes(t)) State.radTabs.push(t); });
+      if (State.radTabs.length > before){
+        const sel = document.getElementById('radOverrideSelect');
+        if (sel){
+          const cur = sel.value;
+          State.radTabs.filter(t => !sel.querySelector(`option[value="${t}"]`))
+            .forEach(t => { const o=document.createElement('option'); o.value=t; o.textContent=t; sel.appendChild(o); });
+          sel.value = cur;
+        }
+      }
+    } catch(e){}
+  };
+  s.onerror = () => { delete window[cbName]; if(s.parentNode) s.parentNode.removeChild(s); };
+  s.src = `https://spreadsheets.google.com/feeds/worksheets/${RADIOGRAFIAS_SHEET_ID}/public/basic?alt=json-in-script&callback=${cbName}`;
+  document.head.appendChild(s);
+}
+
+async function fetchRadiografiaIfNeeded(dkey, updatePanel){
+  if (!dkey) return;
+  const tabName = getRadiografiaTab(dkey);
+  if (!tabName || State.radiografia[tabName] !== undefined) {
+    if (updatePanel) updateCostePersonalKPI(dkey);
+    return;
+  }
+  State.radiografia[tabName] = null;
+  try {
+    const json = await loadViaJSONP_2(RADIOGRAFIAS_SHEET_ID, tabName);
+    const rows = gvizJsonToRows(json);
+    State.radiografia[tabName] = parseRadiografiaRows(rows);
+  } catch(e){
+    State.radiografia[tabName] = null;
+  }
+  const singleEl = document.getElementById('evalTurnoSection');
+  if (singleEl) { singleEl.innerHTML = buildEvalTurnoHTML(State.shop, State.from); attachEvalHandlers(); }
+  // Refresh any multi-day blocks using this tab
+  document.querySelectorAll('[id^="evalDay-"]').forEach(el => {
+    const dd = el.id.replace('evalDay-','');
+    if (getRadiografiaTab(dd) === tabName) el.innerHTML = buildEvalDayContent(State.shop, dd);
+  });
+  attachEvalHandlers();
+  if (updatePanel) updateCostePersonalKPI(dkey);
+}
+
+function calcTotalPersonnelCostForDay(shop, dkey){
+  const tabName = getRadiografiaTab(dkey);
+  if (!tabName) return NaN;
+  const radData = State.radiografia[tabName];
+  if (!radData) return NaN;
+  const parts = dkey.split('-').map(Number);
+  const jsDay = new Date(parts[0], parts[1]-1, parts[2]).getDay();
+  const shopsToCalc = shop === 'all' ? SHOP_ORDER : [shop];
+  const costeHora = State.costeBruto * (1 + State.seguridadSocial / 100);
+  let total = 0, found = false;
+  for (const shopFull of shopsToCalc){
+    const shopKey = SHOP_RAD_KEY[shopFull];
+    if (!shopKey) continue;
+    const h = calcPersonnelCostForShop(shopKey, jsDay, radData);
+    if (!isNaN(h)){ total += h * costeHora; found = true; }
+  }
+  return found ? total : NaN;
+}
+
+function updateCostePersonalKPI(dkey){
+  const el = document.getElementById('costePersonalKPI');
+  if (!el) return;
+  const costeHora = State.costeBruto * (1 + State.seguridadSocial / 100);
+  const shop = State.shop, from = State.from, to = State.to;
+  const shopsToCalc = shop === 'all' ? SHOP_ORDER : [shop];
+  const days = []; let dd = from; while(dd <= to){ days.push(dd); dd = shiftDate(dd,1); }
+  let totalCost = 0, totalVentas = 0, hasRad = false;
+  for (const dd of days){
+    const tabName = getRadiografiaTab(dd);
+    const radData = tabName ? State.radiografia[tabName] : null;
+    if (!radData) continue;
+    const parts = dd.split('-').map(Number);
+    const jsDay = new Date(parts[0], parts[1]-1, parts[2]).getDay();
+    for (const shopFull of shopsToCalc){
+      const shopKey = SHOP_RAD_KEY[shopFull]; if(!shopKey) continue;
+      const h = calcPersonnelCostForShop(shopKey, jsDay, radData);
+      if (!isNaN(h)){ totalCost += h * costeHora; hasRad = true; }
+      const rows = (State.t1ByDkey[dd]||[]).filter(r => shopEq(r.shop, shopFull));
+      totalVentas += rows.reduce((a,r)=>a+(isNaN(r.ventas)?0:r.ventas),0);
+    }
+  }
+  const ratio = (hasRad && totalVentas > 0) ? (totalCost / (totalVentas/1.1)) * 100 : NaN;
+  el.innerHTML = isNaN(ratio) ? '<div class="kpi-value small">—</div>' : `<div class="kpi-value small">${fmtNum(ratio,1)} %</div>`;
+}
+
+function getStaffForSlot(shopKey, jsDay, t1Slot, radData){
+  if (!radData || !radData[shopKey]) return NaN;
+  const slots = radData[shopKey][jsDay];
+  if (!slots || !slots.length) return NaN;
+  const target = slotToMins(t1Slot);
+  if (!target) return NaN;
+  const overlapping = slots.filter(r => {
+    const rm = slotToMins(r.slot);
+    return rm && rm.start < target.end && rm.end > target.start;
+  });
+  if (!overlapping.length) return NaN;
+  return overlapping.reduce((a,r)=>a+r.staff, 0) / overlapping.length;
+}
+
+function slotDurationHours(slot){
+  const mins = slotToMins(slot);
+  return mins ? (mins.end - mins.start) / 60 : 0;
+}
+
+function calcPersonnelCostForShop(shopKey, jsDay, radData){
+  if (!radData || !radData[shopKey] || !radData[shopKey][jsDay]) return NaN;
+  const slots = radData[shopKey][jsDay];
+  let totalHours = 0;
+  for (const s of slots) totalHours += s.staff * slotDurationHours(s.slot);
+  return totalHours;
+}
+
+/* Core per-day eval content (no global controls) — used by both single and multi-day */
+function buildEvalDayContent(shop, dkey){
+  const autoTab = getRadiografiaTab(dkey);
+  const tabName = State.radOverride || autoTab;
+  if (!tabName) return '<div class="empty-note">Sin radiografía disponible para esta fecha.</div>';
+  const radData = State.radiografia[tabName];
+  if (!radData) return '<div class="empty-note" style="padding:16px;">Cargando radiografía…</div>';
+
+  const overrideNote = State.radOverride && State.radOverride !== autoTab
+    ? ` <span style="color:var(--mango);font-weight:700;">(override)</span>` : '';
+  const radTabNote = `<div style="font-size:11px;color:var(--ink-soft);margin-bottom:14px;">
+    📋 Radiografía: <strong>${esc(tabName)}</strong>${overrideNote}
+  </div>`;
+  const [y,m,d] = dkey.split('-').map(Number);
+  const jsDay = new Date(y,m-1,d).getDay();
+  const shopsToShow = shop === 'all' ? SHOP_ORDER : [shop];
+  const costeHora = State.costeBruto * (1 + State.seguridadSocial / 100);
+
+  let grandTotalHours=0, grandTotalCost=0, grandVentas=0, grandHasData=false;
+  for (const shopFull of shopsToShow){
+    const shopKey = SHOP_RAD_KEY[shopFull]; if(!shopKey) continue;
+    const t1rows = (State.raw.t1||[]).filter(r=>r.dkey===dkey&&shopEq(r.shop,shopFull));
+    const ventasDia = t1rows.reduce((a,r)=>a+(isNaN(r.ventas)?0:r.ventas),0);
+    const totalHours = calcPersonnelCostForShop(shopKey,jsDay,radData);
+    const totalCost = isNaN(totalHours)?NaN:totalHours*costeHora;
+    if(!isNaN(totalHours)){grandTotalHours+=totalHours;grandTotalCost+=totalCost;grandHasData=true;}
+    if(ventasDia>0) grandVentas+=ventasDia;
+  }
+  const grandNetas = grandVentas/1.1;
+  const grandRatio = grandNetas>0 ? grandTotalCost/grandNetas : NaN;
+
+  let html = radTabNote;
+  if (shop==='all' && grandHasData){
+    html += `<div class="eval-grand-total" style="margin-bottom:24px;">
+      <strong>Total 5 tiendas</strong>
+      <span>Horas: <strong>${grandTotalHours.toFixed(1)}</strong></span>
+      <span>Coste personal: <strong>${fmtEUR(grandTotalCost)}</strong></span>
+      <span>Ventas netas: <strong>${fmtEUR(grandNetas)}</strong></span>
+      <span>Ratio: <strong>${isNaN(grandRatio)?'—':(grandRatio*100).toFixed(1)+' %'}</strong></span>
+    </div>`;
+  }
+
+  for (const shopFull of shopsToShow){
+    const shopKey = SHOP_RAD_KEY[shopFull]; if(!shopKey) continue;
+    const prod = State.productividadByShop[shopFull]||110;
+    const t1rows = (State.raw.t1||[]).filter(r=>r.dkey===dkey&&shopEq(r.shop,shopFull));
+    const ventasDia = t1rows.reduce((a,r)=>a+(isNaN(r.ventas)?0:r.ventas),0);
+    const ventasNetas = ventasDia/1.1;
+    const totalHours = calcPersonnelCostForShop(shopKey,jsDay,radData);
+    const totalCost = isNaN(totalHours)?NaN:totalHours*costeHora;
+    const costRatio = (!isNaN(totalCost)&&ventasNetas>0)?totalCost/ventasNetas:NaN;
+    const sorted = [...t1rows].sort((a,b)=>hourOrderKey(a.horario)-hourOrderKey(b.horario));
+
+    html += `<div class="eval-shop-block">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+        <div class="eval-shop-title" style="margin:0;">${esc(shopFull.replace('Amorino ',''))}</div>
+        <div class="prod-control" style="margin:0;">
+          <label>Productividad:</label>
+          <input type="number" class="prod-shop-input" data-shop="${esc(shopFull)}" value="${prod}" min="1" max="9999" step="5"> €/p/h
+        </div>
+      </div>`;
+    if (sorted.length){
+      html += `<div class="eval-table-wrap"><table class="eval-table">
+        <thead><tr><th>Franja</th><th class="num">Ventas</th><th class="num">P. nec.</th>
+          <th class="num">P. rad.</th><th class="num">Ev</th><th class="num">Deg.</th></tr></thead><tbody>
+        ${sorted.map(row=>{
+          const staff=getStaffForSlot(shopKey,jsDay,row.horario,radData);
+          const needed=isNaN(row.ventas)?NaN:row.ventas/prod;
+          const ev=(!isNaN(needed)&&!isNaN(staff))?staff-needed:NaN;
+          const cls=isNaN(ev)?'':(ev>=0?'ev-pos':'ev-neg');
+          const evStr=isNaN(ev)?'—':(ev>=0?'+':'')+ev.toFixed(2);
+          const degu=getDeguCount(shopFull,dkey,row.horario);
+          return `<tr class="${cls}"><td>${esc(row.horario)}</td><td class="num">${fmtEUR(row.ventas)}</td>
+            <td class="num">${isNaN(needed)?'—':needed.toFixed(2)}</td>
+            <td class="num">${isNaN(staff)?'—':staff.toFixed(1)}</td>
+            <td class="num"><strong>${evStr}</strong></td>
+            <td class="num">${degu>0?`<strong style="color:var(--pistachio)">${degu}</strong>`:'—'}</td></tr>`;
+        }).join('')}
+        </tbody></table></div>`;
+    } else {
+      html += `<div class="empty-note">Sin datos de ventas para este día.</div>`;
+    }
+    html += `<div class="eval-cost-row">
+      <span>Horas según rad.: <strong>${isNaN(totalHours)?'—':totalHours.toFixed(1)}</strong></span>
+      <span>Coste personal: <strong>${isNaN(totalCost)?'—':fmtEUR(totalCost)}</strong></span>
+      <span>Ventas netas: <strong>${fmtEUR(ventasNetas)}</strong></span>
+      <span>Ratio: <strong>${isNaN(costRatio)?'—':(costRatio*100).toFixed(1)+' %'}</strong></span>
+    </div></div>`;
+  }
+  return html || '<div class="empty-note">Sin datos para mostrar.</div>';
+}
+
+function buildEvalGlobalControls(){
+  const costeHora = State.costeBruto * (1 + State.seguridadSocial / 100);
+
+  // Use dynamically loaded tab names, fall back to empty while loading
+  const knownTabs = State.radTabs || [];
+  const autoTab = State.from ? getRadiografiaTab(State.from) : null;
+  const selTab = State.radOverride || '';
+
+  return `<div class="eval-global-controls" id="evalGlobalControls">
+    <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
+      <div class="prod-control"><label>Coste bruto:</label>
+        <input type="number" id="costeBrutoInput" value="${State.costeBruto}" min="0.01" max="999" step="0.05"> €/h</div>
+      <div class="prod-control"><label>Seg. Social:</label>
+        <input type="number" id="ssInput" value="${State.seguridadSocial}" min="0" max="100" step="1"> %</div>
+      <div class="prod-control" style="color:var(--ink);font-weight:700;">→ Total: ${fmtNum(costeHora,2)} €/h</div>
+      <div class="prod-control">
+        <label>Radiografía</label>
+        <select id="radOverrideSelect" style="min-width:200px;">
+          <option value="">Automático${autoTab?' ('+autoTab+')':''}</option>
+          ${knownTabs.map(t=>`<option value="${esc(t)}" ${selTab===t?'selected':''}>${esc(t)}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <button class="btn no-print" style="background:var(--cocoa);font-size:12px;padding:7px 14px;" onclick="window.print()">⬇ Exportar PDF</button>
+  </div>`;
+}
+
+function buildEvalTurnoHTML(shop, dkey){
+  if (!dkey) return '<div class="empty-note">Selecciona un día para ver la evaluación del turno.</div>';
+  return buildEvalGlobalControls() + buildEvalDayContent(shop, dkey);
+}
+
+function buildEvalMultiDayHTML(shop, from, to){
+  const days=[]; let d=from; while(d<=to){days.push(d);d=shiftDate(d,1);}
+  let html = buildEvalGlobalControls();
+  for (const dd of days){
+    html += `<div class="eval-day-block">
+      <div class="eval-day-header">${dateLabel(dd)}</div>
+      <div id="evalDay-${dd}">${buildEvalDayContent(shop, dd)}</div>
+    </div>`;
+  }
+  return html;
+}
+
+function renderAll(){
+  if (!State.raw) return;
+  const shop = State.shop, from = State.from, to = State.to;
+  const isRange = from !== to;
+
+  if (State.activeTab === 'resenas'){
+    document.getElementById('content').innerHTML = `
+      <div class="section-title"><span class="swatch" style="background:var(--mango)"></span>Reseñas Google
+        <button onclick="State.resenas={_loaded:false,entries:[]};loadResenasIfNeeded();"
+          style="font-size:11px;font-weight:600;background:none;border:1px solid var(--line);border-radius:8px;padding:4px 10px;cursor:pointer;margin-left:12px;color:var(--ink-soft);">↻ Actualizar</button>
+      </div>
+      <div class="card" id="resenasSection">${buildResenasHTML(shop, from, to)}</div>`;
+    loadResenasIfNeeded();
+    return;
+  }
+
+  if (State.activeTab === 'degustaciones'){
+    document.getElementById('content').innerHTML = `
+      <div class="section-title"><span class="swatch" style="background:var(--pistachio)"></span>Degustaciones</div>
+      <div class="card">${buildDegustacionesHTML(shop, from, to)}</div>`;
+    loadDegustacionesIfNeeded();
+    return;
+  }
+
+  if (State.activeTab === 'anulaciones'){
+    document.getElementById('content').innerHTML = `
+      <div class="section-title"><span class="swatch" style="background:var(--raspberry)"></span>Anulaciones</div>
+      <div class="card" id="anulacionesSection">${buildAnulacionesHTML(shop, from, to)}</div>`;
+    loadAnulacionesIfNeeded();
+    return;
+  }
+
+  if (State.activeTab === 'feedback'){
+    document.getElementById('content').innerHTML = `
+      <div class="section-title"><span class="swatch" style="background:var(--blueberry)"></span>Feedback Desarrollo del Turno</div>
+      <div class="card" id="feedbackSection">${buildFeedbackHTML(shop, from, to)}</div>`;
+    loadFeedbackIfNeeded();
+    return;
+  }
+
+  if (State.activeTab === 'eval'){
+    const isMulti = isRange;
+    const html = isMulti
+      ? `<div class="card" style="padding-bottom:24px;" id="evalCard">${buildEvalMultiDayHTML(shop, from, to)}</div>`
+      : `<div class="card" style="padding-bottom:24px;" id="evalCard"><div id="evalTurnoSection">${buildEvalTurnoHTML(shop, from)}</div></div>`;
+    document.getElementById('content').innerHTML = html;
+    attachEvalHandlers();
+    if (!isMulti){
+      fetchRadiografiaIfNeeded(from);
+      loadDegustacionesIfNeeded();
+    } else {
+      const days=[]; let d=from; while(d<=to){days.push(d);d=shiftDate(d,1);}
+      days.forEach(dd => fetchRadiografiaIfNeeded(dd));
+      loadDegustacionesIfNeeded();
+    }
+    loadRadTabsIfNeeded();
+    return;
+  }
+
+  if (State.activeTab === 'combo'){
+    document.getElementById('content').innerHTML = `
+      <div class="section-title"><span class="swatch" style="background:var(--pistachio)"></span>Planificación Combo
+        <button onclick="State.combo={_loaded:false,rows:[]};loadComboIfNeeded();"
+          style="font-size:11px;font-weight:600;background:none;border:1px solid var(--line);border-radius:8px;padding:4px 10px;cursor:pointer;margin-left:12px;color:var(--ink-soft);">↻ Actualizar</button>
+      </div>
+      <div class="card" id="comboSection">${buildComboHTML()}</div>`;
+    loadComboIfNeeded();
+    return;
+  }
+
+  // Panel tab (default)
+  const html = `
+    ${renderKPIs(shop, from, to)}
+    <div id="weatherKPIs">${buildWeatherKPIsHTML(from, to)}</div>
+    <div class="section-title"><span class="swatch" style="background:var(--raspberry)"></span>Evolución diaria de ventas</div>
+    ${renderDailySeriesCard(shop, from, to)}
+    <div class="section-title"><span class="swatch" style="background:var(--raspberry)"></span>Ventas por hora</div>
+    <div class="grid-2">
+      ${renderHourlyCard(shop, from, to)}
+      ${renderPaymentCard(shop, from, to)}
+    </div>
+    <div class="section-title"><span class="swatch" style="background:var(--pistachio)"></span>Equipo y sabores</div>
+    <div class="grid-2">
+      ${renderEmployeesCard(shop, from, to)}
+      ${renderFlavorsCard(shop, from, to)}
+    </div>
+    <div class="section-title"><span class="swatch" style="background:var(--mango)"></span>Últimos tickets</div>
+    ${renderUltimosCard(shop, from, to)}
+  `;
+  document.getElementById('content').innerHTML = html;
+  attachSortHandler();
+  fetchWeatherIfNeeded(from, to);
+  if (!isRange) fetchRadiografiaIfNeeded(from, true); // true = also update panel KPI
+  if (!isRange) loadDegustacionesIfNeeded();
+}
+
+/* ---- Evolución diaria (serie temporal) ---- */
+function renderDailySeriesCard(shop, from, to){
+  if (!from || !to) return `<div class="card"><div class="empty-note">Sin fechas seleccionadas</div></div>`;
+
+  const days = [];
+  let d = from;
+  while (d <= to) { days.push(d); d = shiftDate(d, 1); }
+
+  if (days.length < 2){
+    return `<div class="card">
+      <div class="hint">${shop==='all'?'Todas las tiendas':esc(shop)} · ${rangeLabel(from,to)}</div>
+      <div class="empty-note">Selecciona un rango de varios días para ver la evolución.</div>
+    </div>`;
+  }
+
+  const rows = t1ForRange(from, to, shop);
+  const byDay = new Map();
+  days.forEach(dd => byDay.set(dd, 0));
+  rows.forEach(r => { if (!isNaN(r.ventas)) byDay.set(r.dkey, (byDay.get(r.dkey) || 0) + r.ventas); });
+  const values = days.map(dd => byDay.get(dd) || 0);
+
+  // Previous year: same calendar dates, -1 year, from Google Sheet only
+  const prevValues = days.map(dd => getPrevYearTotalForShop(dd, shop));
+  const hasPrev = prevValues.some(v => !isNaN(v));
+
+  const allVals = values.concat(prevValues.filter(v => !isNaN(v)));
+  const max = Math.max(...allVals, 1);
+  const W = 760, H = 260, padL = 14, padR = 14, padT = 18, padB = 50;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+  const stepX = days.length > 1 ? innerW / (days.length - 1) : 0;
+  const toY = v => padT + innerH - (isNaN(v) || !max ? 0 : (v / max) * innerH);
+
+  const pts = values.map((v, i) => [padL + i * stepX, toY(v)]);
+  const prevPts = prevValues.map((v, i) => [padL + i * stepX, isNaN(v) ? null : toY(v)]);
+
+  const linePath = pts.map((p, i) => (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+  const baseline = (padT + innerH).toFixed(1);
+  const areaPath = linePath + ` L${pts[pts.length-1][0].toFixed(1)},${baseline} L${pts[0][0].toFixed(1)},${baseline} Z`;
+
+  let prevPath = '';
+  prevPts.forEach((p, i) => {
+    if (p[1] === null) return;
+    const pp = prevPts[i-1];
+    prevPath += (i === 0 || pp === null || pp[1] === null ? 'M' : 'L') + p[0].toFixed(1) + ',' + p[1].toFixed(1) + ' ';
+  });
+
+  const labelEvery = days.length <= 8 ? 1 : Math.ceil(days.length / 8);
+  const dots = pts.map((p, i) => `<circle class="series-dot" cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3.5" fill="#C84B5E" stroke="#FFF" stroke-width="1.5"><title>${dateLabel(days[i])}: ${fmtEUR(values[i])}</title></circle>`).join('');
+  const prevDots = hasPrev ? prevPts.map((p, i) => p[1] === null ? '' :
+    `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.5" fill="#5E6FA3" stroke="#FFF" stroke-width="1"><title>${dateLabel(prevYearKey(days[i]))}: ${fmtEUR(prevValues[i])}</title></circle>`
+  ).join('') : '';
+  const xLabels = pts.map((p, i) => (i % labelEvery === 0 || i === pts.length - 1)
+    ? `<text x="${p[0].toFixed(1)}" y="${H - 28}" font-size="10" fill="#766955" text-anchor="middle">${dateLabel(days[i]).slice(0, 5)}</text>`
+    : '').join('');
+
+  const total = values.reduce((a,b)=>a+b,0);
+  const avg = total / values.length;
+  const best = Math.max(...values);
+  const bestDay = days[values.indexOf(best)];
+
+  const legend = `<g transform="translate(${padL}, ${H - 16})">
+    <line x1="0" y1="-4" x2="18" y2="-4" stroke="#C84B5E" stroke-width="2.5"/>
+    <circle cx="9" cy="-4" r="3" fill="#C84B5E"/>
+    <text x="22" y="0" font-size="11" fill="#766955">Este año</text>
+    ${hasPrev ? `<line x1="80" y1="-4" x2="98" y2="-4" stroke="#5E6FA3" stroke-width="1.8" stroke-dasharray="4 3"/>
+    <circle cx="89" cy="-4" r="2.5" fill="#5E6FA3"/>
+    <text x="102" y="0" font-size="11" fill="#766955">Año anterior</text>` : ''}
+  </g>`;
+
+  return `<div class="card">
+    <div class="hint">${shop==='all'?'Todas las tiendas':esc(shop)} · ${rangeLabel(from,to)} · media diaria ${fmtEUR(avg)} · mejor día ${dateLabel(bestDay)} (${fmtEUR(best)})</div>
+    <svg viewBox="0 0 ${W} ${H}" class="series-svg" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="seriesFill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#C84B5E" stop-opacity="0.22"/>
+          <stop offset="100%" stop-color="#C84B5E" stop-opacity="0.02"/>
+        </linearGradient>
+      </defs>
+      <path d="${areaPath}" fill="url(#seriesFill)" stroke="none"/>
+      ${hasPrev && prevPath ? `<path d="${prevPath.trim()}" fill="none" stroke="#5E6FA3" stroke-width="1.8" stroke-dasharray="5 3" stroke-linejoin="round" stroke-linecap="round" opacity="0.8"/>` : ''}
+      <path d="${linePath}" fill="none" stroke="#C84B5E" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+      ${hasPrev ? prevDots : ''}
+      ${dots}
+      ${xLabels}
+      ${legend}
+    </svg>
+  </div>`;
+}
+
+/* ---- KPIs ---- */
+function renderKPIs(shop, from, to){
+  if (!from || !to) return `<div class="banner">No hay fechas seleccionadas todavía.</div>`;
+  const inScope = r => inRange(r.dkey, from, to) && (shop === 'all' || shopEq(r.shop, shop));
+  const t1rows = t1ForRange(from, to, shop);
+  const t2rows = t2ForRange(from, to, shop);
+  const t3rows = State.raw.t3.filter(inScope);
+
+  const ventasPeriodo = sum(t1rows.map(r => r.ventas));
+  const ticketsTotal = sum(t2rows.map(r => r.ticketsTotal));
+  const litros = sum(t2rows.map(r => r.litrosDia));
+  const ticketMedio = ticketsTotal ? ventasPeriodo / ticketsTotal : NaN;
+  const sgTotal = sum(t3rows.map(r => r.sugerencias));
+  const ticketsConT3 = sum(t3rows.map(r => r.tickets));
+  const sugPctT3 = ticketsConT3 ? (sgTotal / ticketsConT3) * 100 : NaN;
+
+  // Use t2 for shop-level sugerencias and media de helado (authoritative source)
+  // Weighted average by ticketsTotal across shops/days
+  const t2TicketsTotal = sum(t2rows.map(r => r.ticketsTotal));
+  const sugPct = t2TicketsTotal
+    ? t2rows.filter(r => !isNaN(r.sugerenciasPct) && !isNaN(r.ticketsTotal))
+        .reduce((a,r) => a + r.sugerenciasPct * r.ticketsTotal, 0) / t2TicketsTotal
+    : sugPctT3; // fallback to t3 if t2 unavailable
+  const medHelKPI = t2TicketsTotal
+    ? t2rows.filter(r => !isNaN(r.ticketMedioGelato) && !isNaN(r.ticketsTotal))
+        .reduce((a,r) => a + r.ticketMedioGelato * r.ticketsTotal, 0) / t2TicketsTotal
+    : NaN;
+
+  // "Var. mes vs año anterior": compute from t1 + historical to avoid gaps in Table 2
+  let difPct = NaN;
+  {
+    const mStart = monthStart(to);
+    const inScopeMonth = r => inRange(r.dkey, mStart, to) && (shop === 'all' || shopEq(r.shop, shop));
+    const mesActual = sum(t1ForRange(mStart, to, shop).map(r => r.ventas));
+    const mDays = []; let dd = mStart; while(dd <= to){ mDays.push(dd); dd = shiftDate(dd,1); }
+    const prevMesTotal = mDays.map(d => getPrevYearTotalForShop(d, shop)).filter(v => !isNaN(v));
+    const mesAnt = prevMesTotal.length ? prevMesTotal.reduce((a,b)=>a+b,0) : NaN;
+    difPct = (!isNaN(mesActual) && !isNaN(mesAnt) && mesAnt > 0)
+      ? ((mesActual - mesAnt) / mesAnt) * 100 : NaN;
+  }
+
+  const isRange = from !== to;
+  // Days with data vs total days in range
+  const totalDays = (() => { let n=0, d=from; while(d<=to){ n++; d=shiftDate(d,1); } return n; })();
+  const daysWithData = (() => {
+    const have = new Set(t1rows.filter(r => !isNaN(r.ventas) && r.ventas > 0).map(r => r.dkey));
+    return have.size;
+  })();
+  const SHOP_ABBR = {
+    'Amorino Sevilla Avenida':       'Ave',
+    'Amorino Patio de los Naranjos': 'Nar',
+    'Amorino Catedral':              'Cat',
+    'Amorino Plaza Nueva':           'PN',
+    'Amorino Alcázar':               'Alc',
+  };
+  const shopsToCheck = shop === 'all' ? SHOP_ORDER : [shop];
+
+  let coverageNote;
+  if (isRange){
+    if (shop === 'all'){
+      const perShop = shopsToCheck.map(s => {
+        const n = new Set((State.t1ByDkey ? [] : []).concat(
+          (() => { const res=[]; let d=from; while(d<=to){for(const r of(State.t1ByDkey[d]||[])){if(shopEq(r.shop,s)&&!isNaN(r.ventas)&&r.ventas>0)res.push(d);} d=shiftDate(d,1);} return res; })()
+        )).size;
+        const abbr = SHOP_ABBR[s] || s.replace('Amorino ','');
+        return `${abbr} ${n}/${totalDays}`;
+      });
+      coverageNote = `${daysWithData}/${totalDays} días · ` + perShop.join(' · ');
+    } else {
+      coverageNote = `${daysWithData}/${totalDays} días con datos`;
+    }
+  } else {
+    // Single day
+    if (shop === 'all'){
+      const statuses = shopsToCheck.map(s => {
+        const has = (State.t1ByDkey[from]||[]).some(r => shopEq(r.shop,s) && !isNaN(r.ventas) && r.ventas > 0);
+        return `${SHOP_ABBR[s]||s} ${has ? '✓' : '✗'}`;
+      });
+      coverageNote = statuses.join(' · ');
+    } else {
+      const has = (State.t1ByDkey[from]||[]).some(r => shopEq(r.shop,shop) && !isNaN(r.ventas) && r.ventas > 0);
+      coverageNote = has ? 'Con datos ✓' : 'Sin datos ✗';
+    }
+  }
+
+  // Trayectoria: (ventas / daysWithData) × days_in_month
+  const avgDaily = daysWithData > 0 ? ventasPeriodo / daysWithData : NaN;
+  const monthDays = (() => {
+    if (!isRange) return null;
+    const [fy, fm] = from.split('-').map(Number);
+    const [ty, tm] = to.split('-').map(Number);
+    if (fy === ty && fm === tm) return new Date(fy, fm, 0).getDate(); // same month
+    return 30; // cross-month: use 30
+  })();
+  const trayectoria = (!isNaN(avgDaily) && monthDays) ? avgDaily * monthDays : NaN;
+  const trayectoriaNote = !isNaN(trayectoria) ? `Proyección mes (${monthDays}d): ${fmtEUR(trayectoria)}` : null;
+
+  const cards = [
+    { label: isRange ? 'Ventas del periodo' : 'Ventas del día', value:fmtEUR(ventasPeriodo), color:'var(--raspberry)', note: coverageNote, note2: trayectoriaNote },
+    { label:'Tickets totales', value:fmtInt(ticketsTotal), color:'var(--mango)' },
+    { label:'Ticket medio', value:fmtEUR(ticketMedio), color:'var(--pistachio)' },
+    { label:'Litros de helado', value:fmtNum(litros,1)+' Lt.', color:'var(--blueberry)' },
+    { label:'Media de helado', value:fmtEUR(medHelKPI), color:'var(--pistachio)' },
+    { label:'% Sugerencias/ticket', value:fmtPct(sugPct), color:'var(--cocoa)' },
+    { label:'Var. mes vs año anterior', value:fmtPct(difPct), color: (difPct>=0?'#4D7A3F':'var(--raspberry)'), note: isRange ? ('a '+dateLabel(to)) : null },
+  ];
+
+  // True period-vs-period YoY: sum same calendar dates last year
+  const prevDays = [];
+  { let dp = from; while(dp <= to){ prevDays.push(dp); dp = shiftDate(dp,1); } }
+  const prevValues = prevDays.map(dp => getPrevYearTotalForShop(dp, shop));
+  const validPrev = prevValues.filter(v => !isNaN(v));
+  const ventasPrevPeriodo = validPrev.length ? validPrev.reduce((a,b)=>a+b,0) : NaN;
+  const yoyPct = (!isNaN(ventasPeriodo) && !isNaN(ventasPrevPeriodo) && ventasPrevPeriodo > 0)
+    ? ((ventasPeriodo - ventasPrevPeriodo) / ventasPrevPeriodo) * 100 : NaN;
+  const yoyColor = isNaN(yoyPct) ? 'var(--blueberry)' : (yoyPct >= 0 ? '#4D7A3F' : 'var(--raspberry)');
+  const yoyCards = [
+    { label: isRange ? 'Mismo periodo año anterior' : 'Mismo día año anterior',
+      value: fmtEUR(ventasPrevPeriodo),
+      color: '#5E6FA3',
+      note: validPrev.length < prevDays.length ? `${validPrev.length}/${prevDays.length} días con datos` : null },
+    { label: 'Variación interanual', value: fmtPct(yoyPct), color: yoyColor },
+  ];
+
+  // Update print header meta
+  const metaEl = document.getElementById('printMeta');
+  if (metaEl){
+    const shopLabel = shop === 'all' ? 'Todas las tiendas' : shop.replace('Amorino ','');
+    metaEl.textContent = `${shopLabel} · ${rangeLabel(from, to)} · Generado el ${new Date().toLocaleDateString('es-ES', {day:'2-digit',month:'long',year:'numeric'})}`;
+  }
+
+  return `<div class="kpi-section-label">${isRange ? 'Rendimiento del periodo' : 'Rendimiento del día'}</div>
+  <div class="kpi-row">${cards.map(c => `
+    <div class="kpi">
+      <div class="kpi-scoop" style="background:${c.color}"></div>
+      <div class="kpi-body">
+        <div class="kpi-label">${esc(c.label)}</div>
+        <div class="kpi-value ${c.value.length>8?'small':''}">${c.value}</div>
+        ${c.note ? `<div class="kpi-sub">${esc(c.note)}</div>` : ''}
+        ${c.note2 ? `<div class="kpi-sub" style="margin-top:2px;color:var(--blueberry);font-weight:700;">${esc(c.note2)}</div>` : ''}
+      </div>
+    </div>`).join('')}</div>
+  <div class="kpi-section-label" style="margin-top:18px;">Comparación interanual · mismo periodo</div>
+  <div class="kpi-row" style="grid-template-columns:repeat(2,1fr);max-width:420px;">${yoyCards.map(c => `
+    <div class="kpi">
+      <div class="kpi-scoop" style="background:${c.color}"></div>
+      <div class="kpi-body">
+        <div class="kpi-label">${esc(c.label)}</div>
+        <div class="kpi-value ${c.value.length>8?'small':''}">${c.value}</div>
+        ${c.note ? `<div class="kpi-sub">${esc(c.note)}</div>` : ''}
+      </div>
+    </div>`).join('')}</div>
+  <div class="kpi-section-label" style="margin-top:18px;">Comparación interanual · % sugerencias</div>
+  ${(() => {
+    const prevSug = getPrevYearSugForShop(from, to, shop);
+    const sugDiff = (!isNaN(sugPct) && !isNaN(prevSug)) ? sugPct - prevSug : NaN;
+    const sugColor = isNaN(sugDiff) ? 'var(--blueberry)' : (sugDiff >= 0 ? '#4D7A3F' : 'var(--raspberry)');
+    const sugCards = [
+      { label: isRange ? 'Sugerencias mismo periodo año ant.' : 'Sugerencias mismo día año ant.',
+        value: fmtPct(prevSug), color: '#5E6FA3' },
+      { label: 'Variación interanual (pp)',
+        value: isNaN(sugDiff) ? '—' : (sugDiff >= 0 ? '+' : '') + fmtNum(sugDiff, 1) + ' pp',
+        color: sugColor },
+    ];
+    return `<div class="kpi-row" style="grid-template-columns:repeat(2,1fr);max-width:420px;">${sugCards.map(c => `
+      <div class="kpi">
+        <div class="kpi-scoop" style="background:${c.color}"></div>
+        <div class="kpi-body">
+          <div class="kpi-label">${esc(c.label)}</div>
+          <div class="kpi-value small">${c.value}</div>
+        </div>
+      </div>`).join('')}</div>`;
+  })()}
+  <div class="kpi-section-label" style="margin-top:18px;">Comparación interanual · media de helado</div>
+  ${(() => {
+    const mhComp = getMatchedMedHelComparison(from, to, shop);
+    const medHelDiff = (!isNaN(mhComp.current) && !isNaN(mhComp.previous)) ? mhComp.current - mhComp.previous : NaN;
+    const medHelColor = isNaN(medHelDiff) ? 'var(--blueberry)' : (medHelDiff >= 0 ? '#4D7A3F' : 'var(--raspberry)');
+    const matchNote = mhComp.matchedDays < mhComp.totalDays && mhComp.matchedDays > 0
+      ? `${mhComp.matchedDays}/${mhComp.totalDays} días comparables` : null;
+    const medHelCards = [
+      { label: isRange ? 'Med. helado mismo periodo año ant.' : 'Med. helado mismo día año ant.',
+        value: fmtEUR(mhComp.previous), color: '#5E6FA3',
+        note: isNaN(mhComp.previous) ? 'Sin datos históricos para este periodo' : matchNote },
+      { label: 'Variación interanual',
+        value: isNaN(medHelDiff) ? '—' : (medHelDiff >= 0 ? '+' : '') + fmtNum(medHelDiff, 2) + ' €',
+        color: medHelColor, note: matchNote && !isNaN(mhComp.previous) ? null : null },
+    ];
+    return `<div class="kpi-row" style="grid-template-columns:repeat(2,1fr);max-width:420px;">${medHelCards.map(c => `
+      <div class="kpi">
+        <div class="kpi-scoop" style="background:${c.color}"></div>
+        <div class="kpi-body">
+          <div class="kpi-label">${esc(c.label)}</div>
+          <div class="kpi-value small">${c.value}</div>
+          ${c.note ? `<div class="kpi-sub">${esc(c.note)}</div>` : ''}
+        </div>
+      </div>`).join('')}</div>`;
+  })()}
+  ${(() => {
+    const costeHora = State.costeBruto * (1 + State.seguridadSocial / 100);
+    const shopsToCalc = shop === 'all' ? SHOP_ORDER : [shop];
+    const days = []; let dd = from; while(dd <= to){ days.push(dd); dd = shiftDate(dd,1); }
+
+    let totalCost = 0, totalVentas = 0, hasRad = false;
+    for (const dd of days){
+      const tabName = getRadiografiaTab(dd);
+      const radData = tabName ? State.radiografia[tabName] : null;
+      if (!radData) continue;
+      const parts = dd.split('-').map(Number);
+      const jsDay = new Date(parts[0], parts[1]-1, parts[2]).getDay();
+      for (const shopFull of shopsToCalc){
+        const shopKey = SHOP_RAD_KEY[shopFull]; if(!shopKey) continue;
+        const h = calcPersonnelCostForShop(shopKey, jsDay, radData);
+        if (!isNaN(h)){ totalCost += h * costeHora; hasRad = true; }
+        const rows = (State.raw.t1||[]).filter(r => r.dkey === dd && shopEq(r.shop, shopFull));
+        totalVentas += rows.reduce((a,r)=>a+(isNaN(r.ventas)?0:r.ventas),0);
+      }
+    }
+    const ventasNetas = totalVentas / 1.1;
+    const ratio = (hasRad && ventasNetas > 0) ? (totalCost / ventasNetas) * 100 : NaN;
+    const shopLabel = shop === 'all' ? 'Total 5 tiendas' : shop.replace('Amorino ','');
+    return `<div class="kpi-section-label" style="margin-top:18px;">Coste de personal (teórico)</div>
+    <div class="kpi-row" style="grid-template-columns:repeat(1,1fr);max-width:210px;">
+      <div class="kpi">
+        <div class="kpi-scoop" style="background:var(--cocoa)"></div>
+        <div class="kpi-body">
+          <div class="kpi-label">${esc(shopLabel)} · ${fmtNum(costeHora,2)} €/h</div>
+          <div id="costePersonalKPI">${isNaN(ratio) ? '<div class="kpi-value small">—</div>' : `<div class="kpi-value small">${fmtNum(ratio,1)} %</div>`}</div>
+          ${isRange && !hasRad ? `<div class="kpi-sub">Cargando radiografías…</div>` : ''}
+          ${isRange && hasRad && days.length > 1 ? `<div class="kpi-sub">${days.filter(dd=>{const t=getRadiografiaTab(dd);return t&&State.radiografia[t];}).length}/${days.length} días con rad.</div>` : ''}
+        </div>
+      </div>
+    </div>`;
+  })()}`;
+}
+function sum(arr){ const v = arr.filter(n => !isNaN(n)); return v.length ? v.reduce((a,b)=>a+b,0) : NaN; }
+
+/* ---- Hourly chart ---- */
+function renderHourlyCard(shop, from, to){
+  if (!from || !to) return `<div class="card"><div class="empty-note">Sin fechas seleccionadas</div></div>`;
+  const rows = t1ForRange(from, to, shop);
+  if (!rows.length) return `<div class="card"><h3>Ventas por hora</h3><div class="empty-note">Sin datos para esta selección</div></div>`;
+  const map = new Map();
+  rows.forEach(r => map.set(r.horario, (map.get(r.horario)||0) + (isNaN(r.ventas)?0:r.ventas)));
+  const horas = Array.from(map.keys()).sort((a,b) => hourOrderKey(a) - hourOrderKey(b));
+  const max = Math.max(...horas.map(h => map.get(h)), 1);
+  const bars = horas.map(h => {
+    const v = map.get(h);
+    const pct = Math.max((v/max)*100, 2);
+    return `<div class="hbar-col">
+        <div class="hbar" style="height:${pct}%" title="${esc(h)}h · ${fmtEUR(v)}"></div>
+        <div class="hbar-axis">${esc(h)}</div>
+      </div>`;
+  }).join('');
+  return `<div class="card">
+    <h3>Ventas por hora</h3>
+    <div class="hint">${shop==='all'?'Todas las tiendas':esc(shop)} · ${rangeLabel(from,to)}${from!==to?' (suma del periodo)':''}</div>
+    <div class="hbars">${bars}</div>
+  </div>`;
+}
+
+/* ---- Payment donut ---- */
+function renderPaymentCard(shop, from, to){
+  if (!from || !to) return `<div class="card"><div class="empty-note">Sin fechas seleccionadas</div></div>`;
+  const rows = State.raw.t6.filter(r => inRange(r.dkey, from, to) && (shop === 'all' || shopEq(r.shop, shop)));
+  if (!rows.length) return `<div class="card"><h3>Formas de pago</h3><div class="empty-note">Sin datos para esta selección</div></div>`;
+  const map = new Map();
+  rows.forEach(r => map.set(r.forma, (map.get(r.forma)||0) + (isNaN(r.total)?0:r.total)));
+  const entries = Array.from(map.entries()).sort((a,b) => b[1]-a[1]);
+  const total = sum(entries.map(e => e[1])) || 1;
+  let acc = 0;
+  const stops = entries.map((e,i) => {
+    const pct = (e[1]/total)*100;
+    const pctFrom = acc; acc += pct;
+    return `${FLAVOR_COLORS[i % FLAVOR_COLORS.length]} ${pctFrom}% ${acc}%`;
+  }).join(', ');
+  const legend = entries.map((e,i) => `
+    <div class="legend-row">
+      <span class="legend-sw" style="background:${FLAVOR_COLORS[i % FLAVOR_COLORS.length]}"></span>
+      <span>${esc(e[0])}</span>
+      <span class="pct" style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;">
+        <span>${fmtEUR(e[1])}</span>
+        <span style="font-size:10.5px;color:var(--ink-soft);font-weight:400;">${fmtPct((e[1]/total)*100)}</span>
+      </span>
+    </div>`).join('');
+  return `<div class="card">
+    <h3>Formas de pago</h3>
+    <div class="hint">${shop==='all'?'Todas las tiendas':esc(shop)} · ${rangeLabel(from,to)}</div>
+    <div class="donut-wrap">
+      <div style="position:relative;">
+        <div class="donut" style="background:conic-gradient(${stops})"></div>
+        <div class="donut-center"><div class="v">${fmtEUR(total)}</div><div class="l">Total</div></div>
+      </div>
+      <div class="legend">${legend}</div>
+    </div>
+  </div>`;
+}
+
+/* ---- Employees ---- */
+let empSortKey = 'tickets';
+let empSearch = '';    // compound key "shop||name" for trend chart
+let empSearchText = ''; // free text for table filtering
+
+function empKey(shop, emp){ return `${shop}||${emp}`; }
+function empKeyShop(key){ return key.split('||')[0]; }
+function empKeyName(key){ return key.split('||')[1]; }
+function renderEmployeesCard(shop, from, to){
+  if (!from || !to) return `<div class="card"><div class="empty-note">Sin fechas seleccionadas</div></div>`;
+  const rows = State.raw.t3.filter(r => inRange(r.dkey, from, to) && (shop === 'all' || shopEq(r.shop, shop)) && r.empleado);
+  if (!rows.length) return `<div class="card"><h3>Empleados</h3><div class="empty-note">Sin datos para esta selección</div></div>`;
+
+  const groups = new Map();
+  rows.forEach(r => {
+    const key = `${r.shop}|${r.empleado}`;
+    if (!groups.has(key)) groups.set(key, { shop:r.shop, empleado:r.empleado, dias:0, ticketsSum:0, sgSum:0, ticketMedioSum:0, ticketMedioN:0, medHelSum:0, medHelN:0 });
+    const g = groups.get(key);
+    g.dias += 1;
+    if (!isNaN(r.tickets))    g.ticketsSum    += r.tickets;
+    if (!isNaN(r.sugerencias)) g.sgSum         += r.sugerencias;
+    if (!isNaN(r.ticketMedio)){ g.ticketMedioSum += r.ticketMedio; g.ticketMedioN += 1; }
+    if (!isNaN(r.medHel) && !isNaN(r.tickets) && r.tickets > 0){
+      g.medHelSum += r.medHel * r.tickets;
+      g.medHelN   += r.tickets;
+    }
+  });
+  const agg = Array.from(groups.values()).map(g => ({
+    shop: g.shop, empleado: g.empleado, dias: g.dias,
+    tickets:       g.ticketsSum,
+    ticketMedio:   g.ticketMedioN ? g.ticketMedioSum / g.ticketMedioN : NaN,
+    medHel:        g.medHelN      ? g.medHelSum      / g.medHelN      : NaN,
+    sugerenciasPct: g.ticketsSum  ? (g.sgSum / g.ticketsSum) * 100    : NaN
+  }));
+
+  const sorted = agg.sort((a,b) => (b[empSortKey]||0) - (a[empSortKey]||0));
+  const filtered = empSearchText
+    ? sorted.filter(r => r.empleado.toLowerCase().includes(empSearchText.toLowerCase()))
+    : sorted;
+  const showShop = shop === 'all';
+  const isRange = from !== to;
+
+  // Employee trend chart
+  let trendHtml = '';
+  if (empSearch){
+    const selShop = empKeyShop(empSearch);
+    const selName = empKeyName(empSearch);
+    const empRows = rows.filter(r => r.empleado === selName && shopEq(r.shop, selShop));
+    if (empRows.length){
+      const byDay = new Map();
+      empRows.forEach(r => {
+        if (!byDay.has(r.dkey)) byDay.set(r.dkey, {sg:0, tix:0, medHelSum:0, medHelTix:0});
+        const d = byDay.get(r.dkey);
+        if (!isNaN(r.sugerencias)) d.sg += r.sugerencias;
+        if (!isNaN(r.tickets))     d.tix += r.tickets;
+        if (!isNaN(r.medHel) && !isNaN(r.tickets) && r.tickets > 0){
+          d.medHelSum += r.medHel * r.tickets;
+          d.medHelTix += r.tickets;
+        }
+      });
+      const days = [...byDay.keys()].sort();
+      const vals    = days.map(d => { const e = byDay.get(d); return e.tix > 0 ? (e.sg/e.tix)*100 : NaN; });
+      const medHels = days.map(d => { const e = byDay.get(d); return e.medHelTix > 0 ? e.medHelSum/e.medHelTix : NaN; });
+      const tixByDay = days.map(d => byDay.get(d).tix);
+      const sgByDay  = days.map(d => byDay.get(d).sg);
+      const validVals   = vals.filter(v => !isNaN(v));
+      const validMedHel = medHels.filter(v => !isNaN(v));
+      const avg    = validVals.length   ? validVals.reduce((a,b)=>a+b,0)/validVals.length : NaN;
+      const avgMH  = validMedHel.length ? validMedHel.reduce((a,b)=>a+b,0)/validMedHel.length : NaN;
+
+      // Team benchmark per day (same shop, excluding ARCH)
+      const teamByDay = new Map();
+      State.raw.t3.filter(r => shopEq(r.shop, selShop) && inRange(r.dkey, from, to) && !/arch/i.test(r.empleado))
+        .forEach(r => {
+          if (!teamByDay.has(r.dkey)) teamByDay.set(r.dkey, {sg:0,tix:0,mhSum:0,mhTix:0});
+          const td = teamByDay.get(r.dkey);
+          if (!isNaN(r.sugerencias)) td.sg  += r.sugerencias;
+          if (!isNaN(r.tickets))     td.tix += r.tickets;
+          if (!isNaN(r.medHel) && !isNaN(r.tickets) && r.tickets>0){ td.mhSum+=r.medHel*r.tickets; td.mhTix+=r.tickets; }
+        });
+      const teamSugAll  = [...teamByDay.values()];
+      const teamSugFlat = (() => { const sg=teamSugAll.reduce((a,t)=>a+t.sg,0), tix=teamSugAll.reduce((a,t)=>a+t.tix,0); return tix>0?(sg/tix)*100:NaN; })();
+      const teamMhFlat  = (() => { const ms=teamSugAll.reduce((a,t)=>a+t.mhSum,0), mt=teamSugAll.reduce((a,t)=>a+t.mhTix,0); return mt>0?ms/mt:NaN; })();
+
+      // Store for download
+      State.empTrendExport = days.map((d,i) => ({
+        fecha: dateLabel(d),
+        tienda: selShop,
+        tickets: tixByDay[i]||0,
+        sugerencias: sgByDay[i]||0,
+        pct: isNaN(vals[i]) ? '' : +vals[i].toFixed(2),
+        medHel: isNaN(medHels[i]) ? '' : +medHels[i].toFixed(2)
+      }));
+
+      const toggleBtns = (prefix, labels) => labels.map(([key,color,label]) => `
+        <button data-empline="${prefix}_${key}" onclick="toggleEmpLine('${prefix}_${key}')"
+          style="font-size:10px;padding:3px 10px;border:1.5px solid ${color};border-radius:20px;
+          background:${color};color:#fff;cursor:pointer;font-family:'Inter',sans-serif;font-weight:600;
+          opacity:${empLineVis[prefix+'_'+key]?1:0.35};">${label}</button>`).join('');
+
+      const vis = key => `id="emp-line-${key}" style="${empLineVis[key]?'':'display:none'}"`;
+
+      if (validVals.length >= 1){
+        const W=700, H=200, padL=38, padR=14, padT=14, padB=36;
+        const innerW=W-padL-padR, innerH=H-padT-padB;
+        const max=Math.max(...validVals, 25);
+        const stepX = days.length>1 ? innerW/(days.length-1) : 0;
+        const toY = v => isNaN(v)?null:padT+innerH-(v/max)*innerH;
+        const pts = vals.map((v,i)=>[padL+i*stepX, toY(v)]);
+        const path = pts.map((p,i)=>p[1]===null?'':(i===0||pts[i-1][1]===null?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+        const labelEvery = days.length<=10?1:Math.ceil(days.length/10);
+        const refY = toY(25);
+        const avgY = !isNaN(avg) ? toY(avg) : null;
+        const teamY = !isNaN(teamSugFlat) ? toY(teamSugFlat) : null;
+        const dots = pts.map((p,i)=>p[1]===null?'':`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3.5"
+          fill="${vals[i]>=25?'#4D7A3F':'#C84B5E'}" stroke="#fff" stroke-width="1.5">
+          <title>${dateLabel(days[i])}: ${fmtPct(vals[i])} (${sgByDay[i]} sg / ${tixByDay[i]} tix)</title></circle>`).join('');
+        const xLabels = pts.map((p,i)=>(i%labelEvery===0||i===pts.length-1)?
+          `<text x="${p[0].toFixed(1)}" y="${H-8}" font-size="9" fill="#766955" text-anchor="middle">${dateLabel(days[i]).slice(0,5)}</text>`:''
+        ).join('');
+        const yTicks = [0,10,20,30,40,50].filter(v=>v<=max+5);
+        const yAxisLabels = yTicks.map(v=>{const y=toY(v);if(y===null)return '';
+          return `<line x1="${padL-4}" y1="${y.toFixed(1)}" x2="${padL}" y2="${y.toFixed(1)}" stroke="#ccc" stroke-width="1"/>
+          <line x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}" stroke="#f0e8d8" stroke-width="0.5"/>
+          <text x="${padL-6}" y="${(y+3).toFixed(1)}" font-size="9" fill="#999" text-anchor="end">${v}%</text>`;
+        }).join('');
+
+        trendHtml = `<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line);">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+            <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);">
+              ${esc(selName)} · ${esc(selShop.replace('Amorino ',''))} · ${validVals.length} días · media ${fmtPct(avg)}
+            </div>
+            <button onclick="downloadEmpTrend()"
+              style="font-size:12px;font-weight:600;color:var(--cocoa);background:var(--cream-2);
+              border:1px solid var(--line);border-radius:8px;padding:5px 12px;cursor:pointer;">⬇ Excel</button>
+          </div>
+          <div style="font-size:10px;color:var(--ink-soft);margin-bottom:8px;">Un punto = un día de trabajo · sugerencias ÷ tickets de ese día</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+            ${toggleBtns('sug',[['red','#C84B5E','25% umbral'],['blue','#5E6FA3','media trabajador'],['green','#4D7A3F','equipo (sin Arch)']])}
+          </div>
+          <svg viewBox="0 0 ${W} ${H}" style="width:100%;overflow:visible;">
+            ${yAxisLabels}
+            <g ${vis('sug_red')}>${refY!==null?`<line x1="${padL}" y1="${refY.toFixed(1)}" x2="${W-padR}" y2="${refY.toFixed(1)}" stroke="#C84B5E" stroke-width="1.5" stroke-dasharray="6 3"/>
+              <text x="${W-padR-2}" y="${(refY-4).toFixed(1)}" font-size="9" fill="#C84B5E" text-anchor="end">25%</text>`:''}</g>
+            <g ${vis('sug_blue')}>${avgY!==null?`<line x1="${padL}" y1="${avgY.toFixed(1)}" x2="${W-padR}" y2="${avgY.toFixed(1)}" stroke="#5E6FA3" stroke-width="1" stroke-dasharray="3 3" opacity="0.8"/>
+              <text x="${padL+4}" y="${(avgY-4).toFixed(1)}" font-size="9" fill="#5E6FA3">media del trabajador</text>`:''}</g>
+            <g ${vis('sug_green')}>${teamY!==null?`<line x1="${padL}" y1="${teamY.toFixed(1)}" x2="${W-padR}" y2="${teamY.toFixed(1)}" stroke="#4D7A3F" stroke-width="1.5" stroke-dasharray="4 2" opacity="0.85"/>
+              <text x="${padL+4}" y="${(teamY+10).toFixed(1)}" font-size="9" fill="#4D7A3F">equipo (sin Arch) ${fmtPct(teamSugFlat)}</text>`:''}</g>
+            <path d="${path.trim()}" fill="none" stroke="#5E6FA3" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+            ${dots}${xLabels}
+          </svg>
+          ${(() => {
+            if (validMedHel.length < 1) return '';
+            const MH_THRESH = 5.10;
+            const mhMax = Math.max(...validMedHel, MH_THRESH+0.5);
+            const mhMin = Math.max(0, Math.min(...validMedHel, MH_THRESH)-0.5);
+            const mhRange = mhMax-mhMin||1;
+            const mhToY = v => isNaN(v)?null:padT+innerH-((v-mhMin)/mhRange)*innerH;
+            const mhPts = medHels.map((v,i)=>[padL+i*stepX, mhToY(v)]);
+            const mhPath = mhPts.map((p,i)=>p[1]===null?'':(i===0||mhPts[i-1][1]===null?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+            const thrY = mhToY(MH_THRESH);
+            const avgMhY = mhToY(avgMH);
+            const teamMhY = !isNaN(teamMhFlat) ? mhToY(teamMhFlat) : null;
+            const mhTicks = [...new Set([mhMin, MH_THRESH, mhMax].map(v=>+v.toFixed(2)))];
+            const mhYAxis = mhTicks.map(v=>{const y=mhToY(v);if(y===null)return '';
+              return `<line x1="${padL-4}" y1="${y.toFixed(1)}" x2="${padL}" y2="${y.toFixed(1)}" stroke="#ccc" stroke-width="1"/>
+              <line x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}" stroke="#f0e8d8" stroke-width="0.5"/>
+              <text x="${padL-6}" y="${(y+3).toFixed(1)}" font-size="9" fill="#999" text-anchor="end">${v.toFixed(2)}€</text>`;
+            }).join('');
+            const mhDots = mhPts.map((p,i)=>p[1]===null?'':`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3.5"
+              fill="${medHels[i]>=MH_THRESH?'#4D7A3F':'#C84B5E'}" stroke="#fff" stroke-width="1.5">
+              <title>${dateLabel(days[i])}: ${fmtEUR(medHels[i])}</title></circle>`).join('');
+            return `<div style="margin-top:14px;font-size:10px;color:var(--ink-soft);margin-bottom:4px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;">
+              Media de helado · media ${fmtEUR(avgMH)}
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+              ${toggleBtns('mh',[['red','#C84B5E','5,10€ umbral'],['blue','#8FA871','media trabajador'],['green','#4D7A3F','equipo (sin Arch)']])}
+            </div>
+            <svg viewBox="0 0 ${W} ${H}" style="width:100%;overflow:visible;">
+              ${mhYAxis}
+              <g ${vis('mh_red')}>${thrY!==null?`<line x1="${padL}" y1="${thrY.toFixed(1)}" x2="${W-padR}" y2="${thrY.toFixed(1)}" stroke="#C84B5E" stroke-width="1.5" stroke-dasharray="6 3"/>
+                <text x="${W-padR-2}" y="${(thrY-4).toFixed(1)}" font-size="9" fill="#C84B5E" text-anchor="end">5,10 €</text>`:''}</g>
+              <g ${vis('mh_blue')}>${avgMhY!==null?`<line x1="${padL}" y1="${avgMhY.toFixed(1)}" x2="${W-padR}" y2="${avgMhY.toFixed(1)}" stroke="#8FA871" stroke-width="1" stroke-dasharray="3 3" opacity="0.8"/>
+                <text x="${padL+4}" y="${(avgMhY-4).toFixed(1)}" font-size="9" fill="#8FA871">media del trabajador</text>`:''}</g>
+              <g ${vis('mh_green')}>${teamMhY!==null?`<line x1="${padL}" y1="${teamMhY.toFixed(1)}" x2="${W-padR}" y2="${teamMhY.toFixed(1)}" stroke="#4D7A3F" stroke-width="1.5" stroke-dasharray="4 2" opacity="0.85"/>
+                <text x="${padL+4}" y="${(teamMhY+10).toFixed(1)}" font-size="9" fill="#4D7A3F">equipo (sin Arch) ${fmtEUR(teamMhFlat)}</text>`:''}</g>
+              <path d="${mhPath.trim()}" fill="none" stroke="#8FA871" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+              ${mhDots}${xLabels}
+            </svg>`;
+          })()}
+        </div>`;
+      } else {
+        trendHtml = `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line);font-size:12px;color:var(--ink-soft);">Sin datos suficientes para mostrar la trayectoria.</div>`;
+      }
+    }
+  }
+
+  return `<div class="card">
+    <h3>Rendimiento del equipo</h3>
+    <div class="hint">${shop==='all'?'Todas las tiendas':esc(shop)} · ${rangeLabel(from,to)} · ${sorted.length} persona${sorted.length!==1?'s':''}</div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px;">
+      <select class="sort-select" id="empSortSelect" style="margin-bottom:0;">
+        <option value="tickets"       ${empSortKey==='tickets'?'selected':''}>Ordenar por Nº de tickets</option>
+        <option value="ticketMedio"   ${empSortKey==='ticketMedio'?'selected':''}>Ordenar por ticket medio</option>
+        <option value="medHel"        ${empSortKey==='medHel'?'selected':''}>Ordenar por media helado</option>
+        <option value="sugerenciasPct"${empSortKey==='sugerenciasPct'?'selected':''}>Ordenar por % sugerencias</option>
+      </select>
+      <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:160px;">
+        <input id="empSearchInput" placeholder="Buscar empleado…" value="${esc(empSearchText)}"
+          style="font-family:'Inter',sans-serif;font-size:13px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:var(--white);color:var(--ink);flex:1;">
+        ${empSearchText ? `<button onclick="empSearch='';empSearchText='';renderAll();" style="font-size:11px;border:none;background:none;cursor:pointer;color:var(--ink-soft);">✕</button>` : ''}
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+    <table>
+      <thead><tr>
+        <th>Empleado${showShop?' / Tienda':''}</th>
+        ${isRange?'<th class="num">Días</th>':''}
+        <th class="num">Tickets</th>
+        <th class="num">Ticket medio</th>
+        <th class="num">Med. Hel.</th>
+        <th class="num">% Sug.</th>
+      </tr></thead>
+      <tbody>
+        ${filtered.map(r => {
+          const sugClass = isNaN(r.sugerenciasPct)?'':(r.sugerenciasPct>=25?'cell-good':'cell-bad');
+          const helClass = isNaN(r.medHel)?'':(r.medHel>=5.20?'cell-good':'cell-bad');
+          const key = empKey(r.shop, r.empleado);
+          const isSelected = key === empSearch;
+          return `<tr style="${isSelected?'background:rgba(94,111,163,0.08);':''}" onclick="empSearch='${esc(key)}';renderAll();" class="emp-row">
+            <td><div class="emp-name">${esc(r.empleado)}</div>${showShop?`<div class="shop-tag">${esc(r.shop.replace('Amorino ',''))}</div>`:''}</td>
+            ${isRange?`<td class="num">${fmtInt(r.dias)}</td>`:''}
+            <td class="num">${fmtInt(r.tickets)}</td>
+            <td class="num">${fmtEUR(r.ticketMedio)}</td>
+            <td class="num ${helClass}">${isNaN(r.medHel)?'—':fmtNum(r.medHel,2)+' €'}</td>
+            <td class="num ${sugClass}">${fmtPct(r.sugerenciasPct)}</td>
+          </tr>`;}).join('')}
+      </tbody>
+    </table>
+    </div>
+    ${trendHtml}
+  </div>`;
+}
+function downloadEmpTrend(){
+  if (!State.empTrendExport || !State.empTrendExport.length || typeof XLSX === 'undefined') return;
+  const rows = [['Fecha','Tienda','Tickets del día','Sugerencias del día','% Sugerencias del día','Media Helado (€)del día']]
+    .concat(State.empTrendExport.map(r => [r.fecha, r.tienda, r.tickets, r.sugerencias, r.pct, r.medHel]));
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb, ws, 'Sugerencias');
+  const emp = empSearch ? empKeyName(empSearch).replace(/[^a-zA-Z0-9]/g,'_') : 'empleado';
+  XLSX.writeFile(wb, `${emp}_sugerencias_diarias.xlsx`);
+}
+
+const empLineVis = {sug_red:true, sug_blue:true, sug_green:true, mh_red:true, mh_blue:true, mh_green:true};
+function toggleEmpLine(key){
+  empLineVis[key] = !empLineVis[key];
+  const el = document.getElementById('emp-line-'+key);
+  if (el) el.style.display = empLineVis[key] ? '' : 'none';
+  const btn = document.querySelector(`button[data-empline="${key}"]`);
+  if (btn) btn.style.opacity = empLineVis[key] ? '1' : '0.35';
+}
+
+function attachSortHandler(){
+  const el = document.getElementById('empSortSelect');
+  if (el) el.addEventListener('change', e => { empSortKey = e.target.value; renderAll(); });
+  const si = document.getElementById('empSearchInput');
+  if (si){
+    // Live filter as user types
+    si.addEventListener('input', e => {
+      empSearchText = e.target.value.trim();
+      // Clear trend if search text changed
+      if (empSearch && empKeyName(empSearch).toLowerCase() !== empSearchText.toLowerCase()) empSearch = '';
+      renderAll();
+      // Restore focus and cursor position
+      const inp = document.getElementById('empSearchInput');
+      if (inp){ inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+    });
+  }
+}
+
+function attachEvalHandlers(){
+  // Per-shop productivity inputs
+  document.querySelectorAll('.prod-shop-input').forEach(inp => {
+    inp.addEventListener('change', e => {
+      const v = parseFloat(e.target.value);
+      const shopFull = e.target.dataset.shop;
+      if (!isNaN(v) && v > 0 && shopFull) {
+        State.productividadByShop[shopFull] = v;
+        refreshEval();
+      }
+    });
+  });
+  // Hourly cost inputs (costeBruto + seguridadSocial)
+  const radSel = document.getElementById('radOverrideSelect');
+  if (radSel) radSel.addEventListener('change', e => {
+    State.radOverride = e.target.value || null;
+    if (State.radOverride && State.radiografia[State.radOverride] === undefined){
+      fetchRadiografiaIfNeeded(State.from); // triggers load of override tab
+      State.radiografia[State.radOverride] = null; // mark as loading
+      loadViaJSONP_2(RADIOGRAFIAS_SHEET_ID, State.radOverride)
+        .then(json => {
+          State.radiografia[State.radOverride] = parseRadiografiaRows(gvizJsonToRows(json));
+          refreshEval();
+        }).catch(() => { State.radiografia[State.radOverride] = null; });
+    } else {
+      refreshEval();
+    }
+  });
+  const costeBrutoEl = document.getElementById('costeBrutoInput');
+  if (costeBrutoEl) costeBrutoEl.addEventListener('change', e => {
+    const v = parseFloat(e.target.value);
+    if (!isNaN(v) && v > 0) { State.costeBruto = v; refreshEval(); }
+  });
+  const ssEl = document.getElementById('ssInput');
+  if (ssEl) ssEl.addEventListener('change', e => {
+    const v = parseFloat(e.target.value);
+    if (!isNaN(v) && v >= 0) { State.seguridadSocial = v; refreshEval(); }
+  });
+}
+function refreshEval(){
+  // Single-day mode
+  const sec = document.getElementById('evalTurnoSection');
+  if (sec) { sec.innerHTML = buildEvalTurnoHTML(State.shop, State.from); attachEvalHandlers(); return; }
+  // Multi-day mode: refresh all day blocks
+  document.querySelectorAll('[id^="evalDay-"]').forEach(el => {
+    const dd = el.id.replace('evalDay-','');
+    el.innerHTML = buildEvalDayContent(State.shop, dd);
+  });
+  // Refresh global controls cost display
+  const ctrl = document.getElementById('costeBrutoInput');
+  if (ctrl) ctrl.closest('.eval-global-controls').querySelector('.prod-control:last-of-type').textContent =
+    `→ Total: ${fmtNum(State.costeBruto*(1+State.seguridadSocial/100),2)} €/h`;
+  attachEvalHandlers();
+}
+
+/* ---- Flavors ---- */
+function renderFlavorsCard(shop, from, to){
+  if (!from || !to) return `<div class="card"><div class="empty-note">Sin fechas seleccionadas</div></div>`;
+  const rows = State.raw.t5.filter(r => inRange(r.dkey, from, to) && (shop === 'all' || shopEq(r.shop, shop)) && r.sabor);
+  if (!rows.length) return `<div class="card"><h3>Sabores más vendidos</h3><div class="empty-note">Sin datos para esta selección</div></div>`;
+  const map = new Map();
+  rows.forEach(r => map.set(r.sabor, (map.get(r.sabor)||0) + (isNaN(r.unidades)?0:r.unidades)));
+  const top = Array.from(map.entries()).sort((a,b) => b[1]-a[1]).slice(0,10);
+  const max = Math.max(...top.map(t => t[1]), 1);
+  return `<div class="card">
+    <h3>Sabores más vendidos</h3>
+    <div class="hint">${shop==='all'?'Todas las tiendas':esc(shop)} · ${rangeLabel(from,to)}</div>
+    <div class="rank-list">
+      ${top.map((t,i) => `
+        <div class="rank-row">
+          <div class="rank-num">${i+1}</div>
+          <div class="rank-item">
+            <div class="rank-name">${esc(t[0])}</div>
+            <div class="rank-bar-wrap"><div class="rank-bar" style="width:${(t[1]/max)*100}%"></div></div>
+          </div>
+          <div class="rank-val">${fmtInt(t[1])} ud.</div>
+        </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+/* ---- Ultimos ---- */
+function latestUltRow(shop, from, to){
+  const candidates = State.raw.ult.filter(r => shopEq(r.shop, shop) && inRange(r.dkey, from, to));
+  if (!candidates.length) return null;
+  return candidates.reduce((best, r) => (!best || r.dkey > best.dkey) ? r : best, null);
+}
+function renderUltimosCard(shop, from, to){
+  if (!from || !to) return `<div class="card"><div class="empty-note">Sin fechas seleccionadas</div></div>`;
+  const isRange = from !== to;
+  if (shop !== 'all'){
+    const row = latestUltRow(shop, from, to);
+    if (!row || !row.tickets.length) return `<div class="card"><div class="empty-note">Sin datos para esta selección</div></div>`;
+    return `<div class="card">
+      <h3>${esc(shop)}</h3>
+      <div class="hint">Horas de los últimos 10 tickets · ${dateLabel(row.dkey)}${isRange?' (fecha más reciente con datos dentro del rango)':''}</div>
+      <div class="tape-list">
+        ${row.tickets.map((t,i) => `<div class="ticket-row ${i===0?'latest':''}"><span class="t-idx">Ticket ${i+1}</span><span>${esc(t)}</span></div>`).join('')}
+      </div>
+    </div>`;
+  }
+  const cards = State.shops.map(s => {
+    const row = latestUltRow(s, from, to);
+    const tickets = row ? row.tickets.slice(0,5) : [];
+    return `<div class="ticket-card">
+      <h4>${esc(s.replace('Amorino ',''))}</h4>
+      ${row ? `<div class="hint" style="margin-bottom:8px;">${dateLabel(row.dkey)}</div>` : ''}
+      ${tickets.length ? tickets.map((t,i) => `<div class="ticket-row ${i===0?'latest':''}"><span class="t-idx">#${i+1}</span><span>${esc(t)}</span></div>`).join('') : '<div class="empty-note" style="padding:10px 0;">Sin datos</div>'}
+    </div>`;
+  }).join('');
+  return `<div class="tickets-grid">${cards}</div>`;
+}
+
+/* ================= INIT ================= */
+document.getElementById('mainTabBar').addEventListener('click', e => {
+  const btn = e.target.closest('.main-tab[data-tab]');
+  if (!btn) return;
+  const tab = btn.dataset.tab;
+  State.activeTab = tab;
+  document.body.classList.toggle('eval-active', tab === 'eval');
+  document.querySelectorAll('.main-tab[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  renderAll();
+});
+
+loadData();
+setInterval(() => { if (!State.loading) loadData(); }, AUTO_REFRESH_MS);
+</script>
+</body>
+</html>
