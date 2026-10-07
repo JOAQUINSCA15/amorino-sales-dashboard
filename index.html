@@ -1816,7 +1816,7 @@ function buildWeatherKPIsHTML(from, to){
 /* ================= COMBO PLANIFICACIÓN ================= */
 // Sheet ID de la hoja "Amorino Operaciones" (tab Combo_Planning, gid 0)
 // Cámbialo por el ID real una vez crees la hoja y ejecutes el Apps Script.
-const COMBO_SHEET_ID = 'PENDIENTE_SHEET_ID';
+const COMBO_SHEET_ID = '14kP6Fyxb9IRdg47vxHSOtDjZ7r8n5gkdZ0e2TwYbDc8';
 
 const COMBO_SHOP_ORDER = [
   'Amorino Avenida',
@@ -1843,9 +1843,11 @@ async function loadComboIfNeeded(){
       const tienda = String(get(ci.tienda)).trim();
       const fecha  = String(get(ci.fecha)).trim();
       const dia    = String(get(ci.dia)).trim();
-      const horas  = parseFloat(get(ci.horas)) || 0;
-      const turnos = parseInt(get(ci.turnos))  || 0;
-      const emps   = parseInt(get(ci.empleados)) || 0;
+      const horas  = parseFloat(String(get(ci.horas)).replace(',','.')) || 0;
+      const turnos   = parseInt(get(ci.turnos))  || 0;
+      const empNames = String(get(ci.empleados)).trim();
+      // empleados column holds a comma-separated list of names; count non-empty entries
+      const emps = empNames ? empNames.split(',').filter(n => n.trim()).length : 0;
       const semana = String(get(ci.semana)).trim();
       if (!tienda || tienda === 'Tienda') continue;
       rows.push({ tienda, fecha, dia, horas, turnos, emps, semana });
