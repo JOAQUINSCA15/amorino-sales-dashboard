@@ -464,13 +464,19 @@
 
 <script>
 (function(){
-  const HASH = '6b709c197ec64ebfab482d5d0bc89cb24fa97866d671e62b4906b289920121ae';
   const KEY = 'am_auth';
   async function checkPw(){
     const val = document.getElementById('pwInput').value;
-    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(val));
-    const hash = Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
-    if (hash === HASH){
+    let ok = false;
+    // Prefer subtle crypto (HTTPS); fall back to btoa for local file:// testing
+    if (window.crypto && crypto.subtle) {
+      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(val));
+      const hash = Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+      ok = (hash === '1114d15b41488a52a8d1c7c9c2b4529269ae41b78aecbbe6b3a9e9252ced609e');
+    } else {
+      ok = (btoa(unescape(encodeURIComponent(val))) === btoa(unescape(encodeURIComponent('AmorinoSevilla2026'))));
+    }
+    if (ok){
       sessionStorage.setItem(KEY, '1');
       document.getElementById('loginScreen').style.display = 'none';
       const app = document.getElementById('app');
