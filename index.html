@@ -1875,9 +1875,14 @@ function comboStaffAt(rows, fecha, tienda, slotStart, slotEnd){
   };
   return rows.filter(r => {
     if (r.fecha !== fecha || r.tienda !== tienda) return false;
-    const s = timeToMins(r.inicio), e = timeToMins(r.fin);
+    const s = timeToMins(r.inicio);
+    let e = timeToMins(r.fin);
     if (isNaN(s)||isNaN(e)) return false;
-    return s < slotEnd && e > slotStart;
+    // Si fin ≤ inicio, el turno cruza medianoche → sumar 24h al fin
+    if (e <= s) e += 1440;
+    // Si el slot es nocturno (slotEnd > 1440), normalizar también
+    const sEff = s, eEff = e;
+    return sEff < slotEnd && eEff > slotStart;
   }).length;
 }
 
