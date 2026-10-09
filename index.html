@@ -1949,6 +1949,8 @@ function buildComboHTML(){
 
   // --- Toggle: show sales from same weekday, previous week ---
   const showVentas = State.comboShowVentas || false;
+  if (!State.comboHiddenShops) State.comboHiddenShops = new Set();
+  const visibleShops = COMBO_SHOP_ORDER.filter(s => !State.comboHiddenShops.has(s));
   const prevFecha = (() => {
     const d = new Date(selFecha + 'T12:00:00Z');
     d.setUTCDate(d.getUTCDate() - 7);
@@ -2018,22 +2020,22 @@ function buildComboHTML(){
   const ventasHdrS = hdrS + 'color:var(--mango);font-size:10px;';
   let thead = `<tr>
     <th style="${hdrS}text-align:left;min-width:70px;">Franja</th>
-    ${COMBO_SHOP_ORDER.map(s => {
+    ${visibleShops.map(s => {
       const shopName = s.replace('Amorino ','');
       return `<th style="${hdrS}" colspan="${showVentas ? 2 : 1}">${shopName}</th>`;
     }).join('')}
   </tr>` + (showVentas ? `<tr>
     <th style="${hdrS}text-align:left;color:transparent;font-size:10px;">·</th>
-    ${COMBO_SHOP_ORDER.map(() => `
+    ${visibleShops.map(() => `
       <th style="${hdrS}font-size:10px;padding-top:2px;padding-bottom:5px;">personal</th>
       <th style="${ventasHdrS}padding-top:2px;padding-bottom:5px;">€ sem. ant.</th>
     `).join('')}
   </tr>` : '');
 
   // Per-shop error counters
-  const shopOver  = {};  // slots where actual > target
-  const shopUnder = {};  // slots where actual < target
-  for (const s of COMBO_SHOP_ORDER){ shopOver[s]=0; shopUnder[s]=0; }
+  const shopOver  = {};
+  const shopUnder = {};
+  for (const s of visibleShops){ shopOver[s]=0; shopUnder[s]=0; }
 
   let tbody = '';
   for (const slot of slots){
@@ -2042,7 +2044,7 @@ function buildComboHTML(){
     const rowBg = isCurrent ? 'background:rgba(143,168,113,0.12);' : '';
 
     let cells = '';
-    for (const shop of COMBO_SHOP_ORDER){
+    for (const shop of visibleShops){
       const radKey  = COMBO_TO_RAD_KEY[shop];
       const target  = radData && radKey ? (() => {
         const shopSlots = (radData[radKey]||{})[jsDay] || [];
@@ -2100,11 +2102,26 @@ function buildComboHTML(){
     ${showVentas ? '✕ Ocultar ventas' : '€ Ver ventas ' + ventasFecha}
   </button>`;
 
+  const shopChips = COMBO_SHOP_ORDER.map(s => {
+    const hidden = State.comboHiddenShops.has(s);
+    const label  = s.replace('Amorino ','');
+    return `<button onclick="if(State.comboHiddenShops.has('${s}'))State.comboHiddenShops.delete('${s}');else State.comboHiddenShops.add('${s}');document.getElementById('comboSection').innerHTML=buildComboHTML();"
+      style="font-size:12px;font-weight:600;padding:5px 12px;border-radius:20px;cursor:pointer;
+      border:1px solid ${hidden?'var(--line)':'var(--ink-soft)'};
+      background:${hidden?'var(--surface)':'var(--ink)'};
+      color:${hidden?'var(--ink-soft)':'var(--white)'};
+      opacity:${hidden?'0.5':'1'};">${label}</button>`;
+  }).join('');
+
   return `
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
       ${dateSelect}
       ${ventasToggleBtn}
       <span style="font-size:12px;color:var(--ink-soft);">Planificado <strong style="color:var(--ink);">vs.</strong> Radiografía · número real / objetivo por franja horaria</span>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+      <span style="font-size:11px;color:var(--ink-soft);margin-right:2px;">Tiendas:</span>
+      ${shopChips}
     </div>
     ${showVentas ? `<div style="font-size:12px;color:var(--mango);background:rgba(230,150,50,0.08);border:1px solid rgba(230,150,50,0.25);border-radius:8px;padding:8px 14px;margin-bottom:14px;">
       📊 Mostrando ventas del <strong>${ventasFecha}</strong> — mismo día de la semana anterior al seleccionado. Las columnas <em>€ sem. ant.</em> reflejan la venta real de cada franja en ese día, directamente desde Table1.
@@ -2117,7 +2134,7 @@ function buildComboHTML(){
       </table>
     </div>
     <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap;">
-      ${COMBO_SHOP_ORDER.map(s => {
+      ${visibleShops.map(s => {
         const o = shopOver[s]||0, u = shopUnder[s]||0;
         return `<div style="font-size:11px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 12px;line-height:1.6;">
           <div style="font-weight:700;color:var(--ink);margin-bottom:2px;">${s.replace('Amorino ','')}</div>
