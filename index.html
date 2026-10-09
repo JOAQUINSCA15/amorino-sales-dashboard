@@ -1982,6 +1982,11 @@ function buildComboHTML(){
     ${COMBO_SHOP_ORDER.map(s=>`<th style="${hdrS}">${s.replace('Amorino ','')}</th>`).join('')}
   </tr>`;
 
+  // Per-shop error counters
+  const shopOver  = {};  // slots where actual > target
+  const shopUnder = {};  // slots where actual < target
+  for (const s of COMBO_SHOP_ORDER){ shopOver[s]=0; shopUnder[s]=0; }
+
   let tbody = '';
   for (const slot of slots){
     const sm = slotToMins(slot); if (!sm) continue;
@@ -2008,6 +2013,8 @@ function buildComboHTML(){
         cellContent = `<span style="color:var(--line);">—</span>`;
       } else {
         const diff = actual - target;
+        if (diff > 0) shopOver[shop]++;
+        if (diff < 0) shopUnder[shop]++;
         const bg   = diff === 0 ? 'rgba(143,168,113,0.15)' : diff > 0 ? 'rgba(230,150,50,0.13)' : 'rgba(200,75,94,0.12)';
         const col  = diff === 0 ? 'var(--pistachio)' : diff > 0 ? 'var(--mango)' : 'var(--raspberry)';
         const sign = diff > 0 ? `+${diff}` : diff === 0 ? '✓' : `${diff}`;
@@ -2041,10 +2048,20 @@ function buildComboHTML(){
         <tbody>${tbody}</tbody>
       </table>
     </div>
-    <div style="display:flex;gap:20px;margin-top:14px;font-size:12px;color:var(--ink-soft);">
-      <span><span style="color:var(--pistachio);font-weight:700;">3 ✓</span> = cumple exactamente</span>
-      <span><span style="color:var(--mango);font-weight:700;">4 +1</span> = supera objetivo</span>
-      <span><span style="color:var(--raspberry);font-weight:700;">2 −1</span> = falta personal</span>
+    <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap;">
+      ${COMBO_SHOP_ORDER.map(s => {
+        const o = shopOver[s]||0, u = shopUnder[s]||0;
+        return `<div style="font-size:11px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 12px;line-height:1.6;">
+          <div style="font-weight:700;color:var(--ink);margin-bottom:2px;">${s.replace('Amorino ','')}</div>
+          <span style="color:var(--mango);">▲ ${o} franja${o!==1?'s':''} por encima</span><br>
+          <span style="color:var(--raspberry);">▼ ${u} franja${u!==1?'s':''} por debajo</span>
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="display:flex;gap:20px;margin-top:12px;font-size:12px;color:var(--ink-soft);">
+      <span><span style="color:var(--pistachio);font-weight:700;">✓</span> = cumple exactamente</span>
+      <span><span style="color:var(--mango);font-weight:700;">+1</span> = supera objetivo</span>
+      <span><span style="color:var(--raspberry);font-weight:700;">−1</span> = falta personal</span>
     </div>`;
 }
 
