@@ -1832,6 +1832,12 @@ const COMBO_TO_RAD_KEY = {
 };
 const COMBO_SHOP_ORDER = ['Amorino Catedral','Amorino Avenida','Amorino Alcázar','Amorino Plaza Nueva','Amorino Naranjos'];
 // Etiquetas que NO cuentan como turno de tienda (comparación uppercase, sin tildes)
+// Empleados que NO cuentan como turno de tienda (comparación uppercase, sin tildes)
+const COMBO_EXCLUDED_EMPLOYEES = ['RUSLAN DOMBRAUSKAS', 'DIMITRO VOLK'];
+const COMBO_EXCLUDED_EMP_NORM  = COMBO_EXCLUDED_EMPLOYEES.map(s => s.toUpperCase()
+  .replace(/[ÁÀÄÂ]/g,'A').replace(/[ÉÈËÊ]/g,'E').replace(/[ÍÌÏÎ]/g,'I')
+  .replace(/[ÓÒÖÔ]/g,'O').replace(/[ÚÙÜÛ]/g,'U').replace(/Ñ/g,'N').trim());
+
 const COMBO_EXCLUDED_LABELS = [
   'CAMIÓN','CAMION',
   'FORMACIÓN','FORMACION',
@@ -1896,6 +1902,7 @@ function comboStaffAt(rows, fecha, tienda, slotStart, slotEnd){
   return rows.filter(r => {
     if (r.fecha !== fecha || r.tienda !== tienda) return false;
     if (COMBO_EXCLUDED_NORM.includes(normalizeLabel(r.etiqueta))) return false;
+    if (COMBO_EXCLUDED_EMP_NORM.includes(normalizeLabel(r.empleado))) return false;
     const s = timeToMins(r.inicio);
     let e = timeToMins(r.fin);
     if (isNaN(s)||isNaN(e)) return false;
