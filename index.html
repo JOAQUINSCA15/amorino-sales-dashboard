@@ -1954,14 +1954,23 @@ function buildComboHTML(){
     d.setUTCDate(d.getUTCDate() - 7);
     return d.toISOString().slice(0,10);
   })();
-  // Build ventas lookup: {shop_normalized}|{horario} → ventas
-  const ventasMap = {};
-  if (showVentas && State.raw && State.raw.t1){
-    for (const r of State.raw.t1){
-      if (r.dkey !== prevFecha) continue;
-      const k = (r.shop||'').trim().toUpperCase() + '|' + (r.horario||'').trim();
-      ventasMap[k] = (r.ventas || 0);
-    }
+  // Build ventas lookup: rows from prevFecha in t1
+  const ventasRows = (showVentas && State.raw && State.raw.t1)
+    ? State.raw.t1.filter(r => r.dkey === prevFecha)
+    : [];
+
+  // Lookup ventas for a given shop (full Combo name) and slot (minutes)
+  function getVentasForSlot(shop, slotMins){
+    const radKey = COMBO_TO_RAD_KEY[shop] || '';
+    // Match t1 shop by rad key (e.g. "CATEDRAL" ↔ r.shop="Catedral" or "Amorino Catedral")
+    const shopNorm = normalizeLabel(radKey);
+    return ventasRows.filter(r => {
+      const rShopNorm = normalizeLabel(r.shop);
+      if (!rShopNorm.includes(shopNorm) && !shopNorm.includes(rShopNorm)) return false;
+      const h = slotToMins(r.horario);
+      if (!h) return false;
+      return h.start < slotMins.end && h.end > slotMins.start;
+    }).reduce((sum, r) => sum + (isNaN(r.ventas) ? 0 : r.ventas), 0);
   }
   const ventasFecha = (() => {
     const [y,mo,d] = prevFecha.split('-');
@@ -2063,19 +2072,12 @@ function buildComboHTML(){
       cells += `<td style="${cellStyle}">${cellContent}</td>`;
 
       if (showVentas){
-        // Find ventas for this shop + slot from previous same-weekday
-        const radKey = COMBO_TO_RAD_KEY[shop] || '';
-        const shopNorm = radKey.toUpperCase(); // e.g. 'CATEDRAL'
-        // Match horario: t1 horario format may be "10:00-11:00" or "10h-11h" — try both
-        const slotNorm = slot.trim();
-        const slotAlt  = slot.replace(/:00/g,'h').replace(/-/,'-');
-        const vKey1 = shopNorm + '|' + slotNorm;
-        const vKey2 = shopNorm + '|' + slotAlt;
-        const venta = ventasMap[vKey1] ?? ventasMap[vKey2] ?? null;
-        const ventaStr = venta !== null
-          ? (venta >= 1000 ? (venta/1000).toFixed(1)+'k' : Math.round(venta)+'€')
+        const venta = getVentasForSlot(shop, sm);
+        const hasData = ventasRows.length > 0 && venta > 0;
+        const ventaStr = hasData
+          ? (venta >= 1000 ? (venta/1000).toFixed(1)+'k€' : Math.round(venta)+'€')
           : '—';
-        const ventaCol = venta !== null ? 'var(--mango)' : 'var(--line)';
+        const ventaCol = hasData ? 'var(--mango)' : 'var(--line)';
         cells += `<td style="${cellS}font-size:11px;color:${ventaCol};">${ventaStr}</td>`;
       }
     }
