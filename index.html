@@ -1831,6 +1831,25 @@ const COMBO_TO_RAD_KEY = {
   'Amorino Catedral':   'CATEDRAL',
 };
 const COMBO_SHOP_ORDER = ['Amorino Catedral','Amorino Avenida','Amorino Alcázar','Amorino Plaza Nueva','Amorino Naranjos'];
+// Etiquetas que NO cuentan como turno de tienda (comparación uppercase, sin tildes)
+const COMBO_EXCLUDED_LABELS = [
+  'CAMIÓN','CAMION',
+  'FORMACIÓN','FORMACION',
+  'INVENTARIO',
+  'ORGANIZAR -20 Y CONTAR','ORGANIZAR -20 Y CONTAR','ORGANIZAR/CONTAR -20','ORGANIZAR/CONTAR-20',
+  'FECHAR',
+  'AUDITORÍA','AUDITORIA',
+  'ORDENAR TDI',
+  'ACADEMY',
+];
+// Normaliza para comparar: mayúsculas + quitar tildes
+function normalizeLabel(s){
+  return String(s||'').toUpperCase()
+    .replace(/[ÁÀÄÂ]/g,'A').replace(/[ÉÈËÊ]/g,'E')
+    .replace(/[ÍÌÏÎ]/g,'I').replace(/[ÓÒÖÔ]/g,'O')
+    .replace(/[ÚÙÜÛ]/g,'U').replace(/Ñ/g,'N').trim();
+}
+const COMBO_EXCLUDED_NORM = COMBO_EXCLUDED_LABELS.map(normalizeLabel);
 
 async function loadComboIfNeeded(){
   if (State.combo._loaded) return;
@@ -1856,8 +1875,9 @@ async function loadComboIfNeeded(){
       const fin     = String(get(3)).trim();
       const empleado= String(get(4)).trim();
       const semana  = String(get(5)).trim();
+      const etiqueta = normalizeLabel(get(6));
       if (!fecha || !inicio) continue;
-      rows.push({ tienda, fecha, inicio, fin, empleado, semana });
+      rows.push({ tienda, fecha, inicio, fin, empleado, semana, etiqueta });
     }
     State.combo = { _loaded: true, rows };
   } catch(e){
@@ -1875,6 +1895,7 @@ function comboStaffAt(rows, fecha, tienda, slotStart, slotEnd){
   };
   return rows.filter(r => {
     if (r.fecha !== fecha || r.tienda !== tienda) return false;
+    if (COMBO_EXCLUDED_NORM.includes(normalizeLabel(r.etiqueta))) return false;
     const s = timeToMins(r.inicio);
     let e = timeToMins(r.fin);
     if (isNaN(s)||isNaN(e)) return false;
