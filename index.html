@@ -1947,6 +1947,28 @@ function buildComboHTML(){
   const todayKey  = `${nowMad.getFullYear()}-${String(nowMad.getMonth()+1).padStart(2,'0')}-${String(nowMad.getDate()).padStart(2,'0')}`;
   const selFecha  = State.comboFecha || (diasDisp.includes(todayKey) ? todayKey : diasDisp[diasDisp.length-1] || todayKey);
 
+  // --- Toggle: show sales from same weekday, previous week ---
+  const showVentas = State.comboShowVentas || false;
+  const prevFecha = (() => {
+    const d = new Date(selFecha + 'T12:00:00Z');
+    d.setUTCDate(d.getUTCDate() - 7);
+    return d.toISOString().slice(0,10);
+  })();
+  // Build ventas lookup: {shop_normalized}|{horario} → ventas
+  const ventasMap = {};
+  if (showVentas && State.raw && State.raw.t1){
+    for (const r of State.raw.t1){
+      if (r.dkey !== prevFecha) continue;
+      const k = (r.shop||'').trim().toUpperCase() + '|' + (r.horario||'').trim();
+      ventasMap[k] = (r.ventas || 0);
+    }
+  }
+  const ventasFecha = (() => {
+    const [y,mo,d] = prevFecha.split('-');
+    const ms=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    return `${parseInt(d)} ${ms[parseInt(mo)-1]}`;
+  })();
+
   // --- Radiografía for that day ---
   const tabName  = getRadiografiaTab(selFecha);
   const radData  = tabName ? (State.radiografia[tabName] || null) : null;
@@ -1984,10 +2006,20 @@ function buildComboHTML(){
   const hdrS  = 'padding:7px 12px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);font-weight:600;text-align:center;white-space:nowrap;border-bottom:2px solid var(--line);';
   const cellS = 'padding:8px 10px;text-align:center;font-size:13px;border-bottom:1px solid var(--line);white-space:nowrap;';
 
+  const ventasHdrS = hdrS + 'color:var(--mango);font-size:10px;';
   let thead = `<tr>
     <th style="${hdrS}text-align:left;min-width:70px;">Franja</th>
-    ${COMBO_SHOP_ORDER.map(s=>`<th style="${hdrS}">${s.replace('Amorino ','')}</th>`).join('')}
-  </tr>`;
+    ${COMBO_SHOP_ORDER.map(s => {
+      const shopName = s.replace('Amorino ','');
+      return `<th style="${hdrS}" colspan="${showVentas ? 2 : 1}">${shopName}</th>`;
+    }).join('')}
+  </tr>` + (showVentas ? `<tr>
+    <th style="${hdrS}text-align:left;color:transparent;font-size:10px;">·</th>
+    ${COMBO_SHOP_ORDER.map(() => `
+      <th style="${hdrS}font-size:10px;padding-top:2px;padding-bottom:5px;">personal</th>
+      <th style="${ventasHdrS}padding-top:2px;padding-bottom:5px;">€ sem. ant.</th>
+    `).join('')}
+  </tr>` : '');
 
   // Per-shop error counters
   const shopOver  = {};  // slots where actual > target
@@ -2029,6 +2061,23 @@ function buildComboHTML(){
         cellStyle += `background:${bg};`;
       }
       cells += `<td style="${cellStyle}">${cellContent}</td>`;
+
+      if (showVentas){
+        // Find ventas for this shop + slot from previous same-weekday
+        const radKey = COMBO_TO_RAD_KEY[shop] || '';
+        const shopNorm = radKey.toUpperCase(); // e.g. 'CATEDRAL'
+        // Match horario: t1 horario format may be "10:00-11:00" or "10h-11h" — try both
+        const slotNorm = slot.trim();
+        const slotAlt  = slot.replace(/:00/g,'h').replace(/-/,'-');
+        const vKey1 = shopNorm + '|' + slotNorm;
+        const vKey2 = shopNorm + '|' + slotAlt;
+        const venta = ventasMap[vKey1] ?? ventasMap[vKey2] ?? null;
+        const ventaStr = venta !== null
+          ? (venta >= 1000 ? (venta/1000).toFixed(1)+'k' : Math.round(venta)+'€')
+          : '—';
+        const ventaCol = venta !== null ? 'var(--mango)' : 'var(--line)';
+        cells += `<td style="${cellS}font-size:11px;color:${ventaCol};">${ventaStr}</td>`;
+      }
     }
 
     const slotLabel = slot.replace(/:00/g,'h').replace(/-/,' – ');
@@ -2043,11 +2092,21 @@ function buildComboHTML(){
     ⚠️ Cargando radiografía para este día… Si no aparece, abre primero la pestaña <strong>Eval</strong> y vuelve aquí.
   </div>`;
 
+  const ventasToggleBtn = `<button onclick="State.comboShowVentas=!State.comboShowVentas;document.getElementById('comboSection').innerHTML=buildComboHTML();"
+    style="font-size:12px;font-weight:600;padding:6px 14px;border-radius:8px;cursor:pointer;border:1px solid ${showVentas?'var(--mango)':'var(--line)'};
+    background:${showVentas?'rgba(230,150,50,0.12)':'var(--white)'};color:${showVentas?'var(--mango)':'var(--ink-soft)'};">
+    ${showVentas ? '✕ Ocultar ventas' : '€ Ver ventas ' + ventasFecha}
+  </button>`;
+
   return `
-    <div style="display:flex;align-items:center;gap:16px;margin-bottom:18px;flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap;">
       ${dateSelect}
+      ${ventasToggleBtn}
       <span style="font-size:12px;color:var(--ink-soft);">Planificado <strong style="color:var(--ink);">vs.</strong> Radiografía · número real / objetivo por franja horaria</span>
     </div>
+    ${showVentas ? `<div style="font-size:12px;color:var(--mango);background:rgba(230,150,50,0.08);border:1px solid rgba(230,150,50,0.25);border-radius:8px;padding:8px 14px;margin-bottom:14px;">
+      📊 Mostrando ventas del <strong>${ventasFecha}</strong> — mismo día de la semana anterior al seleccionado. Las columnas <em>€ sem. ant.</em> reflejan la venta real de cada franja en ese día, directamente desde Table1.
+    </div>` : ''}
     ${radNote}
     <div style="overflow-x:auto;">
       <table style="width:100%;border-collapse:collapse;">
