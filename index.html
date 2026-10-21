@@ -835,6 +835,7 @@ const HIST_SHOP_KEY = {
 /* ================= STATE ================= */
 const State = {
   shop:'all', from:null, to:null, raw:null, loading:false, error:null, lastSync:null,
+  dailyCompMode: 'calendar', // 'calendar' = mismo día calendario | 'weekday' = mismo día de semana
   weather:{}, weatherFetching:false,
   radiografia:{},
   radOverride: null,
@@ -1679,6 +1680,59 @@ function prevYearKey(dkey){
   const [y,m,d] = dkey.split('-');
   return `${parseInt(y,10)-1}-${m}-${d}`;
 }
+
+/* Returns the date (dkey) in the previous year that has the same ISO week number
+   AND the same day of week as the input date.
+   ISO week 1 = week containing the first Thursday of the year. */
+function sameWeekdayPrevYear(dkey){
+  const [y,m,d] = dkey.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  // ISO week helper
+  function isoWeekNum(date){
+    const t = new Date(date); t.setHours(0,0,0,0);
+    const iso = t.getDay() === 0 ? 7 : t.getDay(); // 1=Mon…7=Sun
+    t.setDate(t.getDate() + 4 - iso); // move to Thursday of this week
+    const jan1 = new Date(t.getFullYear(), 0, 1);
+    return Math.ceil(((t - jan1) / 86400000 + 1) / 7);
+  }
+  const week = isoWeekNum(dt);
+  const isoDay = dt.getDay() === 0 ? 7 : dt.getDay(); // 1=Mon…7=Sun
+  const prevY = y - 1;
+  // Monday of ISO week 1 of prevY: Jan 4 is always in week 1
+  const jan4 = new Date(prevY, 0, 4);
+  const jan4iso = jan4.getDay() === 0 ? 7 : jan4.getDay();
+  const w1mon = new Date(jan4.getTime() - (jan4iso - 1) * 86400000);
+  const target = new Date(w1mon.getTime() + (week - 1) * 7 * 86400000 + (isoDay - 1) * 86400000);
+  const ty = target.getFullYear(), tm = String(target.getMonth()+1).padStart(2,'0'), td2 = String(target.getDate()).padStart(2,'0');
+  return `${ty}-${tm}-${td2}`;
+}
+
+/* Same as getPrevYearTotalForShop but uses sameWeekdayPrevYear instead of calendar offset */
+function getPrevWeekdayTotalForShop(dkey, shop){
+  const pkey = sameWeekdayPrevYear(dkey);
+  if (State.raw){
+    if (shop === 'all'){
+      const rows = State.t1ByDkey[pkey] || [];
+      if (rows.length){ const s = rows.reduce((a,r)=>a+(isNaN(r.ventas)?0:r.ventas),0); if(s>0) return s; }
+    } else {
+      const rows = (State.t1ByDkey[pkey]||[]).filter(r => shopEq(r.shop, shop));
+      if (rows.length){ const s = rows.reduce((a,r)=>a+(isNaN(r.ventas)?0:r.ventas),0); if(s>0) return s; }
+    }
+  }
+  if (shop === 'all'){
+    let total = 0, found = 0;
+    for (const fullName of Object.keys(HISTORICAL_SALES_ALL)){
+      const v = HISTORICAL_SALES_ALL[fullName][pkey];
+      if (v !== undefined){ total += v; found++; }
+    }
+    return found > 0 ? total : NaN;
+  } else {
+    const hist = HISTORICAL_SALES_ALL[shop];
+    if (hist && hist[pkey] !== undefined) return hist[pkey];
+    return NaN;
+  }
+}
+
 function getPrevYearTotalForShop(dkey, shop){
   const pkey = prevYearKey(dkey);
   // 1. Try Google Sheet data (covers 2026+ for future comparison years)
@@ -2158,14 +2212,15 @@ async function loadDegustacionesIfNeeded(){
     }
     anyOk = true;
   } catch(e){ /* Data tab unavailable — continue to pivot tabs */ }
-  // 2. Per-shop pivot tabs (date × hour matrix) — loaded in parallel
-  await Promise.allSettled(DEGU_PIVOT_TABS.map(async ([tabName, shopFull]) => {
+  // 2. Per-shop pivot tabs (date × hour matrix) — loaded sequentially to avoid
+  //    concurrent JSONP requests flooding Google Sheets and timing out other loaders.
+  for (const [tabName, shopFull] of DEGU_PIVOT_TABS) {
     try {
       const json2 = await loadViaJSONP_2(DEGU_SHEET_ID, tabName);
       parseDeguPivotTab(gvizJsonToRows(json2), shopFull);
       anyOk = true;
     } catch(e){ /* tab missing or empty — skip */ }
-  }));
+  }
   State.degustaciones._loaded = anyOk ? true : 'error';
   // Re-render eval section if open
   const el = document.getElementById('evalTurnoSection');
@@ -2644,7 +2699,7 @@ function renderAll(){
     ${renderKPIs(shop, from, to)}
     <div id="weatherKPIs">${buildWeatherKPIsHTML(from, to)}</div>
     <div class="section-title"><span class="swatch" style="background:var(--raspberry)"></span>Evolución diaria de ventas</div>
-    ${renderDailySeriesCard(shop, from, to)}
+    <div id="dailySeriesSection">${renderDailySeriesCard(shop, from, to)}</div>
     <div class="section-title"><span class="swatch" style="background:var(--raspberry)"></span>Ventas por hora</div>
     <div class="grid-2">
       ${renderHourlyCard(shop, from, to)}
@@ -2663,6 +2718,13 @@ function renderAll(){
   fetchWeatherIfNeeded(from, to);
   if (!isRange) fetchRadiografiaIfNeeded(from, true); // true = also update panel KPI
   if (!isRange) loadDegustacionesIfNeeded();
+}
+
+/* ---- Toggle modo comparación serie diaria ---- */
+function setDailyCompMode(mode){
+  State.dailyCompMode = mode;
+  const sec = document.getElementById('dailySeriesSection');
+  if (sec) sec.innerHTML = renderDailySeriesCard(State.shop, State.from, State.to);
 }
 
 /* ---- Evolución diaria (serie temporal) ---- */
@@ -2686,8 +2748,11 @@ function renderDailySeriesCard(shop, from, to){
   rows.forEach(r => { if (!isNaN(r.ventas)) byDay.set(r.dkey, (byDay.get(r.dkey) || 0) + r.ventas); });
   const values = days.map(dd => byDay.get(dd) || 0);
 
-  // Previous year: same calendar dates, -1 year, from Google Sheet only
-  const prevValues = days.map(dd => getPrevYearTotalForShop(dd, shop));
+  // Previous year comparison — mode-dependent
+  const compMode = State.dailyCompMode || 'calendar';
+  const prevValues = days.map(dd =>
+    compMode === 'weekday' ? getPrevWeekdayTotalForShop(dd, shop) : getPrevYearTotalForShop(dd, shop)
+  );
   const hasPrev = prevValues.some(v => !isNaN(v));
 
   const allVals = values.concat(prevValues.filter(v => !isNaN(v)));
@@ -2713,8 +2778,9 @@ function renderDailySeriesCard(shop, from, to){
 
   const labelEvery = days.length <= 8 ? 1 : Math.ceil(days.length / 8);
   const dots = pts.map((p, i) => `<circle class="series-dot" cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3.5" fill="#C84B5E" stroke="#FFF" stroke-width="1.5"><title>${dateLabel(days[i])}: ${fmtEUR(values[i])}</title></circle>`).join('');
+  const prevKeyFn = compMode === 'weekday' ? sameWeekdayPrevYear : prevYearKey;
   const prevDots = hasPrev ? prevPts.map((p, i) => p[1] === null ? '' :
-    `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.5" fill="#5E6FA3" stroke="#FFF" stroke-width="1"><title>${dateLabel(prevYearKey(days[i]))}: ${fmtEUR(prevValues[i])}</title></circle>`
+    `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.5" fill="#5E6FA3" stroke="#FFF" stroke-width="1"><title>${dateLabel(prevKeyFn(days[i]))}: ${fmtEUR(prevValues[i])}</title></circle>`
   ).join('') : '';
   const xLabels = pts.map((p, i) => (i % labelEvery === 0 || i === pts.length - 1)
     ? `<text x="${p[0].toFixed(1)}" y="${H - 28}" font-size="10" fill="#766955" text-anchor="middle">${dateLabel(days[i]).slice(0, 5)}</text>`
@@ -2725,16 +2791,24 @@ function renderDailySeriesCard(shop, from, to){
   const best = Math.max(...values);
   const bestDay = days[values.indexOf(best)];
 
+  const prevLabel = compMode === 'weekday' ? 'Mismo día de semana (año ant.)' : 'Año anterior';
   const legend = `<g transform="translate(${padL}, ${H - 16})">
     <line x1="0" y1="-4" x2="18" y2="-4" stroke="#C84B5E" stroke-width="2.5"/>
     <circle cx="9" cy="-4" r="3" fill="#C84B5E"/>
     <text x="22" y="0" font-size="11" fill="#766955">Este año</text>
     ${hasPrev ? `<line x1="80" y1="-4" x2="98" y2="-4" stroke="#5E6FA3" stroke-width="1.8" stroke-dasharray="4 3"/>
     <circle cx="89" cy="-4" r="2.5" fill="#5E6FA3"/>
-    <text x="102" y="0" font-size="11" fill="#766955">Año anterior</text>` : ''}
+    <text x="102" y="0" font-size="11" fill="#766955">${prevLabel}</text>` : ''}
   </g>`;
 
+  const modeCalSel = compMode === 'calendar';
+  const toggleHTML = `<div style="display:flex;gap:4px;margin-bottom:8px;">
+    <button onclick="setDailyCompMode('calendar')" style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--line);cursor:pointer;background:${modeCalSel?'var(--raspberry)':'var(--paper)'};color:${modeCalSel?'#fff':'var(--ink-soft)'};font-weight:${modeCalSel?'700':'400'};">Día a día</button>
+    <button onclick="setDailyCompMode('weekday')" style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--line);cursor:pointer;background:${!modeCalSel?'var(--raspberry)':'var(--paper)'};color:${!modeCalSel?'#fff':'var(--ink-soft)'};font-weight:${!modeCalSel?'700':'400'};">Mismo día de la semana</button>
+  </div>`;
+
   return `<div class="card">
+    ${toggleHTML}
     <div class="hint">${shop==='all'?'Todas las tiendas':esc(shop)} · ${rangeLabel(from,to)} · media diaria ${fmtEUR(avg)} · mejor día ${dateLabel(bestDay)} (${fmtEUR(best)})</div>
     <svg viewBox="0 0 ${W} ${H}" class="series-svg" preserveAspectRatio="none">
       <defs>
