@@ -2092,6 +2092,41 @@ const DEGU_SHOP_MAP = {
 function normDeguShop(raw){
   return DEGU_SHOP_MAP[(raw||'').trim().toLowerCase().normalize('NFC')] || null;
 }
+// Per-shop pivot tabs in the same spreadsheet (date × hour matrix).
+// Structure: rows 0-2 = headers, row 3 = "Fecha"|h0|h1|…|"Suma total", row 4+ = data.
+const DEGU_PIVOT_TABS = [
+  ['Catedral',   'Amorino Catedral'],
+  ['Alcázar',    'Amorino Alcázar'],
+  ['Naranjos',   'Amorino Patio de los Naranjos'],
+  ['Avenida',    'Amorino Sevilla Avenida'],
+  ['Plaza Nueva','Amorino Plaza Nueva'],
+];
+function parseDeguPivotTab(rows, shopFull){
+  // Find header row where col-A is "Fecha"
+  let hdrIdx = -1;
+  for (let i = 0; i < Math.min(rows.length, 10); i++){
+    if (String(rows[i][0]||'').trim() === 'Fecha'){ hdrIdx = i; break; }
+  }
+  if (hdrIdx < 0) return;
+  const hdr = rows[hdrIdx];
+  // Map column index → hour number
+  const hourCols = [];
+  for (let c = 1; c < hdr.length; c++){
+    const h = parseInt(hdr[c], 10);
+    if (!isNaN(h) && h >= 0 && h <= 23) hourCols.push({col:c, hour:h});
+  }
+  if (!State.degustaciones[shopFull]) State.degustaciones[shopFull] = {};
+  for (let r = hdrIdx + 1; r < rows.length; r++){
+    const row = rows[r];
+    const dkey = String(row[0]||'').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dkey)) continue;
+    if (!State.degustaciones[shopFull][dkey]) State.degustaciones[shopFull][dkey] = {};
+    for (const {col, hour} of hourCols){
+      const n = parseInt(row[col], 10);
+      if (n > 0) State.degustaciones[shopFull][dkey][hour] = (State.degustaciones[shopFull][dkey][hour]||0) + n;
+    }
+  }
+}
 function parseMarcaTemporal(s){
   if (!s) return null;
   const str = String(s).trim();
@@ -2106,7 +2141,9 @@ function parseMarcaTemporal(s){
 async function loadDegustacionesIfNeeded(){
   if (State.degustaciones._loaded) return;
   State.degustaciones._loaded = 'loading';
+  let anyOk = false;
   try {
+    // 1. Raw form submissions (Data tab)
     const json = await loadViaJSONP_2(DEGU_SHEET_ID, 'Data');
     const rows = gvizJsonToRows(json).slice(1); // skip header row
     // cols: 0=Marca temporal, 1=TIENDA, 2=FOTO, 3=PRODUCTO UTILIZADO
@@ -2119,10 +2156,17 @@ async function loadDegustacionesIfNeeded(){
       if (!State.degustaciones[shop][p.dkey]) State.degustaciones[shop][p.dkey] = {};
       State.degustaciones[shop][p.dkey][p.hour] = (State.degustaciones[shop][p.dkey][p.hour]||0) + 1;
     }
-    State.degustaciones._loaded = true;
-  } catch(e){
-    State.degustaciones._loaded = 'error';
-  }
+    anyOk = true;
+  } catch(e){ /* Data tab unavailable — continue to pivot tabs */ }
+  // 2. Per-shop pivot tabs (date × hour matrix) — loaded in parallel
+  await Promise.allSettled(DEGU_PIVOT_TABS.map(async ([tabName, shopFull]) => {
+    try {
+      const json2 = await loadViaJSONP_2(DEGU_SHEET_ID, tabName);
+      parseDeguPivotTab(gvizJsonToRows(json2), shopFull);
+      anyOk = true;
+    } catch(e){ /* tab missing or empty — skip */ }
+  }));
+  State.degustaciones._loaded = anyOk ? true : 'error';
   // Re-render eval section if open
   const el = document.getElementById('evalTurnoSection');
   if (el) { el.innerHTML = buildEvalTurnoHTML(State.shop, State.from); attachEvalHandlers(); }
