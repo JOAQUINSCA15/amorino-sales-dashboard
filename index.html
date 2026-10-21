@@ -157,7 +157,7 @@
   .prod-control{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-soft);margin-bottom:14px;}
   .prod-control input{width:68px;padding:4px 8px;border:1px solid var(--line);border-radius:6px;font-size:13px;font-family:'Inter',sans-serif;}
   .prod-control input:focus{outline:2px solid var(--blueberry);outline-offset:1px;}
-  .series-svg{width:100%;height:240px;overflow:visible;}
+  .series-svg{width:100%;height:auto;display:block;overflow:visible;}
   .series-dot{transition:r .15s;cursor:default;}
   .series-dot:hover{r:5.5;}
   .hbar-col{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;min-width:0;}
@@ -326,7 +326,7 @@
     .eval-global-controls{padding-bottom:10px;margin-bottom:10px;}
     .prod-control{display:none;}
     .eval-day-header{font-size:14px;padding:6px 0;margin-bottom:8px;}
-    .series-svg{height:120px !important;}
+    .series-svg{height:auto !important;max-height:160px;}
     .hbars{height:100px;}
     .tickets-grid{grid-template-columns:repeat(3,1fr);}
     a{color:inherit;text-decoration:none;}
@@ -2755,75 +2755,144 @@ function renderDailySeriesCard(shop, from, to){
   );
   const hasPrev = prevValues.some(v => !isNaN(v));
 
-  const allVals = values.concat(prevValues.filter(v => !isNaN(v)));
-  const max = Math.max(...allVals, 1);
-  const W = 760, H = 260, padL = 14, padR = 14, padT = 18, padB = 50;
-  const innerW = W - padL - padR, innerH = H - padT - padB;
-  const stepX = days.length > 1 ? innerW / (days.length - 1) : 0;
-  const toY = v => padT + innerH - (isNaN(v) || !max ? 0 : (v / max) * innerH);
-
-  const pts = values.map((v, i) => [padL + i * stepX, toY(v)]);
-  const prevPts = prevValues.map((v, i) => [padL + i * stepX, isNaN(v) ? null : toY(v)]);
-
-  const linePath = pts.map((p, i) => (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
-  const baseline = (padT + innerH).toFixed(1);
-  const areaPath = linePath + ` L${pts[pts.length-1][0].toFixed(1)},${baseline} L${pts[0][0].toFixed(1)},${baseline} Z`;
-
-  let prevPath = '';
-  prevPts.forEach((p, i) => {
-    if (p[1] === null) return;
-    const pp = prevPts[i-1];
-    prevPath += (i === 0 || pp === null || pp[1] === null ? 'M' : 'L') + p[0].toFixed(1) + ',' + p[1].toFixed(1) + ' ';
-  });
-
-  const labelEvery = days.length <= 8 ? 1 : Math.ceil(days.length / 8);
-  const dots = pts.map((p, i) => `<circle class="series-dot" cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3.5" fill="#C84B5E" stroke="#FFF" stroke-width="1.5"><title>${dateLabel(days[i])}: ${fmtEUR(values[i])}</title></circle>`).join('');
-  const prevKeyFn = compMode === 'weekday' ? sameWeekdayPrevYear : prevYearKey;
-  const prevDots = hasPrev ? prevPts.map((p, i) => p[1] === null ? '' :
-    `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.5" fill="#5E6FA3" stroke="#FFF" stroke-width="1"><title>${dateLabel(prevKeyFn(days[i]))}: ${fmtEUR(prevValues[i])}</title></circle>`
-  ).join('') : '';
-  const xLabels = pts.map((p, i) => (i % labelEvery === 0 || i === pts.length - 1)
-    ? `<text x="${p[0].toFixed(1)}" y="${H - 28}" font-size="10" fill="#766955" text-anchor="middle">${dateLabel(days[i]).slice(0, 5)}</text>`
-    : '').join('');
-
   const total = values.reduce((a,b)=>a+b,0);
   const avg = total / values.length;
   const best = Math.max(...values);
   const bestDay = days[values.indexOf(best)];
 
-  const prevLabel = compMode === 'weekday' ? 'Mismo día de semana (año ant.)' : 'Año anterior';
-  const legend = `<g transform="translate(${padL}, ${H - 16})">
-    <line x1="0" y1="-4" x2="18" y2="-4" stroke="#C84B5E" stroke-width="2.5"/>
-    <circle cx="9" cy="-4" r="3" fill="#C84B5E"/>
-    <text x="22" y="0" font-size="11" fill="#766955">Este año</text>
-    ${hasPrev ? `<line x1="80" y1="-4" x2="98" y2="-4" stroke="#5E6FA3" stroke-width="1.8" stroke-dasharray="4 3"/>
-    <circle cx="89" cy="-4" r="2.5" fill="#5E6FA3"/>
-    <text x="102" y="0" font-size="11" fill="#766955">${prevLabel}</text>` : ''}
+  // ---- Chart geometry ----
+  const W = 780, H = 310;
+  const padL = 62, padR = 18, padT = 22, padB = 72; // generous bottom for rotated labels
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+
+  // Y axis: nice round ticks
+  const rawMax = Math.max(...values.concat(prevValues.filter(v => !isNaN(v))), 1);
+  function niceStep(range, ticks){ const mag = Math.pow(10, Math.floor(Math.log10(range/ticks))); const steps=[1,2,5,10]; return mag * steps.find(s => (range/(mag*s)) <= ticks+1); }
+  const yStep = niceStep(rawMax, 4);
+  const yMax = Math.ceil(rawMax / yStep) * yStep;
+  const yTicks = [];
+  for (let v = 0; v <= yMax; v += yStep) yTicks.push(v);
+
+  const toY = v => padT + innerH - (isNaN(v) || !yMax ? 0 : Math.min(v / yMax, 1) * innerH);
+  const toX = i => padL + (days.length > 1 ? i * innerW / (days.length - 1) : innerW / 2);
+
+  const pts = values.map((v, i) => [toX(i), toY(v)]);
+  const prevPts = prevValues.map((v, i) => [toX(i), isNaN(v) ? null : toY(v)]);
+
+  // Smooth bezier curves
+  function smoothPath(pts){
+    if (pts.length < 2) return '';
+    let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+    for (let i = 1; i < pts.length; i++){
+      const [x0,y0] = pts[i-1], [x1,y1] = pts[i];
+      const cpx = (x0+x1)/2;
+      d += ` C${cpx.toFixed(1)},${y0.toFixed(1)} ${cpx.toFixed(1)},${y1.toFixed(1)} ${x1.toFixed(1)},${y1.toFixed(1)}`;
+    }
+    return d;
+  }
+  function smoothPathFromSegments(pts){ // pts with possible nulls
+    let d = '', lastNull = true;
+    for (let i = 0; i < pts.length; i++){
+      const p = pts[i];
+      if (p[1] === null){ lastNull = true; continue; }
+      if (lastNull){ d += `M${p[0].toFixed(1)},${p[1].toFixed(1)}`; lastNull = false; continue; }
+      const prev = pts.slice(0,i).reverse().find(q => q[1] !== null);
+      if (!prev){ d += `M${p[0].toFixed(1)},${p[1].toFixed(1)}`; continue; }
+      const cpx = (prev[0]+p[0])/2;
+      d += ` C${cpx.toFixed(1)},${prev[1].toFixed(1)} ${cpx.toFixed(1)},${p[1].toFixed(1)} ${p[0].toFixed(1)},${p[1].toFixed(1)}`;
+    }
+    return d;
+  }
+
+  const linePath = smoothPath(pts);
+  const baseline = (padT + innerH).toFixed(1);
+  const areaPath = linePath + ` L${pts[pts.length-1][0].toFixed(1)},${baseline} L${pts[0][0].toFixed(1)},${baseline} Z`;
+  const prevPath = smoothPathFromSegments(prevPts);
+
+  // X label strategy: show every nth, always show first+last, rotate -45°
+  const labelEvery = days.length <= 7 ? 1 : days.length <= 14 ? 1 : days.length <= 31 ? 2 : days.length <= 62 ? 7 : 14;
+  const DAY_SHORT = ['Do','Lu','Ma','Mi','Ju','Vi','Sá'];
+  function xLabelText(dkey){
+    const [y,m,d2] = dkey.split('-').map(Number);
+    const dt = new Date(y, m-1, d2);
+    const dow = DAY_SHORT[dt.getDay()];
+    if (days.length <= 14) return `${dow} ${d2}/${m}`;   // "Mi 21/10"
+    if (days.length <= 62) return `${d2}/${m}`;           // "21/10"
+    return `${d2}/${m}`;
+  }
+
+  const xLabels = pts.map((p, i) => {
+    if (i % labelEvery !== 0 && i !== pts.length - 1) return '';
+    const txt = xLabelText(days[i]);
+    // Rotated -45° around the tick point, anchor end
+    return `<text transform="translate(${p[0].toFixed(1)},${(padT+innerH+14).toFixed(1)}) rotate(-45)"
+      font-size="11.5" fill="var(--ink-soft)" text-anchor="end" dominant-baseline="middle">${txt}</text>`;
+  }).join('');
+
+  // Tick marks
+  const xTicks = pts.map((p, i) => {
+    if (i % labelEvery !== 0 && i !== pts.length - 1) return '';
+    return `<line x1="${p[0].toFixed(1)}" y1="${(padT+innerH).toFixed(1)}" x2="${p[0].toFixed(1)}" y2="${(padT+innerH+5).toFixed(1)}" stroke="var(--line)" stroke-width="1"/>`;
+  }).join('');
+
+  // Y axis gridlines + labels
+  const yAxisSVG = yTicks.map(v => {
+    const y = toY(v).toFixed(1);
+    const label = v >= 1000 ? `${(v/1000).toFixed(v%1000===0?0:1)}k` : String(v);
+    return `<line x1="${padL}" y1="${y}" x2="${padL+innerW}" y2="${y}" stroke="var(--line)" stroke-width="${v===0?'1.5':'0.8'}" stroke-dasharray="${v===0?'':'4 4'}" opacity="0.6"/>
+    <text x="${(padL-8).toFixed(1)}" y="${y}" font-size="11" fill="var(--ink-soft)" text-anchor="end" dominant-baseline="middle">${label}</text>`;
+  }).join('');
+
+  // Dots — show only if not too many days
+  const showDots = days.length <= 45;
+  const prevKeyFn = compMode === 'weekday' ? sameWeekdayPrevYear : prevYearKey;
+  const dots = showDots ? pts.map((p, i) => `<circle class="series-dot" cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3.5" fill="#C84B5E" stroke="var(--paper)" stroke-width="1.5"><title>${dateLabel(days[i])}: ${fmtEUR(values[i])}</title></circle>`).join('') : '';
+  const prevDots = (showDots && hasPrev) ? prevPts.map((p, i) => p[1] === null ? '' :
+    `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.5" fill="#5E6FA3" stroke="var(--paper)" stroke-width="1"><title>${dateLabel(prevKeyFn(days[i]))}: ${fmtEUR(prevValues[i])}</title></circle>`
+  ).join('') : '';
+
+  // Legend (inside chart, top-right area)
+  const prevLabel = compMode === 'weekday' ? 'Mismo día de semana año ant.' : 'Año anterior';
+  const legendX = padL + innerW - (hasPrev ? 240 : 80);
+  const legendSVG = `<g transform="translate(${legendX},${padT + 4})">
+    <line x1="0" y1="7" x2="22" y2="7" stroke="#C84B5E" stroke-width="2.5"/>
+    <circle cx="11" cy="7" r="3.5" fill="#C84B5E"/>
+    <text x="28" y="11" font-size="11.5" fill="var(--ink-soft)">Este año</text>
+    ${hasPrev ? `<line x1="100" y1="7" x2="122" y2="7" stroke="#5E6FA3" stroke-width="1.8" stroke-dasharray="5 3"/>
+    <circle cx="111" cy="7" r="2.5" fill="#5E6FA3"/>
+    <text x="128" y="11" font-size="11.5" fill="var(--ink-soft)">${prevLabel}</text>` : ''}
   </g>`;
 
   const modeCalSel = compMode === 'calendar';
-  const toggleHTML = `<div style="display:flex;gap:4px;margin-bottom:8px;">
-    <button onclick="setDailyCompMode('calendar')" style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--line);cursor:pointer;background:${modeCalSel?'var(--raspberry)':'var(--paper)'};color:${modeCalSel?'#fff':'var(--ink-soft)'};font-weight:${modeCalSel?'700':'400'};">Día a día</button>
-    <button onclick="setDailyCompMode('weekday')" style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--line);cursor:pointer;background:${!modeCalSel?'var(--raspberry)':'var(--paper)'};color:${!modeCalSel?'#fff':'var(--ink-soft)'};font-weight:${!modeCalSel?'700':'400'};">Mismo día de la semana</button>
+  const toggleHTML = `<div style="display:flex;gap:4px;margin-bottom:10px;">
+    <button onclick="setDailyCompMode('calendar')" style="font-size:11px;padding:4px 12px;border-radius:20px;border:1px solid var(--line);cursor:pointer;background:${modeCalSel?'var(--raspberry)':'transparent'};color:${modeCalSel?'#fff':'var(--ink-soft)'};font-weight:${modeCalSel?'700':'400'};">Día a día</button>
+    <button onclick="setDailyCompMode('weekday')" style="font-size:11px;padding:4px 12px;border-radius:20px;border:1px solid var(--line);cursor:pointer;background:${!modeCalSel?'var(--raspberry)':'transparent'};color:${!modeCalSel?'#fff':'var(--ink-soft)'};font-weight:${!modeCalSel?'700':'400'};">Mismo día de la semana</button>
   </div>`;
 
   return `<div class="card">
     ${toggleHTML}
     <div class="hint">${shop==='all'?'Todas las tiendas':esc(shop)} · ${rangeLabel(from,to)} · media diaria ${fmtEUR(avg)} · mejor día ${dateLabel(bestDay)} (${fmtEUR(best)})</div>
-    <svg viewBox="0 0 ${W} ${H}" class="series-svg" preserveAspectRatio="none">
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;overflow:visible;">
       <defs>
         <linearGradient id="seriesFill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#C84B5E" stop-opacity="0.22"/>
-          <stop offset="100%" stop-color="#C84B5E" stop-opacity="0.02"/>
+          <stop offset="0%" stop-color="#C84B5E" stop-opacity="0.18"/>
+          <stop offset="100%" stop-color="#C84B5E" stop-opacity="0.01"/>
         </linearGradient>
+        <clipPath id="chartClip">
+          <rect x="${padL}" y="${padT}" width="${innerW}" height="${innerH}"/>
+        </clipPath>
       </defs>
-      <path d="${areaPath}" fill="url(#seriesFill)" stroke="none"/>
-      ${hasPrev && prevPath ? `<path d="${prevPath.trim()}" fill="none" stroke="#5E6FA3" stroke-width="1.8" stroke-dasharray="5 3" stroke-linejoin="round" stroke-linecap="round" opacity="0.8"/>` : ''}
-      <path d="${linePath}" fill="none" stroke="#C84B5E" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
-      ${hasPrev ? prevDots : ''}
-      ${dots}
+      ${yAxisSVG}
+      <g clip-path="url(#chartClip)">
+        <path d="${areaPath}" fill="url(#seriesFill)" stroke="none"/>
+        ${hasPrev && prevPath ? `<path d="${prevPath}" fill="none" stroke="#5E6FA3" stroke-width="1.8" stroke-dasharray="5 3" stroke-linejoin="round" stroke-linecap="round" opacity="0.85"/>` : ''}
+        <path d="${linePath}" fill="none" stroke="#C84B5E" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+        ${hasPrev ? prevDots : ''}
+        ${dots}
+      </g>
+      ${xTicks}
       ${xLabels}
-      ${legend}
+      ${legendSVG}
     </svg>
   </div>`;
 }
