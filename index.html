@@ -730,6 +730,7 @@ function shiftDate(dkey, days){
 function monthStart(dkey){ const [y,m] = dkey.split('-'); return `${y}-${m}-01`; }
 function clampDate(dkey, min, max){ if (dkey < min) return min; if (dkey > max) return max; return dkey; }
 function inRange(dkey, from, to){ return !!dkey && (!from || dkey >= from) && (!to || dkey <= to); }
+function offsetDkey(dkey, days){ const d = new Date(dkey+'T12:00:00Z'); d.setUTCDate(d.getUTCDate()+days); return d.toISOString().slice(0,10); }
 function rangeLabel(from, to){ return from === to ? dateLabel(from) : `${dateLabel(from)} → ${dateLabel(to)}`; }
 function fmtEUR(n){ return isNaN(n) ? '—' : n.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'; }
 function fmtInt(n){ return isNaN(n) ? '—' : Math.round(n).toLocaleString('es-ES'); }
@@ -1511,14 +1512,20 @@ async function loadResenasIfNeeded(){
 }
 
 function buildResenasHTML(shop, from, to){
-  if (!from || !to) return '<div class="empty-note">Selecciona un periodo.</div>';
   if (State.resenas._loaded === 'loading') return '<div class="empty-note">Cargando reseñas…</div>';
   if (State.resenas._loaded === 'error')   return '<div class="empty-note" style="color:var(--raspberry)">Error al cargar las reseñas. Comprueba que la hoja esté compartida públicamente.</div>';
   if (!State.resenas._loaded)              return '<div class="empty-note">Cargando reseñas…</div>';
 
+  // Las reseñas usan su propio rango independiente del filtro global de ventas:
+  // últimos 30 días desde la reseña más reciente disponible en los datos.
+  const all = State.resenas.entries;
+  const maxDkey = all.reduce((mx, e) => e.dkey > mx ? e.dkey : mx, '');
+  const resFrom = maxDkey ? offsetDkey(maxDkey, -29) : (from || '');
+  const resTo   = maxDkey || to || '';
+
   const shopsToShow = shop === 'all' ? SHOP_ORDER : [shop];
-  const inPeriod = e => inRange(e.dkey, from, to) && (shop === 'all' || shopEq(e.shop, shop));
-  const entries = State.resenas.entries.filter(inPeriod);
+  const inPeriod = e => inRange(e.dkey, resFrom, resTo) && (shop === 'all' || shopEq(e.shop, shop));
+  const entries = all.filter(inPeriod);
 
   if (!entries.length){
     const dbg = State.resenas._debug || {};
@@ -1528,7 +1535,7 @@ header: ${JSON.stringify(dbg.header)}
 ci: ${JSON.stringify(dbg.ci)}
 sample[0]: ${JSON.stringify((dbg.sample||[])[0])}
 sample[1]: ${JSON.stringify((dbg.sample||[])[1])}
-    </div><div class="empty-note">Sin reseñas en el periodo seleccionado.</div>`;
+    </div><div class="empty-note">Sin reseñas en los últimos 30 días disponibles.</div>`;
   }
 
   // Aggregate per shop
