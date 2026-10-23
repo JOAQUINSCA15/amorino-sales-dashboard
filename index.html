@@ -1959,29 +1959,58 @@ async function loadComboIfNeeded(){
     // Use sheet name (not gid) so it works regardless of tab position
     const json = await loadViaJSONP_bySheet(COMBO_SHEET_ID, 'combo_planificacion');
     const allRows = json.table.rows || [];
-    // Column indices: tienda(0) fecha(1) dia(2) horas(3) turnos(4) empleados(5) semana(6)
-    const ci = { tienda:0, fecha:1, dia:2, horas:3, turnos:4, empleados:5, semana:6 };
-    const rows = [];
+    // Real sheet columns (syncCombo output):
+    // tienda(0) fecha(1) inicio(2) fin(3) empleado(4) semana(5) etiqueta(6)
+    const ci = { tienda:0, fecha:1, inicio:2, fin:3, empleado:4, semana:5, etiqueta:6 };
+    // Parse each shift row, then aggregate by tienda+fecha → horas, turnos, empleados
+    const get = (cv, i) => {
+      const x = cv[i];
+      if (!x) return '';
+      if (typeof x.v === 'string' && x.v.startsWith('Date(')) return x.f || x.v;
+      return x.v ?? x.f ?? '';
+    };
+    const timeToMins = t => {
+      const s = String(t).replace('h',':').trim();
+      const parts = s.split(':');
+      return parseInt(parts[0]||0)*60 + parseInt(parts[1]||0);
+    };
+    const DAY_ES = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+    // Aggregate: key = tienda§fecha → { tienda, fecha, dia, semana, horas, turnos, empsSet }
+    const agg = new Map();
     for (const r of allRows){
       const cv = r.c || [];
-      // gviz returns dates as v:"Date(2026,9,5)" — prefer f (formatted) for dates
-      const get = i => {
-        const x = cv[i];
-        if (!x) return '';
-        // If v is a string starting with "Date(" it's a date — use f or reconstruct
-        if (typeof x.v === 'string' && x.v.startsWith('Date(')) return x.f || x.v;
-        return x.v ?? x.f ?? '';
-      };
-      const tienda = String(get(ci.tienda)).trim();
+      const tienda = String(get(cv, ci.tienda)).trim();
       if (!tienda || tienda === 'tienda' || tienda === 'Tienda') continue;
-      const fecha    = String(get(ci.fecha)).trim();
-      const dia      = String(get(ci.dia)).trim();
-      const horas    = parseFloat(String(get(ci.horas)).replace(',','.')) || 0;
-      const turnos   = parseInt(get(ci.turnos))  || 0;
-      const empNames = String(get(ci.empleados)).trim();
-      const emps     = empNames ? empNames.split(',').filter(n => n.trim()).length : 0;
-      const semana   = String(get(ci.semana)).trim();
-      rows.push({ tienda, fecha, dia, horas, turnos, emps, semana });
+      const fecha  = String(get(cv, ci.fecha)).trim();
+      if (!fecha) continue;
+      const inicio  = String(get(cv, ci.inicio)).trim();
+      const fin     = String(get(cv, ci.fin)).trim();
+      const emp     = String(get(cv, ci.empleado)).trim();
+      const semana  = String(get(cv, ci.semana)).trim();
+      // Compute hours from inicio/fin
+      let horas = 0;
+      if (inicio && fin){
+        const sm = timeToMins(inicio), em = timeToMins(fin);
+        let diff = em - sm; if (diff < 0) diff += 24*60;
+        horas = diff / 60;
+      }
+      // Derive day name from fecha (YYYY-MM-DD)
+      let dia = '';
+      try {
+        const d = new Date(fecha + 'T12:00:00Z');
+        dia = DAY_ES[d.getUTCDay()];
+      } catch(e){}
+      const key = tienda + '§' + fecha;
+      if (!agg.has(key)) agg.set(key, { tienda, fecha, dia, semana, horas:0, turnos:0, empsSet: new Set() });
+      const entry = agg.get(key);
+      entry.horas  += horas;
+      entry.turnos += 1;
+      if (emp) entry.empsSet.add(emp);
+    }
+    const rows = [];
+    for (const [, e] of agg){
+      rows.push({ tienda: e.tienda, fecha: e.fecha, dia: e.dia, semana: e.semana,
+                  horas: Math.round(e.horas*10)/10, turnos: e.turnos, emps: e.empsSet.size });
     }
     State.combo = { _loaded: true, rows };
   } catch(e){
