@@ -1641,7 +1641,7 @@ sample[1]: ${JSON.stringify((dbg.sample||[])[1])}
     }
   }
 
-  return `<div class="kpi-section-label">Valoración media · ${rangeLabel(from,to)} · ${entries.length} reseña${entries.length!==1?'s':''}</div>
+  return `<div class="kpi-section-label">Valoración media · ${rangeLabel(resFrom,resTo)} · ${entries.length} reseña${entries.length!==1?'s':''}</div>
     <div class="kpi-row">${cards}</div>
     ${chartHtml}
     ${countTable}
