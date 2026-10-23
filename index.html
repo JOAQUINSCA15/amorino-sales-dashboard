@@ -2021,7 +2021,32 @@ async function loadComboIfNeeded(){
       rows.push({ tienda: e.tienda, fecha: e.fecha, dia: e.dia, semana: e.semana,
                   horas: Math.round(e.horas*10)/10, turnos: e.turnos, emps: e.empsSet.size });
     }
-    State.combo = { _loaded: true, rows,
+    // Also keep individual shifts (with parsed mins) for franja comparison
+    const parseFechaToKey = s => {
+      const dm = s.match(/Date\((\d+),(\d+),(\d+)/);
+      if (dm) return `${dm[1]}-${String(+dm[2]+1).padStart(2,'0')}-${String(+dm[3]).padStart(2,'0')}`;
+      const pts = s.split('/');
+      if (pts.length === 3 && pts[2].length === 4) return `${pts[2]}-${pts[1].padStart(2,'0')}-${pts[0].padStart(2,'0')}`;
+      return s;
+    };
+    const shifts = [];
+    for (const r of allRows) {
+      const cv2 = r.c || [];
+      const t2 = getStr(cv2, ci.tienda).trim();
+      if (!t2 || t2 === 'tienda' || t2 === 'Tienda') continue;
+      const fRaw = cv2[ci.fecha];
+      if (!fRaw) continue;
+      const fStr = (fRaw.v && String(fRaw.v).startsWith('Date(')) ? fRaw.v : (fRaw.f || String(fRaw.v || ''));
+      const dkey2 = parseFechaToKey(fStr);
+      if (!dkey2 || !dkey2.match(/^\d{4}-\d{2}-\d{2}$/)) continue;
+      const ini2 = getStr(cv2, ci.inicio).trim();
+      const fin2 = getStr(cv2, ci.fin).trim();
+      if (!ini2 || !fin2) continue;
+      const sm2 = timeToMins(ini2), em2 = timeToMins(fin2);
+      shifts.push({ tienda: t2, dkey: dkey2, inicio_mins: sm2, fin_mins: em2 < sm2 ? em2 + 1440 : em2,
+                    empleado: getStr(cv2, ci.empleado).trim(), semana: getStr(cv2, ci.semana).trim() });
+    }
+    State.combo = { _loaded: true, rows, shifts,
       _debug: { totalRows: allRows.length, rows: rows.length,
         sample: (allRows.slice(0,3)).map(r => (r.c||[]).slice(0,5).map(x => x ? {v: x.v, f: x.f} : null)) } };
   } catch(e){
@@ -2047,141 +2072,136 @@ function loadViaJSONP_bySheet(sheetId, sheetName){
 }
 
 function buildComboHTML(){
-  if (COMBO_SHEET_ID === 'PENDIENTE_SHEET_ID'){
-    return `<div class="empty-note" style="padding:32px 0;">
-      <strong>Falta configurar la hoja de Combo.</strong><br><br>
-      1. Crea la hoja "Amorino Operaciones" en Google Sheets y compártela públicamente.<br>
-      2. Pega el Apps Script de Combo y ejecuta <code>syncComboPlanning()</code>.<br>
-      3. Reemplaza <code>COMBO_SHEET_ID</code> en el dashboard con el ID de esa hoja.
-    </div>`;
-  }
+  if (COMBO_SHEET_ID === 'PENDIENTE_SHEET_ID') return `<div class="empty-note" style="padding:32px 0;"><strong>Falta configurar la hoja de Combo.</strong></div>`;
   if (State.combo._loaded === 'loading') return '<div class="empty-note">Cargando planificación…</div>';
   if (State.combo._loaded === 'error')   return '<div class="empty-note" style="color:var(--raspberry)">Error al cargar Combo. Verifica que la hoja esté compartida públicamente.</div>';
   if (!State.combo._loaded)              return '<div class="empty-note">Cargando planificación…</div>';
 
-  const rows = State.combo.rows;
-  if (!rows.length) {
+  const { rows, shifts } = State.combo;
+  if (!rows || !rows.length) {
     const dbg = State.combo._debug || {};
-    return `<div style="background:#f5f5f5;border-radius:8px;padding:10px;font-size:11px;font-family:monospace;white-space:pre-wrap;word-break:break-all;margin-bottom:12px;">
-totalRows: ${dbg.totalRows} · rows parsed: ${dbg.rows}
-sample[0]: ${JSON.stringify((dbg.sample||[])[0])}
-sample[1]: ${JSON.stringify((dbg.sample||[])[1])}
-    </div><div class="empty-note">No hay datos de planificación en la hoja.</div>`;
+    return `<div style="background:#f5f5f5;border-radius:8px;padding:10px;font-size:11px;font-family:monospace;white-space:pre-wrap;word-break:break-all;margin-bottom:12px;">totalRows: ${dbg.totalRows} · rows parsed: ${dbg.rows}\nsample[0]: ${JSON.stringify((dbg.sample||[])[0])}\nsample[1]: ${JSON.stringify((dbg.sample||[])[1])}</div><div class="empty-note">No hay datos de planificación en la hoja.</div>`;
   }
 
-  // Group by semana → for selector
-  const semanas = [...new Set(rows.map(r => r.semana))].sort();
-  const selSemana = State.comboSemana || semanas[semanas.length - 1];
-
-  const weekRows = rows.filter(r => r.semana === selSemana);
-
-  // Build grid: shop × day (normalise dia key to NFC so lookups are consistent)
-  const _norm = s => String(s).normalize('NFC');
-  const grid = {}; // shop → { diaNFC: {horas, turnos, emps} }
-  const diasEnSemana = new Set();
-  for (const r of weekRows){
-    if (!grid[r.tienda]) grid[r.tienda] = {};
-    const diaN = _norm(r.dia);
-    grid[r.tienda][diaN] = { horas: r.horas, turnos: r.turnos, emps: r.emps, fecha: r.fecha };
-    diasEnSemana.add(diaN);
-  }
-
-  // Order days Mon→Sun
-  const dias = COMBO_DAY_NAMES.map(_norm).filter(d => diasEnSemana.has(d));
-
-  // Week total per shop
-  const shopTotals = {};
-  for (const shop of COMBO_SHOP_ORDER){
-    shopTotals[shop] = (grid[shop] ? Object.values(grid[shop]).reduce((s,v) => s + v.horas, 0) : 0);
-  }
+  // Maps Combo short names → SHOP_ORDER full names → SHOP_RAD_KEY
+  const COMBO_TO_FULL = {
+    'Amorino Avenida':    'Amorino Sevilla Avenida',
+    'Amorino Catedral':   'Amorino Catedral',
+    'Amorino Alcázar':    'Amorino Alcázar',
+    'Amorino Plaza Nueva':'Amorino Plaza Nueva',
+    'Amorino Naranjos':   'Amorino Patio de los Naranjos',
+  };
 
   // Semana selector
+  const semanas = [...new Set(rows.map(r => r.semana).filter(Boolean))].sort();
+  const selSemana = State.comboSemana || semanas[semanas.length - 1];
   let semanaSelect = '';
   if (semanas.length > 1){
     semanaSelect = `<select onchange="State.comboSemana=this.value;document.getElementById('comboSection').innerHTML=buildComboHTML();"
       style="font-size:13px;font-weight:600;padding:6px 28px 6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--white);appearance:none;
       background-image:url(\\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23766955'/%3E%3C/svg%3E\\");
       background-repeat:no-repeat;background-position:right 10px center;cursor:pointer;margin-bottom:16px;">
-      ${semanas.map(s => `<option value="${s}" ${s===selSemana?'selected':''}>${s}</option>`).join('')}
+      ${semanas.map(s=>`<option value="${esc(s)}" ${s===selSemana?'selected':''}>${esc(s)}</option>`).join('')}
     </select>`;
   } else {
-    semanaSelect = `<div style="font-size:13px;color:var(--ink-soft);margin-bottom:16px;">Semana del ${selSemana}</div>`;
+    semanaSelect = `<div style="font-size:13px;color:var(--ink-soft);margin-bottom:16px;">Semana del ${esc(selSemana)}</div>`;
   }
 
-  // Table
-  const colStyle = 'padding:10px 14px;text-align:right;font-size:13px;white-space:nowrap;';
-  const hdrStyle = 'padding:8px 14px;font-size:11px;letter-spacing:0.07em;text-transform:uppercase;color:var(--ink-soft);font-weight:600;text-align:right;white-space:nowrap;';
-  const shopStyle = 'padding:10px 14px;font-size:13px;font-weight:600;white-space:nowrap;text-align:left;';
+  // Shifts for selected week
+  const weekShifts = (shifts || []).filter(s => s.semana === selSemana);
+  // Sorted unique dates
+  const fechas = [...new Set(weekShifts.map(s => s.dkey))].sort();
 
-  let thead = `<tr>
-    <th style="${hdrStyle}text-align:left;">Tienda</th>
-    ${dias.map(d => `<th style="${hdrStyle}">${d}</th>`).join('')}
-    <th style="${hdrStyle}color:var(--ink);">Total sem.</th>
-  </tr>`;
-
-  let tbody = '';
-  for (const shop of COMBO_SHOP_ORDER){
-    const shortName = shop.replace('Amorino ','');
-    const shopGrid  = grid[shop] || {};
-    const total     = shopTotals[shop];
-    tbody += `<tr style="border-top:1px solid var(--line);">
-      <td style="${shopStyle}">${shortName}</td>
-      ${dias.map(d => {
-        const cell = shopGrid[d];
-        if (!cell) return `<td style="${colStyle}color:var(--line);">—</td>`;
-        const h = cell.horas.toFixed(1);
-        const bg = cell.horas < 1 ? 'color:var(--ink-soft);' : '';
-        return `<td style="${colStyle}${bg}" title="${cell.emps} empleado(s), ${cell.turnos} turno(s)">${h}h</td>`;
-      }).join('')}
-      <td style="${colStyle}font-weight:700;color:var(--cocoa);">${total.toFixed(1)}h</td>
-    </tr>`;
+  // Shops to show
+  let shopsToShow;
+  if (State.shop === 'all') {
+    shopsToShow = COMBO_SHOP_ORDER;
+  } else {
+    // Match global shop filter to combo shop names
+    shopsToShow = COMBO_SHOP_ORDER.filter(cs => {
+      const full = COMBO_TO_FULL[cs] || cs;
+      return full === State.shop || shopEq(cs, State.shop);
+    });
+    if (!shopsToShow.length) shopsToShow = COMBO_SHOP_ORDER;
   }
 
-  // Day totals row
-  const dayTotals = dias.map(d =>
-    COMBO_SHOP_ORDER.reduce((s, sh) => s + (grid[sh]?.[d]?.horas || 0), 0)
-  );
-  // grandTotal from shopTotals (robust even if dias is partially empty)
-  const grandTotal = Object.values(shopTotals).reduce((s,v) => s + v, 0);
-  const dayGrandFromGrid = dayTotals.reduce((s,v) => s + v, 0); // used in day totals cell
+  const MES_S = ['','ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  const DIA_S = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
 
-  tbody += `<tr style="border-top:2px solid var(--line);background:rgba(91,58,41,0.04);">
-    <td style="${shopStyle}color:var(--ink-soft);font-weight:600;">Total día</td>
-    ${dayTotals.map(t => `<td style="${colStyle}font-weight:700;">${t.toFixed(1)}h</td>`).join('')}
-    <td style="${colStyle}font-weight:800;color:var(--cocoa);">${grandTotal.toFixed(1)}h</td>
-  </tr>`;
+  let html = semanaSelect;
 
-  // KPI summary row
-  const maxDayIdx = dayTotals.length ? dayTotals.indexOf(Math.max(...dayTotals)) : -1;
-  const maxDay = maxDayIdx >= 0 ? dias[maxDayIdx] : '—';
-  const avgDaily = dias.length > 0 ? (grandTotal / dias.length).toFixed(1) : '—';
+  for (const comboShop of shopsToShow) {
+    const fullShop = COMBO_TO_FULL[comboShop] || comboShop;
+    const shopKey  = SHOP_RAD_KEY[fullShop];
+    if (!shopKey) continue;
 
-  const kpis = [
-    { label:'Total horas semana', val: grandTotal.toFixed(1)+'h', color:'var(--cocoa)' },
-    { label:'Media horas/día',    val: avgDaily+'h',              color:'var(--blueberry)' },
-    { label:'Día más cargado',    val: maxDay,                    color:'var(--raspberry)' },
-    { label:'Tiendas planificadas', val: COMBO_SHOP_ORDER.filter(s=>shopTotals[s]>0).length+'/5', color:'var(--pistachio)' },
-  ];
+    // Normalise shop name for matching (strip "Amorino " prefix, lowercase)
+    const normShop = s => s.toLowerCase().replace(/^amorino\s*/,'').trim();
+    const shopShifts = weekShifts.filter(s => normShop(s.tienda) === normShop(comboShop));
 
-  const kpiHTML = `<div class="kpi-row" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px;">
-    ${kpis.map(k=>`<div class="kpi-card">
-      <div class="kpi-label">${k.label}</div>
-      <div class="kpi-value" style="color:${k.color};font-size:28px;">${k.val}</div>
-    </div>`).join('')}
-  </div>`;
+    html += `<div class="eval-shop-block" style="margin-bottom:32px;">
+      <div class="eval-shop-title">${esc(comboShop.replace('Amorino ',''))}</div>`;
 
-  return `
-    ${semanaSelect}
-    ${kpiHTML}
-    <div style="overflow-x:auto;">
-      <table style="width:100%;border-collapse:collapse;">
-        <thead>${thead}</thead>
-        <tbody>${tbody}</tbody>
-      </table>
-    </div>
-    <p style="font-size:11px;color:var(--ink-soft);margin-top:12px;">
-      Datos sincronizados desde Combo. Pasa el cursor sobre las horas para ver nº de empleados y turnos.
-    </p>`;
+    for (const dkey of fechas) {
+      const [y,m,d] = dkey.split('-').map(Number);
+      const jsDay = new Date(y,m-1,d).getDay();
+      const dayLabel = `${DIA_S[jsDay]} ${d} ${MES_S[m]}`;
+
+      const tabName = State.radOverride || getRadiografiaTab(dkey);
+      const radData  = tabName ? State.radiografia[tabName] : null;
+      if (tabName && State.radiografia[tabName] === undefined) fetchRadiografiaIfNeeded(dkey, false);
+
+      const radSlots = (radData && radData[shopKey]) ? (radData[shopKey][jsDay] || []) : [];
+      const dayShifts = shopShifts.filter(s => s.dkey === dkey);
+
+      html += `<div style="margin-bottom:24px;">
+        <div style="font-size:13px;font-weight:700;margin-bottom:6px;color:var(--ink);">${dayLabel}</div>`;
+
+      if (!tabName || !radData) {
+        html += `<div class="empty-note" style="padding:6px 0;">${!tabName?'Sin radiografía para esta fecha.':'Cargando radiografía…'}</div></div>`;
+        continue;
+      }
+      if (!radSlots.length) {
+        html += `<div class="empty-note" style="padding:6px 0;">Sin franjas en la radiografía.</div></div>`;
+        continue;
+      }
+
+      const prevDkey = offsetDkey(dkey, -7);
+      const prevT1   = (State.raw.t1 || []).filter(r => r.dkey === prevDkey && shopEq(r.shop, fullShop));
+      let aboveCount = 0, belowCount = 0;
+
+      html += `<div class="eval-table-wrap"><table class="eval-table">
+        <thead><tr><th>FRANJA</th><th class="num">PERSONAL</th><th class="num">€ SEM.ANT.</th></tr></thead><tbody>`;
+
+      for (const radSlot of radSlots) {
+        const slotM = slotToMins(radSlot.slot);
+        if (!slotM) continue;
+        const planned  = dayShifts.filter(s => s.inicio_mins <= slotM.start && s.fin_mins >= slotM.end).length;
+        const required = Math.round(radSlot.staff);
+        const diff = planned - required;
+        let badge, rowCls;
+        if (diff === 0)      { badge = `${required}✓`;      rowCls = ''; }
+        else if (diff > 0)   { badge = `${required}+${diff}`; rowCls = 'ev-pos'; aboveCount++; }
+        else                 { badge = `${required}${diff}`;  rowCls = 'ev-neg'; belowCount++; }
+
+        // Last week's sales: t1 row whose slot starts at same minute
+        const matchT1 = prevT1.find(r => { const rm = slotToMins(r.horario); return rm && rm.start === slotM.start; });
+        const ventasStr = matchT1 && matchT1.ventas > 0 ? fmtEUR(matchT1.ventas) : '—';
+
+        html += `<tr class="${rowCls}"><td>${esc(radSlot.slot)}</td><td class="num"><strong>${badge}</strong></td><td class="num">${ventasStr}</td></tr>`;
+      }
+
+      html += `</tbody></table></div>`;
+      html += `<div class="eval-cost-row" style="margin-top:4px;">
+        <span style="font-weight:600;">${esc(comboShop.replace('Amorino ',''))}</span>
+        <span>▲ ${aboveCount} franjas por encima</span>
+        <span>▼ ${belowCount} franjas por debajo</span>
+      </div>`;
+      html += `</div>`; // end day
+    }
+    html += `</div>`; // end shop
+  }
+  return html || '<div class="empty-note">Sin datos para mostrar.</div>';
 }
 
 /* ================= EVALUACIÓN DEL TURNO ================= */
@@ -2461,6 +2481,9 @@ async function fetchRadiografiaIfNeeded(dkey, updatePanel){
     if (getRadiografiaTab(dd) === tabName) el.innerHTML = buildEvalDayContent(State.shop, dd);
   });
   attachEvalHandlers();
+  // Re-render combo franja comparison (it uses radiografía data)
+  const comboEl = document.getElementById('comboSection');
+  if (comboEl) comboEl.innerHTML = buildComboHTML();
   if (updatePanel) updateCostePersonalKPI(dkey);
 }
 
