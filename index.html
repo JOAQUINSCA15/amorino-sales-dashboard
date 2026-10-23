@@ -1516,14 +1516,9 @@ function buildResenasHTML(shop, from, to){
   if (State.resenas._loaded === 'error')   return '<div class="empty-note" style="color:var(--raspberry)">Error al cargar las reseñas. Comprueba que la hoja esté compartida públicamente.</div>';
   if (!State.resenas._loaded)              return '<div class="empty-note">Cargando reseñas…</div>';
 
-  // Las reseñas usan su propio rango independiente del filtro global de ventas:
-  // últimos 30 días desde la reseña más reciente disponible en los datos.
-  const all = State.resenas.entries;
-  const maxDkey = all.reduce((mx, e) => e.dkey > mx ? e.dkey : mx, '');
-  const resFrom = maxDkey ? offsetDkey(maxDkey, -29) : (from || '');
-  const resTo   = maxDkey || to || '';
-
+  const resFrom = from, resTo = to;
   const shopsToShow = shop === 'all' ? SHOP_ORDER : [shop];
+  const all = State.resenas.entries;
   const inPeriod = e => inRange(e.dkey, resFrom, resTo) && (shop === 'all' || shopEq(e.shop, shop));
   const entries = all.filter(inPeriod);
 
@@ -1963,11 +1958,23 @@ async function loadComboIfNeeded(){
     // tienda(0) fecha(1) inicio(2) fin(3) empleado(4) semana(5) etiqueta(6)
     const ci = { tienda:0, fecha:1, inicio:2, fin:3, empleado:4, semana:5, etiqueta:6 };
     // Parse each shift row, then aggregate by tienda+fecha → horas, turnos, empleados
-    const get = (cv, i) => {
+    // gviz types: Date → x.v="Date(y,m,d)", TimeOfDay → x.v={h,m,s,ms} or number, String → x.v=string
+    const getStr = (cv, i) => {
       const x = cv[i];
       if (!x) return '';
+      // Date column
       if (typeof x.v === 'string' && x.v.startsWith('Date(')) return x.f || x.v;
-      return x.v ?? x.f ?? '';
+      // TimeOfDay as object {h,m,s,ms} — use formatted string "HH:MM:SS"
+      if (x.v !== null && typeof x.v === 'object' && 'h' in x.v) {
+        return x.f || `${String(x.v.h).padStart(2,'0')}:${String(x.v.m||0).padStart(2,'0')}`;
+      }
+      // TimeOfDay as fraction of day (number 0–1)
+      if (typeof x.v === 'number' && x.v >= 0 && x.v < 1) {
+        if (x.f) return x.f;
+        const totalMins = Math.round(x.v * 24 * 60);
+        return `${String(Math.floor(totalMins/60)).padStart(2,'0')}:${String(totalMins%60).padStart(2,'0')}`;
+      }
+      return String(x.v ?? x.f ?? '');
     };
     const timeToMins = t => {
       const s = String(t).replace('h',':').trim();
@@ -1979,14 +1986,14 @@ async function loadComboIfNeeded(){
     const agg = new Map();
     for (const r of allRows){
       const cv = r.c || [];
-      const tienda = String(get(cv, ci.tienda)).trim();
+      const tienda = getStr(cv, ci.tienda).trim();
       if (!tienda || tienda === 'tienda' || tienda === 'Tienda') continue;
-      const fecha  = String(get(cv, ci.fecha)).trim();
+      const fecha  = getStr(cv, ci.fecha).trim();
       if (!fecha) continue;
-      const inicio  = String(get(cv, ci.inicio)).trim();
-      const fin     = String(get(cv, ci.fin)).trim();
-      const emp     = String(get(cv, ci.empleado)).trim();
-      const semana  = String(get(cv, ci.semana)).trim();
+      const inicio  = getStr(cv, ci.inicio).trim();
+      const fin     = getStr(cv, ci.fin).trim();
+      const emp     = getStr(cv, ci.empleado).trim();
+      const semana  = getStr(cv, ci.semana).trim();
       // Compute hours from inicio/fin
       let horas = 0;
       if (inicio && fin){
