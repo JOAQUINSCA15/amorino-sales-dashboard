@@ -1516,7 +1516,9 @@ function buildResenasHTML(shop, from, to){
   if (State.resenas._loaded === 'error')   return '<div class="empty-note" style="color:var(--raspberry)">Error al cargar las reseñas. Comprueba que la hoja esté compartida públicamente.</div>';
   if (!State.resenas._loaded)              return '<div class="empty-note">Cargando reseñas…</div>';
 
-  const resFrom = from, resTo = to;
+  // Reseñas: ventana de 30 días terminando en la fecha 'to' seleccionada
+  const resTo   = to || '';
+  const resFrom = resTo ? offsetDkey(resTo, -29) : '';
   const shopsToShow = shop === 'all' ? SHOP_ORDER : [shop];
   const all = State.resenas.entries;
   const inPeriod = e => inRange(e.dkey, resFrom, resTo) && (shop === 'all' || shopEq(e.shop, shop));
