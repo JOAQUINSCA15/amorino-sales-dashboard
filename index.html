@@ -2021,7 +2021,9 @@ async function loadComboIfNeeded(){
       rows.push({ tienda: e.tienda, fecha: e.fecha, dia: e.dia, semana: e.semana,
                   horas: Math.round(e.horas*10)/10, turnos: e.turnos, emps: e.empsSet.size });
     }
-    State.combo = { _loaded: true, rows };
+    State.combo = { _loaded: true, rows,
+      _debug: { totalRows: allRows.length, rows: rows.length,
+        sample: (allRows.slice(0,3)).map(r => (r.c||[]).slice(0,5).map(x => x ? {v: x.v, f: x.f} : null)) } };
   } catch(e){
     console.error('Combo load error:', e);
     State.combo = { _loaded: 'error', rows: [] };
@@ -2058,7 +2060,14 @@ function buildComboHTML(){
   if (!State.combo._loaded)              return '<div class="empty-note">Cargando planificación…</div>';
 
   const rows = State.combo.rows;
-  if (!rows.length) return '<div class="empty-note">No hay datos de planificación en la hoja.</div>';
+  if (!rows.length) {
+    const dbg = State.combo._debug || {};
+    return `<div style="background:#f5f5f5;border-radius:8px;padding:10px;font-size:11px;font-family:monospace;white-space:pre-wrap;word-break:break-all;margin-bottom:12px;">
+totalRows: ${dbg.totalRows} · rows parsed: ${dbg.rows}
+sample[0]: ${JSON.stringify((dbg.sample||[])[0])}
+sample[1]: ${JSON.stringify((dbg.sample||[])[1])}
+    </div><div class="empty-note">No hay datos de planificación en la hoja.</div>`;
+  }
 
   // Group by semana → for selector
   const semanas = [...new Set(rows.map(r => r.semana))].sort();
