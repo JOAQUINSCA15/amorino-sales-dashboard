@@ -2095,29 +2095,53 @@ function buildComboHTML(){
   // Semana selector
   const semanas = [...new Set(rows.map(r => r.semana).filter(Boolean))].sort();
   const selSemana = State.comboSemana || semanas[semanas.length - 1];
-  let semanaSelect = '';
-  if (semanas.length > 1){
-    semanaSelect = `<select onchange="State.comboSemana=this.value;document.getElementById('comboSection').innerHTML=buildComboHTML();"
-      style="font-size:13px;font-weight:600;padding:6px 28px 6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--white);appearance:none;
-      background-image:url(\\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23766955'/%3E%3C/svg%3E\\");
-      background-repeat:no-repeat;background-position:right 10px center;cursor:pointer;margin-bottom:16px;">
-      ${semanas.map(s=>`<option value="${esc(s)}" ${s===selSemana?'selected':''}>${esc(s)}</option>`).join('')}
-    </select>`;
-  } else {
-    semanaSelect = `<div style="font-size:13px;color:var(--ink-soft);margin-bottom:16px;">Semana del ${esc(selSemana)}</div>`;
+
+  // All dates in selected week
+  const allWeekShifts = (shifts || []).filter(s => s.semana === selSemana);
+  const allWeekDates  = [...new Set(allWeekShifts.map(s => s.dkey))].sort();
+  const weekMin = allWeekDates[0] || '';
+  const weekMax = allWeekDates[allWeekDates.length - 1] || '';
+
+  // Per-combo date range filter (resets when semana changes)
+  if (State._comboSemanaForRange !== selSemana) {
+    State.comboFrom = weekMin; State.comboTo = weekMax;
+    State._comboSemanaForRange = selSemana;
   }
+  const cFrom = State.comboFrom || weekMin;
+  const cTo   = State.comboTo   || weekMax;
 
-  // Shifts for selected week
-  const weekShifts = (shifts || []).filter(s => s.semana === selSemana);
-  // Sorted unique dates
-  const fechas = [...new Set(weekShifts.map(s => s.dkey))].sort();
+  // Filtered shifts and dates
+  const weekShifts = allWeekShifts.filter(s => s.dkey >= cFrom && s.dkey <= cTo);
+  const fechas = allWeekDates.filter(d => d >= cFrom && d <= cTo);
 
-  // Shops to show
+  // Combo-local shop filter
+  const comboShopFilter = State.comboShopFilter || 'all';
+
+  const _ss = `font-size:12px;padding:5px 24px 5px 8px;border-radius:7px;border:1px solid var(--line);background:var(--white);appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23766955'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;cursor:pointer;`;
+  const _ds = `font-size:12px;padding:5px 8px;border-radius:7px;border:1px solid var(--line);background:var(--white);cursor:pointer;`;
+  const _re = `document.getElementById('comboSection').innerHTML=buildComboHTML();`;
+
+  const controls = `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:16px;">
+    <select style="${_ss}" onchange="State.comboSemana=this.value;State.comboFrom='';State.comboTo='';State._comboSemanaForRange=null;${_re}">
+      ${semanas.map(s=>`<option value="${esc(s)}" ${s===selSemana?'selected':''}>${esc(s)}</option>`).join('')}
+    </select>
+    <label style="font-size:12px;color:var(--ink-soft);">Desde</label>
+    <input type="date" style="${_ds}" value="${cFrom}" min="${weekMin}" max="${weekMax}" onchange="State.comboFrom=this.value;${_re}">
+    <label style="font-size:12px;color:var(--ink-soft);">hasta</label>
+    <input type="date" style="${_ds}" value="${cTo}" min="${weekMin}" max="${weekMax}" onchange="State.comboTo=this.value;${_re}">
+    <select style="${_ss}" onchange="State.comboShopFilter=this.value;${_re}">
+      <option value="all" ${comboShopFilter==='all'?'selected':''}>Todas las tiendas</option>
+      ${COMBO_SHOP_ORDER.map(s=>`<option value="${esc(s)}" ${comboShopFilter===s?'selected':''}>${esc(s.replace('Amorino ',''))}</option>`).join('')}
+    </select>
+  </div>`;
+
+  // Shops to show (combo-local filter takes priority)
   let shopsToShow;
-  if (State.shop === 'all') {
+  if (comboShopFilter !== 'all') {
+    shopsToShow = [comboShopFilter];
+  } else if (State.shop === 'all') {
     shopsToShow = COMBO_SHOP_ORDER;
   } else {
-    // Match global shop filter to combo shop names
     shopsToShow = COMBO_SHOP_ORDER.filter(cs => {
       const full = COMBO_TO_FULL[cs] || cs;
       return full === State.shop || shopEq(cs, State.shop);
@@ -2128,7 +2152,7 @@ function buildComboHTML(){
   const MES_S = ['','ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
   const DIA_S = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
 
-  let html = semanaSelect;
+  let html = controls;
 
   for (const comboShop of shopsToShow) {
     const fullShop = COMBO_TO_FULL[comboShop] || comboShop;
@@ -2180,9 +2204,9 @@ function buildComboHTML(){
         const required = Math.round(radSlot.staff);
         const diff = planned - required;
         let badge, rowCls;
-        if (diff === 0)      { badge = `${required}✓`;      rowCls = ''; }
-        else if (diff > 0)   { badge = `${required}+${diff}`; rowCls = 'ev-pos'; aboveCount++; }
-        else                 { badge = `${required}${diff}`;  rowCls = 'ev-neg'; belowCount++; }
+        if (diff === 0)      { badge = `${planned}✓`;      rowCls = ''; }
+        else if (diff > 0)   { badge = `${planned}+${diff}`; rowCls = 'ev-pos'; aboveCount++; }
+        else                 { badge = `${planned}${diff}`;  rowCls = 'ev-neg'; belowCount++; }
 
         // Last week's sales: t1 row whose slot starts at same minute
         const matchT1 = prevT1.find(r => { const rm = slotToMins(r.horario); return rm && rm.start === slotM.start; });
