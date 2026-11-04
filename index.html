@@ -778,6 +778,7 @@ const HIST_SHOP_KEY = {
 const State = {
   shop:'all', from:null, to:null, raw:null, loading:false, error:null, lastSync:null,
   weather:{}, weatherFetching:false,
+  _vcKey: (()=>{ try{ return localStorage.getItem('vcKey')||'P66BY7XPLBPTPFDPJHQGBANLP'; }catch(e){ return 'P66BY7XPLBPTPFDPJHQGBANLP'; } })(),
   radiografia:{},
   radOverride: null,
   radTabs: null, // null = not loaded, [...] = list of tab names
@@ -798,9 +799,10 @@ const State = {
   seguridadSocial: 32,
 };
 
-/* Sevilla coordinates for weather */
-const WEATHER_LAT = 37.39, WEATHER_LON = -5.98;
-const RAIN_THRESHOLD = 1.0; // ≥1 mm = día de lluvia (umbral meteorológico estándar)
+/* Sevilla weather — Visual Crossing (estación real Sevilla) */
+const VC_LOCATION    = 'Sevilla,Spain';
+const WEATHER_LAT    = 37.39, WEATHER_LON = -5.98; // fallback Open-Meteo
+const RAIN_THRESHOLD = 1.0; // ≥1 mm = día de lluvia
 
 /* ================= DATA LOADING ================= */
 async function fetchTab(name){
@@ -1743,33 +1745,63 @@ function getMatchedMedHelComparison(from, to, shop){
   };
 }
 
+function getVcKey(){ return (State._vcKey || '').trim(); }
+
 async function fetchWeatherIfNeeded(from, to){
   if (!from || !to || State.weatherFetching) return;
-  // Build list of dates needed: current period + same period last year
   const days = []; let d = from; while(d<=to){ days.push(d); d=shiftDate(d,1); }
   const prevDays = days.map(d => prevYearKey(d));
   const allNeeded = [...days, ...prevDays];
   const missing = allNeeded.filter(d => !State.weather[d]);
   if (!missing.length) return;
   State.weatherFetching = true;
-  missing.sort();
-  const wFrom = missing[0], wTo = missing[missing.length-1];
-  function parseW(data){
-    if (!data.daily) return;
-    data.daily.time.forEach((dkey,i) => {
-      const tempMax = data.daily.temperature_2m_max[i];
-      const precip  = data.daily.precipitation_sum[i];
-      if (!State.weather[dkey]) State.weather[dkey] = { tempMax, precip, rain: precip > RAIN_THRESHOLD };
-    });
+
+  const vcKey = getVcKey();
+  if (vcKey) {
+    // Visual Crossing: fetch current period and prev-year period separately
+    async function fetchVC(arr){
+      if (!arr.length) return;
+      arr.sort();
+      const f = arr[0], t2 = arr[arr.length-1];
+      try {
+        const url = `https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/${encodeURIComponent(VC_LOCATION)}/${f}/${t2}?unitGroup=metric&elements=datetime,tempmax,precip&include=days&key=${vcKey}&contentType=json`;
+        const r = await fetch(url);
+        if (!r.ok) return;
+        const data = await r.json();
+        (data.days || []).forEach(day => {
+          const dkey = day.datetime; // "YYYY-MM-DD"
+          const precip  = day.precip  ?? 0;
+          const tempMax = day.tempmax ?? null;
+          State.weather[dkey] = { tempMax, precip, rain: precip >= RAIN_THRESHOLD };
+        });
+      } catch(e){}
+    }
+    const curMissing  = missing.filter(d => days.includes(d));
+    const prevMissing = missing.filter(d => prevDays.includes(d));
+    await fetchVC(curMissing);
+    await fetchVC(prevMissing);
+  } else {
+    // Fallback: Open-Meteo
+    missing.sort();
+    const wFrom = missing[0], wTo = missing[missing.length-1];
+    function parseW(data){
+      if (!data.daily) return;
+      data.daily.time.forEach((dkey,i) => {
+        const tempMax = data.daily.temperature_2m_max[i];
+        const precip  = data.daily.precipitation_sum[i];
+        if (!State.weather[dkey]) State.weather[dkey] = { tempMax, precip, rain: precip > RAIN_THRESHOLD };
+      });
+    }
+    try { const r = await fetch(`https://archive-api.open-meteo.com/v1/archive?latitude=${WEATHER_LAT}&longitude=${WEATHER_LON}&start_date=${wFrom}&end_date=${wTo}&daily=temperature_2m_max,precipitation_sum&timezone=Europe%2FMadrid`); if(r.ok) parseW(await r.json()); } catch(e){}
+    try {
+      const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${WEATHER_LAT}&longitude=${WEATHER_LON}&daily=temperature_2m_max,precipitation_sum&timezone=Europe%2FMadrid&past_days=92&forecast_days=1`);
+      if(r.ok){ const data = await r.json(); if(data.daily) data.daily.time.forEach((dkey,i) => {
+        if(dkey<wFrom||dkey>wTo) return;
+        State.weather[dkey] = { tempMax:data.daily.temperature_2m_max[i], precip:data.daily.precipitation_sum[i], rain:data.daily.precipitation_sum[i]>RAIN_THRESHOLD };
+      }); }
+    } catch(e){}
   }
-  try { const r = await fetch(`https://archive-api.open-meteo.com/v1/archive?latitude=${WEATHER_LAT}&longitude=${WEATHER_LON}&start_date=${wFrom}&end_date=${wTo}&daily=temperature_2m_max,precipitation_sum&timezone=Europe%2FMadrid`); if(r.ok) parseW(await r.json()); } catch(e){}
-  try {
-    const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${WEATHER_LAT}&longitude=${WEATHER_LON}&daily=temperature_2m_max,precipitation_sum&timezone=Europe%2FMadrid&past_days=92&forecast_days=1`);
-    if(r.ok){ const data = await r.json(); if(data.daily) data.daily.time.forEach((dkey,i) => {
-      if(dkey<wFrom||dkey>wTo) return;
-      State.weather[dkey] = { tempMax:data.daily.temperature_2m_max[i], precip:data.daily.precipitation_sum[i], rain:data.daily.precipitation_sum[i]>RAIN_THRESHOLD };
-    }); }
-  } catch(e){}
+
   State.weatherFetching = false;
   const el = document.getElementById('weatherKPIs');
   if (el) el.innerHTML = buildWeatherKPIsHTML(State.from, State.to);
@@ -1812,7 +1844,10 @@ function buildWeatherKPIsHTML(from, to){
     </div></div>`;
   }
 
-  return `<div class="kpi-section-label" style="margin-top:18px;">Meteorología · Sevilla</div>
+  const srcBadge = getVcKey()
+    ? `<span style="font-size:10px;color:var(--pistachio);margin-left:6px;">● Visual Crossing</span>`
+    : `<span style="font-size:10px;color:var(--ink-soft);margin-left:6px;">● Open-Meteo</span>`;
+  return `<div class="kpi-section-label" style="margin-top:18px;display:flex;align-items:center;">Meteorología · Sevilla${srcBadge}</div>
   <div class="kpi-row" style="grid-template-columns:repeat(2,1fr);max-width:420px;">
     ${card(isRange?'Días de lluvia':'Lluvia', cur.rainVal, prev?.rainVal, rainColor)}
     ${card(isRange?'Temperatura máx.':'Temp. máx. del día', cur.tempVal, prev?.tempVal, 'var(--raspberry)')}
@@ -1822,7 +1857,7 @@ function buildWeatherKPIsHTML(from, to){
 /* ================= COMBO PLANIFICACIÓN ================= */
 // Sheet ID de la hoja "Amorino Operaciones" (tab Combo_Planning, gid 0)
 // Cámbialo por el ID real una vez crees la hoja y ejecutes el Apps Script.
-const COMBO_SHEET_ID = '14kP6Fyxb9IRdg47vxHSOtDjZ7r8n5gkdZ0e2TwYbDc8';
+const COMBO_SHEET_ID = '1rKQdex1FPGwaYQa3Ng34Uh8I-sLBRyRl2VmcOTeY99U';
 
 const COMBO_SHOP_ORDER = [
   'Amorino Avenida',
