@@ -1864,7 +1864,7 @@ async function fetchWeatherIfNeeded(from, to){
     State.weather[dkey] = { tempMax: null, precip, rain: precip > 0, src: 'tsev' };
   });
 
-  const missing = allNeeded.filter(d => !State.weather[d]);
+  const missing = allNeeded.filter(d => !State.weather[d] || State.weather[d].tempMax === null);
   if (!missing.length){ State.weatherFetching = false; const el=document.getElementById('weatherKPIs'); if(el) el.innerHTML=buildWeatherKPIsHTML(from,to); return; }
   State.weatherFetching = true;
 
@@ -3486,7 +3486,7 @@ function renderUltimosCard(shop, from, to){
     const row = latestUltRow(s, from, to);
     const tickets = row ? row.tickets.slice(0,5) : [];
     return `<div class="ticket-card">
-      <h4>${esc(s.replace('Amorino S',''))}</h4>
+      <h4>${esc(s.replace('Amorino ',''))}</h4>
       ${row ? `<div class="hint" style="margin-bottom:8px;">${dateLabel(row.dkey)}</div>` : ''}
       ${tickets.length ? tickets.map((t,i) => `<div class="ticket-row ${i===0?'latest':''}"><span class="t-idx">#${i+1}</span><span>${esc(t)}</span></div>`).join('') : '<div class="empty-note" style="padding:10px 0;">Sin datos</div>'}
     </div>`;
