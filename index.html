@@ -1747,6 +1747,76 @@ function getMatchedMedHelComparison(from, to, shop){
 
 function getVcKey(){ return (State._vcKey || '').trim(); }
 
+/* ── tiempoensevilla.es parser ─────────────────────────────────────
+   Table: rows = day 1-31, cols = Día,Ene,Feb,Mar,Abr,May,Jun,Jul,Ago,Sep,Oct,Nov,Dic
+   Stores precip only (no tempMax from this source).
+   Returns true if any data was written.
+*/
+const MONTH_COLS = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+
+function parseTiempoSevillaHTML(html, year){
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    // Find table that has month header cells
+    let table = null;
+    for (const t of doc.querySelectorAll('table')){
+      const txt = t.textContent.toLowerCase();
+      if (txt.includes('ene') && txt.includes('feb') && txt.includes('oct')) { table = t; break; }
+    }
+    if (!table) return false;
+    // Map header text → column index
+    const headers = [...table.querySelectorAll('tr')[0]?.querySelectorAll('th,td') || []].map(c=>c.textContent.trim().toLowerCase());
+    const monthIdx = MONTH_COLS.map(m => headers.indexOf(m)); // -1 if not found
+    let wrote = 0;
+    for (const tr of table.querySelectorAll('tr')){
+      const cells = [...tr.querySelectorAll('td')];
+      if (!cells.length) continue;
+      const dayTxt = cells[0]?.textContent.trim();
+      const day = parseInt(dayTxt, 10);
+      if (isNaN(day) || day < 1 || day > 31) continue;
+      monthIdx.forEach((ci, mi) => {
+        if (ci < 0 || ci >= cells.length) return;
+        const val = cells[ci]?.textContent.trim().replace(',','.');
+        if (!val || val === '---' || val === '') return;
+        const precip = parseFloat(val);
+        if (isNaN(precip)) return;
+        const dkey = `${year}-${String(mi+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+        if (!State.weather[dkey]) State.weather[dkey] = { tempMax: null, precip, rain: precip >= RAIN_THRESHOLD, src:'tsev' };
+        else { State.weather[dkey].precip = precip; State.weather[dkey].rain = precip >= RAIN_THRESHOLD; State.weather[dkey].src = 'tsev'; }
+        wrote++;
+      });
+    }
+    return wrote > 0;
+  } catch(e){ return false; }
+}
+
+async function fetchTiempoSevilla(year){
+  const currentYear = new Date().getFullYear();
+  // Try direct URL and common CumulusMX year-param patterns
+  const baseUrls = year === currentYear
+    ? ['https://www.tiempoensevilla.es/wxraindetail.php']
+    : [
+        `https://www.tiempoensevilla.es/wxraindetail.php?yr=${year}`,
+        `https://www.tiempoensevilla.es/wxraindetail.php?year=${year}`,
+        `https://www.tiempoensevilla.es/wxraindetail.php?y=${year}`,
+      ];
+  // Try direct, then via corsproxy.io
+  for (const base of baseUrls){
+    for (const url of [base, `https://corsproxy.io/?url=${encodeURIComponent(base)}`]){
+      try {
+        const r = await fetch(url, {signal: AbortSignal.timeout(8000)});
+        if (!r.ok) continue;
+        const html = await r.text();
+        // For non-current years, verify page actually shows that year
+        if (year !== currentYear && !html.includes(`${year}`)) continue;
+        if (parseTiempoSevillaHTML(html, year)) return true;
+      } catch(e){}
+    }
+  }
+  return false;
+}
+
 async function fetchWeatherIfNeeded(from, to){
   if (!from || !to || State.weatherFetching) return;
   const days = []; let d = from; while(d<=to){ days.push(d); d=shiftDate(d,1); }
@@ -1756,23 +1826,34 @@ async function fetchWeatherIfNeeded(from, to){
   if (!missing.length) return;
   State.weatherFetching = true;
 
+  // Step 1: tiempoensevilla.es for rain (precise local station)
+  const yearsNeeded = [...new Set(allNeeded.map(d => d.split('-')[0]))].map(Number);
+  const tsevResults = {};
+  for (const yr of yearsNeeded) tsevResults[yr] = await fetchTiempoSevilla(yr);
+
+  // Step 2: Visual Crossing for temperature (and rain fallback if tsev failed)
   const vcKey = getVcKey();
   if (vcKey) {
-    // Visual Crossing: fetch current period and prev-year period separately
     async function fetchVC(arr){
       if (!arr.length) return;
       arr.sort();
       const f = arr[0], t2 = arr[arr.length-1];
       try {
-        const url = `https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/${encodeURIComponent(VC_LOCATION)}/${f}/${t2}?unitGroup=metric&elements=datetime,tempmax,precip&include=days&key=${vcKey}&contentType=json`;
+        const url = `https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/LEZL/${f}/${t2}?unitGroup=metric&elements=datetime,tempmax,precip&include=days&key=${vcKey}&contentType=json`;
         const r = await fetch(url);
         if (!r.ok) return;
         const data = await r.json();
         (data.days || []).forEach(day => {
-          const dkey = day.datetime; // "YYYY-MM-DD"
-          const precip  = day.precip  ?? 0;
+          const dkey = day.datetime;
           const tempMax = day.tempmax ?? null;
-          State.weather[dkey] = { tempMax, precip, rain: precip >= RAIN_THRESHOLD };
+          const precip  = day.precip  ?? 0;
+          if (!State.weather[dkey]) {
+            // tsev had no data → use VC for rain too
+            State.weather[dkey] = { tempMax, precip, rain: precip >= RAIN_THRESHOLD, src:'vc' };
+          } else {
+            // tsev already wrote precip → only add tempMax
+            State.weather[dkey].tempMax = tempMax;
+          }
         });
       } catch(e){}
     }
@@ -1781,23 +1862,16 @@ async function fetchWeatherIfNeeded(from, to){
     await fetchVC(curMissing);
     await fetchVC(prevMissing);
   } else {
-    // Fallback: Open-Meteo
+    // Fallback: Open-Meteo for temperature only if no VC key
     missing.sort();
     const wFrom = missing[0], wTo = missing[missing.length-1];
-    function parseW(data){
-      if (!data.daily) return;
-      data.daily.time.forEach((dkey,i) => {
+    try {
+      const r = await fetch(`https://archive-api.open-meteo.com/v1/archive?latitude=${WEATHER_LAT}&longitude=${WEATHER_LON}&start_date=${wFrom}&end_date=${wTo}&daily=temperature_2m_max,precipitation_sum&timezone=Europe%2FMadrid`);
+      if(r.ok){ const data = await r.json(); if(data.daily) data.daily.time.forEach((dkey,i) => {
         const tempMax = data.daily.temperature_2m_max[i];
         const precip  = data.daily.precipitation_sum[i];
-        if (!State.weather[dkey]) State.weather[dkey] = { tempMax, precip, rain: precip > RAIN_THRESHOLD };
-      });
-    }
-    try { const r = await fetch(`https://archive-api.open-meteo.com/v1/archive?latitude=${WEATHER_LAT}&longitude=${WEATHER_LON}&start_date=${wFrom}&end_date=${wTo}&daily=temperature_2m_max,precipitation_sum&timezone=Europe%2FMadrid`); if(r.ok) parseW(await r.json()); } catch(e){}
-    try {
-      const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${WEATHER_LAT}&longitude=${WEATHER_LON}&daily=temperature_2m_max,precipitation_sum&timezone=Europe%2FMadrid&past_days=92&forecast_days=1`);
-      if(r.ok){ const data = await r.json(); if(data.daily) data.daily.time.forEach((dkey,i) => {
-        if(dkey<wFrom||dkey>wTo) return;
-        State.weather[dkey] = { tempMax:data.daily.temperature_2m_max[i], precip:data.daily.precipitation_sum[i], rain:data.daily.precipitation_sum[i]>RAIN_THRESHOLD };
+        if (!State.weather[dkey]) State.weather[dkey] = { tempMax, precip, rain: precip > RAIN_THRESHOLD, src:'om' };
+        else State.weather[dkey].tempMax = tempMax;
       }); }
     } catch(e){}
   }
@@ -1844,9 +1918,12 @@ function buildWeatherKPIsHTML(from, to){
     </div></div>`;
   }
 
-  const srcBadge = getVcKey()
-    ? `<span style="font-size:10px;color:var(--pistachio);margin-left:6px;">● Visual Crossing</span>`
-    : `<span style="font-size:10px;color:var(--ink-soft);margin-left:6px;">● Open-Meteo</span>`;
+  const usedTsev = wDays.some(w => w.src === 'tsev');
+  const srcBadge = usedTsev
+    ? `<span style="font-size:10px;color:var(--pistachio);margin-left:6px;">● tiempoensevilla.es</span>`
+    : getVcKey()
+      ? `<span style="font-size:10px;color:var(--ink-soft);margin-left:6px;">● Visual Crossing (LEZL)</span>`
+      : `<span style="font-size:10px;color:var(--ink-soft);margin-left:6px;">● Open-Meteo</span>`;
   return `<div class="kpi-section-label" style="margin-top:18px;display:flex;align-items:center;">Meteorología · Sevilla${srcBadge}</div>
   <div class="kpi-row" style="grid-template-columns:repeat(2,1fr);max-width:420px;">
     ${card(isRange?'Días de lluvia':'Lluvia', cur.rainVal, prev?.rainVal, rainColor)}
