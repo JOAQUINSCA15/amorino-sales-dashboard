@@ -1829,8 +1829,11 @@ async function loadLluviaFromSheets(){
   State._lluviaSheetLoaded = true;
   try {
     const url = `https://docs.google.com/spreadsheets/d/${LLUVIA_SHEET_ID}/gviz/tq?tqx=out:json&sheet=lluvia_sevilla`;
-    const r = await fetch(url);
-    if (!r.ok) return;
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 4000);
+    const r = await fetch(url, { signal: ctrl.signal }).catch(() => null);
+    clearTimeout(tid);
+    if (!r || !r.ok) return;
     const text = await r.text();
     const json = JSON.parse(text.replace(/^[^{]*/, '').replace(/[^}]*$/, ''));
     const rows = json?.table?.rows || [];
