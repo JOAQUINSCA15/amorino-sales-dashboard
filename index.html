@@ -2195,7 +2195,16 @@ const DEGU_SHOP_MAP = {
   'amorino catedral':             'Amorino Catedral',
 };
 function normDeguShop(raw){
-  return DEGU_SHOP_MAP[(raw||'').trim().toLowerCase().normalize('NFC')] || null;
+  const key = (raw||'').trim().toLowerCase().normalize('NFC');
+  if (DEGU_SHOP_MAP[key]) return DEGU_SHOP_MAP[key];
+  // Fuzzy fallback by substring (handles "Amorino Sevilla" → Catedral, typos, etc.)
+  const nfd = key.normalize('NFD').replace(/[̀-ͯ]/g,'');
+  if (nfd.includes('catedral') || (nfd.includes('sevilla') && !nfd.includes('avenida') && !nfd.includes('plaza') && !nfd.includes('alcaz') && !nfd.includes('naranjo'))) return 'Amorino Catedral';
+  if (nfd.includes('naranjo'))  return 'Amorino Patio de los Naranjos';
+  if (nfd.includes('plaza'))    return 'Amorino Plaza Nueva';
+  if (nfd.includes('alcaz'))    return 'Amorino Alcázar';
+  if (nfd.includes('avenida'))  return 'Amorino Sevilla Avenida';
+  return null;
 }
 function parseMarcaTemporal(s){
   if (!s) return null;
@@ -2215,20 +2224,24 @@ async function loadDegustacionesIfNeeded(){
     const json = await loadViaJSONP_2(DEGU_SHEET_ID, 'Data');
     const rows = gvizJsonToRows(json).slice(1); // skip header row
     // cols: 0=Marca temporal, 1=TIENDA, 2=FOTO, 3=PRODUCTO UTILIZADO
+    const unknownShops = new Set();
     for (const row of rows){
       const shop = normDeguShop(row[1]);
-      if (!shop) continue;
+      if (!shop){ unknownShops.add(row[1]); continue; }
       const p = parseMarcaTemporal(row[0]);
       if (!p) continue;
       if (!State.degustaciones[shop]) State.degustaciones[shop] = {};
       if (!State.degustaciones[shop][p.dkey]) State.degustaciones[shop][p.dkey] = {};
       State.degustaciones[shop][p.dkey][p.hour] = (State.degustaciones[shop][p.dkey][p.hour]||0) + 1;
     }
+    console.log('[Degu] rows loaded:', rows.length, '| unmatched shops:', [...unknownShops]);
+    console.log('[Degu] shops found:', Object.keys(State.degustaciones).filter(k=>k!=='_loaded'));
     State.degustaciones._loaded = true;
   } catch(e){
     State.degustaciones._loaded = 'error';
   }
-  // Re-render eval section if open
+  // Re-render degustaciones tab if open, and eval section
+  if (State.activeTab === 'degustaciones') renderAll();
   const el = document.getElementById('evalTurnoSection');
   if (el) { el.innerHTML = buildEvalTurnoHTML(State.shop, State.from); attachEvalHandlers(); }
 }
