@@ -2334,8 +2334,8 @@ function loadViaJSONP_2(sheetId, sheetName){
       if(settled) return; settled=true; cleanup();
       if(!json || json.status==='error') reject(new Error('Error: '+sheetName)); else resolve(json);
     };
-    const timer = setTimeout(()=>{ if(settled) return; settled=true; cleanup(); reject(new Error('Timeout: '+sheetName)); }, 15000);
-    scriptEl.src = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json;responseHandler:${cbName}&sheet=${encodeURIComponent(sheetName)}&headers=0&_=${Date.now()}`;
+    const timer = setTimeout(()=>{ if(settled) return; settled=true; cleanup(); reject(new Error('Timeout: '+sheetName)); }, 30000);
+    scriptEl.src = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json;responseHandler:${cbName}&sheet=${encodeURIComponent(sheetName)}&headers=0&tq=select%20*%20limit%2015000&_=${Date.now()}`;
     scriptEl.onerror = ()=>{ if(settled) return; settled=true; cleanup(); reject(new Error('Load error: '+sheetName)); };
     document.head.appendChild(scriptEl);
   });
