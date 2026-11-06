@@ -2877,8 +2877,10 @@ function renderAll(){
   const html = `
     ${renderKPIs(shop, from, to)}
     <div id="weatherKPIs">${buildWeatherKPIsHTML(from, to)}</div>
-    <div id="flightsKPI">${buildFlightsKPIHTML(from, to)}</div>
-    <div id="trainsKPI">${buildTrainsKPIHTML(from, to)}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:4px;">
+      <div id="flightsKPI">${buildFlightsKPIHTML(from, to)}</div>
+      <div id="trainsKPI">${buildTrainsKPIHTML(from, to)}</div>
+    </div>
     <div class="section-title"><span class="swatch" style="background:var(--raspberry)"></span>Evolución diaria de ventas</div>
     ${renderDailySeriesCard(shop, from, to)}
     <div class="section-title"><span class="swatch" style="background:var(--raspberry)"></span>Ventas por hora</div>
