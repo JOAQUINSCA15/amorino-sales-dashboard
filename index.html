@@ -1949,10 +1949,23 @@ function loadFlightsIfNeeded(){
     .then(function(data){
       const rows = data?.table?.rows || [];
       rows.forEach(row => {
-        const c     = row.c || [];
-        const fecha = c[0]?.v ? String(c[0].v).trim() : null;
-        const cnt   = c[1]?.v ?? null;
-        if (!fecha || !fecha.match(/^\d{4}-\d{2}-\d{2}$/)) return;
+        const c   = row.c || [];
+        const raw = c[0]?.v;
+        if (!raw) return;
+        // gviz may return a string "2026-11-06" OR a Date object "Date(2026,10,6)"
+        let fecha = null;
+        const rawStr = String(raw).trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(rawStr)) {
+          fecha = rawStr;
+        } else {
+          const m = rawStr.match(/Date\((\d+),(\d+),(\d+)\)/);
+          if (m) {
+            const y = m[1], mo = String(Number(m[2])+1).padStart(2,'0'), dy = String(m[3]).padStart(2,'0');
+            fecha = `${y}-${mo}-${dy}`;
+          }
+        }
+        if (!fecha) return;
+        const cnt = c[1]?.v ?? null;
         State.flights[fecha] = (cnt !== null && cnt !== '') ? Math.round(Number(cnt)) : null;
       });
       console.log('[Vuelos] rows loaded:', rows.length, '| flights:', JSON.stringify(State.flights));
