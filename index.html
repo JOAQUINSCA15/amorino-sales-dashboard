@@ -1932,82 +1932,41 @@ async function fetchWeatherIfNeeded(from, to){
   if (el) el.innerHTML = buildWeatherKPIsHTML(State.from, State.to);
 }
 
-/* ================= VUELOS SVQ (OpenSky Network) ================= */
-const OPENSKY_AIRPORT = 'LEZL'; // Sevilla San Pablo ICAO
+/* ================= VUELOS SVQ (via Google Sheets scraper) ================= */
+// Data is fetched daily by an Apps Script (vuelos_script.gs) that calls
+// the OpenSky Network API and writes to tab "vuelos_svq" in the Weather Data sheet.
+// The dashboard reads that tab — same pattern as the rain scraper.
+const VUELOS_SHEET_ID  = LLUVIA_SHEET_ID; // reuse Weather Data sheet
+const VUELOS_TAB       = 'vuelos_svq';
 
-// Persist flight cache in localStorage so it survives page reload
-function flightsCacheSave(){
-  try { localStorage.setItem('svq_flights', JSON.stringify(State.flights)); } catch(e){}
-}
-function flightsCacheLoad(){
-  try {
-    const raw = localStorage.getItem('svq_flights');
-    if (raw) Object.assign(State.flights, JSON.parse(raw));
-  } catch(e){}
-}
-flightsCacheLoad();
-
-// Convert YYYY-MM-DD to Unix timestamp at start/end of day in Madrid local time (UTC+1 or UTC+2)
-function dkeyToUnix(dkey, endOfDay){
-  // Use noon UTC ± 12h to cover whole local day regardless of DST
-  const base = new Date(dkey + (endOfDay ? 'T23:00:00Z' : 'T00:00:00Z'));
-  // Adjust: Spain is UTC+1 (winter) / UTC+2 (summer); use ±13h for safety
-  return Math.floor((endOfDay ? new Date(dkey + 'T23:59:00+02:00') : new Date(dkey + 'T00:00:00+01:00')).getTime() / 1000);
-}
-
-async function loadFlightsIfNeeded(){
+function loadFlightsIfNeeded(){
   if (!State.from || !State.to || State.flightsFetching) return;
-
-  // Find dates not yet cached (null = known error, undefined = not tried)
-  const days = []; let d = State.from; while(d<=State.to){ days.push(d); d=shiftDate(d,1); }
-  const needed = days.filter(d => State.flights[d] === undefined);
-  if (!needed.length){ renderFlightsKPI(); return; }
+  if (State._flightsSheetLoaded){ renderFlightsKPI(); return; }
 
   State.flightsFetching = true;
 
-  // Chunk into ≤7-day windows
-  needed.sort();
-  const chunks = [];
-  let cs = needed[0], ce = needed[0];
-  for (let i = 1; i < needed.length; i++){
-    const gap = (new Date(needed[i]) - new Date(ce)) / 86400000;
-    if (gap <= 7){ ce = needed[i]; }
-    else { chunks.push([cs,ce]); cs = ce = needed[i]; }
-  }
-  chunks.push([cs,ce]);
-
-  for (const [from, to] of chunks){
-    const begin = dkeyToUnix(from, false);
-    const end   = dkeyToUnix(to,   true);
-    // Mark all days in window as "null" (error) first; overwrite on success
-    let dd = from; while(dd<=to){ State.flights[dd] = null; dd = shiftDate(dd,1); }
-    try {
-      const ctrl = new AbortController();
-      const tid  = setTimeout(() => ctrl.abort(), 10000);
-      const r = await fetch(
-        `https://opensky-network.org/api/flights/arrival?airport=${OPENSKY_AIRPORT}&begin=${begin}&end=${end}`,
-        { signal: ctrl.signal }
-      ).catch(() => null);
-      clearTimeout(tid);
-      if (r && r.ok){
-        const data = await r.json();
-        // Count arrivals per local date (use lastSeen Unix → Madrid date)
-        const counts = {};
-        for (const f of data){
-          const ts = (f.lastSeen || f.firstSeen || 0) * 1000;
-          if (!ts) continue;
-          // Format as YYYY-MM-DD in Europe/Madrid timezone
-          const dk = new Date(ts).toLocaleDateString('sv-SE', { timeZone:'Europe/Madrid' });
-          counts[dk] = (counts[dk]||0) + 1;
-        }
-        let d2 = from; while(d2<=to){ State.flights[d2] = counts[d2] ?? 0; d2 = shiftDate(d2,1); }
-      }
-    } catch(e){}
-  }
-
-  flightsCacheSave();
-  State.flightsFetching = false;
-  renderFlightsKPI();
+  loadViaJSONP_2(VUELOS_SHEET_ID, VUELOS_TAB)
+    .then(function(data){
+      const rows = data?.table?.rows || [];
+      rows.forEach(row => {
+        const c     = row.c || [];
+        const fecha = c[0]?.v ? String(c[0].v).trim() : null;
+        const cnt   = c[1]?.v ?? null;
+        if (!fecha || !fecha.match(/^\d{4}-\d{2}-\d{2}$/)) return;
+        State.flights[fecha] = (cnt !== null && cnt !== '') ? Math.round(Number(cnt)) : null;
+      });
+      console.log('[Vuelos] rows loaded:', rows.length, '| flights:', JSON.stringify(State.flights));
+      State._flightsSheetLoaded = true;
+      State.flightsFetching = false;
+      renderFlightsKPI();
+    })
+    .catch(function(err){
+      console.warn('[Vuelos] load error:', err);
+      const days = []; let d = State.from; while(d<=State.to){ days.push(d); d=shiftDate(d,1); }
+      days.forEach(d => { if(State.flights[d]===undefined) State.flights[d] = null; });
+      State.flightsFetching = false;
+      renderFlightsKPI();
+    });
 }
 
 function renderFlightsKPI(){
@@ -2023,7 +1982,7 @@ function buildFlightsKPIHTML(from, to){
   const known = days.filter(d => State.flights[d] !== undefined && State.flights[d] !== null);
   if (!known.length){
     const allNull = days.every(d => State.flights[d] === null);
-    if (allNull) return `<div class="kpi"><div class="kpi-scoop" style="background:#8FA871"></div><div class="kpi-body"><div class="kpi-label">Vuelos SVQ</div><div class="kpi-value small" style="font-size:13px;color:var(--ink-soft)">No disponible</div></div></div>`;
+    if (allNull) return `<div class="kpi"><div class="kpi-scoop" style="background:#8FA871"></div><div class="kpi-body"><div class="kpi-label">✈ Llegadas SVQ</div><div class="kpi-value small" style="font-size:12px;color:var(--ink-soft)">Pendiente configuración</div><div class="kpi-sub">Instala el Apps Script de vuelos</div></div></div>`;
     return `<div class="kpi"><div class="kpi-scoop" style="background:#8FA871"></div><div class="kpi-body"><div class="kpi-label">Vuelos SVQ</div><div class="kpi-value small" style="font-size:13px;color:var(--ink-soft)">Cargando…</div></div></div>`;
   }
 
