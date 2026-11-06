@@ -786,10 +786,9 @@ const State = {
   degustaciones:{ _loaded: false },
   flights: {}, // dkey -> arrival count (null = error/unavailable)
   flightsFetching: false,
-  trainsData: null,    // raw parsed JSON from SignalR
-  trainsCount: null,   // number of trains in current board
-  trainsStatus: 'idle', // idle | connecting | online | error
-  _trainsConnection: null,
+  trains: {},          // dkey -> train count (null = error/unavailable)
+  trainsFetching: false,
+  _trainsSheetLoaded: false,
   feedback:{ _loaded: false, entries: [] },
   anulaciones:{ _loaded: false, byShop: {} },
   resenas: { _loaded: false, entries: [] },
@@ -2027,127 +2026,36 @@ function buildFlightsKPIHTML(from, to){
 }
 
 /* =========================================================
-   TRENES SVQ — SignalR directo desde el navegador
+   TRENES SVQ — via Google Sheets (GTFS diario Apps Script)
    ========================================================= */
+const TRENES_SHEET_ID = LLUVIA_SHEET_ID;
+const TRENES_TAB      = 'trenes_svq';
+
 function loadTrainsIfNeeded(){
-  // Solo para el día de hoy (no para rangos)
-  if (!State.from || State.from !== State.to) return;
-  if (State.trainsStatus === 'connecting' || State.trainsStatus === 'online') return;
+  if (!State.from || !State.to || State.trainsFetching) return;
+  if (State._trainsSheetLoaded){ renderTrainsKPI(); return; }
 
-  State.trainsStatus = 'connecting';
-  renderTrainsKPI();
+  State.trainsFetching = true;
 
-  if (!window.signalR) {
-    State.trainsStatus = 'error';
-    renderTrainsKPI();
-    return;
-  }
-
-  try {
-    const conn = new signalR.HubConnectionBuilder()
-      .withUrl('https://info.adif.es/InfoStation', {
-        skipNegotiation: true,
-        transport: signalR.HttpTransportType.WebSockets
-      })
-      .configureLogging(signalR.LogLevel.Error)
-      .withAutomaticReconnect()
-      .build();
-
-    State._trainsConnection = conn;
-
-    conn.on('ReceiveMessage', function(payload){
-      try {
-        const data = typeof payload === 'string' ? JSON.parse(payload) : payload;
-        // Intentar extraer array de llegadas según distintos formatos posibles
-        let arr = [];
-        if (Array.isArray(data)) {
-          arr = data;
-        } else if (data && typeof data === 'object') {
-          arr = data.llegadas || data.arrivals || data.trains || data.data || [];
-          if (!Array.isArray(arr)) arr = Object.values(arr);
-        }
-        // Contar los que ya han llegado (hora de llegada ≤ ahora) o todos si no hay campo de estado
-        const now = new Date();
-        const arrived = arr.filter(t => {
-          // Intentar parsear hora real de llegada
-          const timeStr = t.horaLlegadaReal || t.realArrival || t.llegadaReal || t.arrival || t.hora;
-          if (timeStr) {
-            const [h, m] = String(timeStr).split(':').map(Number);
-            if (!isNaN(h)) {
-              const arrTime = new Date(now);
-              arrTime.setHours(h, m || 0, 0, 0);
-              return arrTime <= now;
-            }
-          }
-          // Sin campo de hora: contar todos
-          return true;
-        });
-        clearTimeout(State._trainsTimeout);
-        State.trainsData  = arr;
-        State.trainsCount = arrived.length || arr.length;
-        State.trainsStatus = 'online';
-        console.log('[Trenes] datos recibidos:', arr.length, 'trenes, contados:', State.trainsCount);
-      } catch(e) {
-        console.warn('[Trenes] error parseando datos:', e);
-        State.trainsStatus = 'error';
-      }
+  loadViaJSONP_2(TRENES_SHEET_ID, TRENES_TAB)
+    .then(rows => {
+      rows.forEach(row => {
+        const fecha = row[0]; // 'yyyy-MM-dd'
+        const cnt   = row[1];
+        if (!fecha) return;
+        State.trains[fecha] = (cnt !== null && cnt !== '') ? Math.round(Number(cnt)) : null;
+      });
+      console.log('[Trenes] rows loaded:', rows.length, '| trains:', JSON.stringify(State.trains));
+      State._trainsSheetLoaded = true;
+      State.trainsFetching = false;
+      renderTrainsKPI();
+    })
+    .catch(() => {
+      const days = []; let d = State.from; while(d <= State.to){ days.push(d); d = shiftDate(d,1); }
+      days.forEach(d => { if(State.trains[d]===undefined) State.trains[d] = null; });
+      State.trainsFetching = false;
       renderTrainsKPI();
     });
-
-    // Timeout de 25s por si el servidor no responde
-    State._trainsTimeout = setTimeout(() => {
-      if (State.trainsStatus === 'connecting') {
-        console.warn('[Trenes] Timeout — sin datos en 25s');
-        State.trainsStatus = 'error';
-        renderTrainsKPI();
-      }
-    }, 25000);
-
-    // Escuchar también variantes de nombre del evento
-    ['receiveMessage','ReceiveData','receiveData','OnMessage','onMessage','UpdateBoard','updateBoard','BoardData','boardData'].forEach(evt => {
-      conn.on(evt, function(payload){
-        console.log('[Trenes RAW EVENT]', evt, payload);
-      });
-    });
-
-    conn.start()
-      .then(() => {
-        console.log('[Trenes] WS conectado, JoinInfo...');
-        // Interceptar WS crudo para ver TODOS los mensajes del servidor
-        try {
-          const ws = conn._connection?._transport?._webSocket;
-          if (ws) {
-            const orig = ws.onmessage;
-            ws.onmessage = function(e) {
-              const preview = typeof e.data === 'string' ? e.data.substring(0,300) : '[binary]';
-              console.log('[Trenes WS RAW]', preview);
-              if (orig) orig.call(this, e);
-            };
-            console.log('[Trenes] interceptor WS instalado');
-          }
-        } catch(interceptErr) {
-          console.warn('[Trenes] no se pudo instalar interceptor:', interceptErr.message);
-        }
-        return conn.invoke('JoinInfo', 'PRO-ECM-SEVILL');
-      })
-      .then(() => {
-        console.log('[Trenes] JoinInfo OK, GetLastMessage...');
-        return conn.invoke('GetLastMessage', 'PRO-ECM-SEVILL').catch(e => {
-          console.warn('[Trenes] GetLastMessage no fatal:', e.message);
-        });
-      })
-      .catch(err => {
-        clearTimeout(State._trainsTimeout);
-        console.warn('[Trenes] SignalR error:', err);
-        State.trainsStatus = 'error';
-        renderTrainsKPI();
-      });
-
-  } catch(e) {
-    console.warn('[Trenes] init error:', e);
-    State.trainsStatus = 'error';
-    renderTrainsKPI();
-  }
 }
 
 function renderTrainsKPI(){
@@ -2157,29 +2065,34 @@ function renderTrainsKPI(){
 
 function buildTrainsKPIHTML(from, to){
   if (!from || !to) return '';
+  const isRange = from !== to;
+  const days = []; let d = from; while(d<=to){ days.push(d); d=shiftDate(d,1); }
 
-  // Solo mostramos para día único (no rangos)
-  if (from !== to) return '';
-
-  const statusMap = {
-    idle:       'Conectando…',
-    connecting: 'Conectando…',
-    error:      'Sin conexión',
-    online:     null
-  };
-
-  const msg = statusMap[State.trainsStatus];
-  if (msg || State.trainsCount === null) {
-    return `<div class="kpi"><div class="kpi-scoop" style="background:#8FA871"></div><div class="kpi-body">
-      <div class="kpi-label">🚄 Trenes SVQ</div>
-      <div class="kpi-value small" style="font-size:13px;color:var(--ink-soft)">${msg || 'Cargando…'}</div>
-    </div></div>`;
+  const known = days.filter(d => State.trains[d] !== undefined && State.trains[d] !== null);
+  if (!known.length){
+    const allNull = days.every(d => State.trains[d] === null);
+    if (allNull) return `<div class="kpi"><div class="kpi-scoop" style="background:#4A90D9"></div><div class="kpi-body"><div class="kpi-label">🚄 Trenes SVQ</div><div class="kpi-value small" style="font-size:12px;color:var(--ink-soft)">Pendiente configuración</div><div class="kpi-sub">Instala el Apps Script de trenes</div></div></div>`;
+    return `<div class="kpi"><div class="kpi-scoop" style="background:#4A90D9"></div><div class="kpi-body"><div class="kpi-label">🚄 Trenes SVQ</div><div class="kpi-value small" style="font-size:13px;color:var(--ink-soft)">Cargando…</div></div></div>`;
   }
 
-  return `<div class="kpi"><div class="kpi-scoop" style="background:#8FA871"></div><div class="kpi-body">
+  const total  = known.reduce((s,d) => s + (State.trains[d]||0), 0);
+  const avg    = (total / known.length).toFixed(1);
+  const maxDay = known.reduce((best,d) => (State.trains[d]||0) > (State.trains[best]||0) ? d : best, known[0]);
+  const maxCnt = State.trains[maxDay] || 0;
+
+  let valStr, subStr;
+  if (isRange){
+    valStr = `${total} trenes`;
+    subStr = `Media ${avg}/día · Máx ${maxCnt} (${dateLabel(maxDay)})`;
+  } else {
+    valStr = `${total} trenes`;
+    subStr = known.length < days.length ? 'Dato parcial' : 'AV/LD/MD · Santa Justa';
+  }
+
+  return `<div class="kpi"><div class="kpi-scoop" style="background:#4A90D9"></div><div class="kpi-body">
     <div class="kpi-label">🚄 Llegadas SVQ</div>
-    <div class="kpi-value small">${State.trainsCount} trenes hoy</div>
-    <div class="kpi-sub">Datos en tiempo real · Santa Justa</div>
+    <div class="kpi-value small">${valStr}</div>
+    ${subStr ? `<div class="kpi-sub">${subStr}</div>` : ''}
   </div></div>`;
 }
 
