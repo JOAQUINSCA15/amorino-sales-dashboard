@@ -2103,9 +2103,31 @@ function loadTrainsIfNeeded(){
       }
     }, 25000);
 
+    // Escuchar también variantes de nombre del evento
+    ['receiveMessage','ReceiveData','receiveData','OnMessage','onMessage','UpdateBoard','updateBoard','BoardData','boardData'].forEach(evt => {
+      conn.on(evt, function(payload){
+        console.log('[Trenes RAW EVENT]', evt, payload);
+      });
+    });
+
     conn.start()
       .then(() => {
         console.log('[Trenes] WS conectado, JoinInfo...');
+        // Interceptar WS crudo para ver TODOS los mensajes del servidor
+        try {
+          const ws = conn._connection?._transport?._webSocket;
+          if (ws) {
+            const orig = ws.onmessage;
+            ws.onmessage = function(e) {
+              const preview = typeof e.data === 'string' ? e.data.substring(0,300) : '[binary]';
+              console.log('[Trenes WS RAW]', preview);
+              if (orig) orig.call(this, e);
+            };
+            console.log('[Trenes] interceptor WS instalado');
+          }
+        } catch(interceptErr) {
+          console.warn('[Trenes] no se pudo instalar interceptor:', interceptErr.message);
+        }
         return conn.invoke('JoinInfo', 'PRO-ECM-SEVILL');
       })
       .then(() => {
@@ -3109,7 +3131,7 @@ function renderKPIs(shop, from, to){
     'Amorino Sevilla Avenida':       'Ave',
     'Amorino Patio de los Naranjos': 'Nar',
     'Amorino Catedral':              'Cat',
-    'Amorino Plaza Nueva':           'P N',
+    'Amorino Plaza Nueva':           'PN',
     'Amorino Alcázar':               'Alc',
   };
   const shopsToCheck = shop === 'all' ? SHOP_ORDER : [shop];
