@@ -2082,6 +2082,7 @@ function loadTrainsIfNeeded(){
           // Sin campo de hora: contar todos
           return true;
         });
+        clearTimeout(State._trainsTimeout);
         State.trainsData  = arr;
         State.trainsCount = arrived.length || arr.length;
         State.trainsStatus = 'online';
@@ -2093,10 +2094,28 @@ function loadTrainsIfNeeded(){
       renderTrainsKPI();
     });
 
+    // Timeout de 25s por si el servidor no responde
+    State._trainsTimeout = setTimeout(() => {
+      if (State.trainsStatus === 'connecting') {
+        console.warn('[Trenes] Timeout — sin datos en 25s');
+        State.trainsStatus = 'error';
+        renderTrainsKPI();
+      }
+    }, 25000);
+
     conn.start()
-      .then(() => conn.invoke('JoinInfo', 'PRO-ECM-SEVILL'))
-      .then(() => conn.invoke('GetLastMessage', 'PRO-ECM-SEVILL').catch(() => {}))
+      .then(() => {
+        console.log('[Trenes] WS conectado, JoinInfo...');
+        return conn.invoke('JoinInfo', 'PRO-ECM-SEVILL');
+      })
+      .then(() => {
+        console.log('[Trenes] JoinInfo OK, GetLastMessage...');
+        return conn.invoke('GetLastMessage', 'PRO-ECM-SEVILL').catch(e => {
+          console.warn('[Trenes] GetLastMessage no fatal:', e.message);
+        });
+      })
       .catch(err => {
+        clearTimeout(State._trainsTimeout);
         console.warn('[Trenes] SignalR error:', err);
         State.trainsStatus = 'error';
         renderTrainsKPI();
