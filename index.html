@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.7/dist/browser/signalr.min.js"></script>
 <style>
   :root{
     --cream:#FBF5EA;
@@ -785,6 +786,10 @@ const State = {
   degustaciones:{ _loaded: false },
   flights: {}, // dkey -> arrival count (null = error/unavailable)
   flightsFetching: false,
+  trainsData: null,    // raw parsed JSON from SignalR
+  trainsCount: null,   // number of trains in current board
+  trainsStatus: 'idle', // idle | connecting | online | error
+  _trainsConnection: null,
   feedback:{ _loaded: false, entries: [] },
   anulaciones:{ _loaded: false, byShop: {} },
   resenas: { _loaded: false, entries: [] },
@@ -1938,6 +1943,7 @@ async function fetchWeatherIfNeeded(from, to){
 // The dashboard reads that tab — same pattern as the rain scraper.
 const VUELOS_SHEET_ID  = LLUVIA_SHEET_ID; // reuse Weather Data sheet
 const VUELOS_TAB       = 'vuelos_svq';
+// Trenes: datos en tiempo real via SignalR directo (no sheet)
 
 function loadFlightsIfNeeded(){
   if (!State.from || !State.to || State.flightsFetching) return;
@@ -2017,6 +2023,122 @@ function buildFlightsKPIHTML(from, to){
     <div class="kpi-label">✈ Llegadas SVQ</div>
     <div class="kpi-value small">${valStr}</div>
     ${subStr ? `<div class="kpi-sub">${subStr}</div>` : ''}
+  </div></div>`;
+}
+
+/* =========================================================
+   TRENES SVQ — SignalR directo desde el navegador
+   ========================================================= */
+function loadTrainsIfNeeded(){
+  // Solo para el día de hoy (no para rangos)
+  if (!State.from || State.from !== State.to) return;
+  if (State.trainsStatus === 'connecting' || State.trainsStatus === 'online') return;
+
+  State.trainsStatus = 'connecting';
+  renderTrainsKPI();
+
+  if (!window.signalR) {
+    State.trainsStatus = 'error';
+    renderTrainsKPI();
+    return;
+  }
+
+  try {
+    const conn = new signalR.HubConnectionBuilder()
+      .withUrl('https://info.adif.es/InfoStation', {
+        skipNegotiation: true,
+        transport: signalR.HttpTransportType.WebSockets
+      })
+      .configureLogging(signalR.LogLevel.Error)
+      .withAutomaticReconnect()
+      .build();
+
+    State._trainsConnection = conn;
+
+    conn.on('ReceiveMessage', function(payload){
+      try {
+        const data = typeof payload === 'string' ? JSON.parse(payload) : payload;
+        // Intentar extraer array de llegadas según distintos formatos posibles
+        let arr = [];
+        if (Array.isArray(data)) {
+          arr = data;
+        } else if (data && typeof data === 'object') {
+          arr = data.llegadas || data.arrivals || data.trains || data.data || [];
+          if (!Array.isArray(arr)) arr = Object.values(arr);
+        }
+        // Contar los que ya han llegado (hora de llegada ≤ ahora) o todos si no hay campo de estado
+        const now = new Date();
+        const arrived = arr.filter(t => {
+          // Intentar parsear hora real de llegada
+          const timeStr = t.horaLlegadaReal || t.realArrival || t.llegadaReal || t.arrival || t.hora;
+          if (timeStr) {
+            const [h, m] = String(timeStr).split(':').map(Number);
+            if (!isNaN(h)) {
+              const arrTime = new Date(now);
+              arrTime.setHours(h, m || 0, 0, 0);
+              return arrTime <= now;
+            }
+          }
+          // Sin campo de hora: contar todos
+          return true;
+        });
+        State.trainsData  = arr;
+        State.trainsCount = arrived.length || arr.length;
+        State.trainsStatus = 'online';
+        console.log('[Trenes] datos recibidos:', arr.length, 'trenes, contados:', State.trainsCount);
+      } catch(e) {
+        console.warn('[Trenes] error parseando datos:', e);
+        State.trainsStatus = 'error';
+      }
+      renderTrainsKPI();
+    });
+
+    conn.start()
+      .then(() => conn.invoke('JoinInfo', 'PRO-ECM-SEVILL'))
+      .then(() => conn.invoke('GetLastMessage', 'PRO-ECM-SEVILL').catch(() => {}))
+      .catch(err => {
+        console.warn('[Trenes] SignalR error:', err);
+        State.trainsStatus = 'error';
+        renderTrainsKPI();
+      });
+
+  } catch(e) {
+    console.warn('[Trenes] init error:', e);
+    State.trainsStatus = 'error';
+    renderTrainsKPI();
+  }
+}
+
+function renderTrainsKPI(){
+  const el = document.getElementById('trainsKPI');
+  if (el) el.innerHTML = buildTrainsKPIHTML(State.from, State.to);
+}
+
+function buildTrainsKPIHTML(from, to){
+  if (!from || !to) return '';
+
+  // Solo mostramos para día único (no rangos)
+  if (from !== to) return '';
+
+  const statusMap = {
+    idle:       'Conectando…',
+    connecting: 'Conectando…',
+    error:      'Sin conexión',
+    online:     null
+  };
+
+  const msg = statusMap[State.trainsStatus];
+  if (msg || State.trainsCount === null) {
+    return `<div class="kpi"><div class="kpi-scoop" style="background:#8FA871"></div><div class="kpi-body">
+      <div class="kpi-label">🚄 Trenes SVQ</div>
+      <div class="kpi-value small" style="font-size:13px;color:var(--ink-soft)">${msg || 'Cargando…'}</div>
+    </div></div>`;
+  }
+
+  return `<div class="kpi"><div class="kpi-scoop" style="background:#8FA871"></div><div class="kpi-body">
+    <div class="kpi-label">🚄 Llegadas SVQ</div>
+    <div class="kpi-value small">${State.trainsCount} trenes hoy</div>
+    <div class="kpi-sub">Datos en tiempo real · Santa Justa</div>
   </div></div>`;
 }
 
@@ -2802,6 +2924,7 @@ function renderAll(){
     ${renderKPIs(shop, from, to)}
     <div id="weatherKPIs">${buildWeatherKPIsHTML(from, to)}</div>
     <div id="flightsKPI">${buildFlightsKPIHTML(from, to)}</div>
+    <div id="trainsKPI">${buildTrainsKPIHTML(from, to)}</div>
     <div class="section-title"><span class="swatch" style="background:var(--raspberry)"></span>Evolución diaria de ventas</div>
     ${renderDailySeriesCard(shop, from, to)}
     <div class="section-title"><span class="swatch" style="background:var(--raspberry)"></span>Ventas por hora</div>
@@ -2821,6 +2944,7 @@ function renderAll(){
   attachSortHandler();
   fetchWeatherIfNeeded(from, to);
   loadFlightsIfNeeded();
+  loadTrainsIfNeeded();
   if (!isRange) fetchRadiografiaIfNeeded(from, true); // true = also update panel KPI
   if (!isRange) loadDegustacionesIfNeeded();
 }
