@@ -783,6 +783,8 @@ const State = {
   radOverride: null,
   radTabs: null, // null = not loaded, [...] = list of tab names
   degustaciones:{ _loaded: false },
+  flights: {}, // dkey -> arrival count (null = error/unavailable)
+  flightsFetching: false,
   feedback:{ _loaded: false, entries: [] },
   anulaciones:{ _loaded: false, byShop: {} },
   resenas: { _loaded: false, entries: [] },
@@ -1930,6 +1932,122 @@ async function fetchWeatherIfNeeded(from, to){
   if (el) el.innerHTML = buildWeatherKPIsHTML(State.from, State.to);
 }
 
+/* ================= VUELOS SVQ (OpenSky Network) ================= */
+const OPENSKY_AIRPORT = 'LEZL'; // Sevilla San Pablo ICAO
+
+// Persist flight cache in localStorage so it survives page reload
+function flightsCacheSave(){
+  try { localStorage.setItem('svq_flights', JSON.stringify(State.flights)); } catch(e){}
+}
+function flightsCacheLoad(){
+  try {
+    const raw = localStorage.getItem('svq_flights');
+    if (raw) Object.assign(State.flights, JSON.parse(raw));
+  } catch(e){}
+}
+flightsCacheLoad();
+
+// Convert YYYY-MM-DD to Unix timestamp at start/end of day in Madrid local time (UTC+1 or UTC+2)
+function dkeyToUnix(dkey, endOfDay){
+  // Use noon UTC ± 12h to cover whole local day regardless of DST
+  const base = new Date(dkey + (endOfDay ? 'T23:00:00Z' : 'T00:00:00Z'));
+  // Adjust: Spain is UTC+1 (winter) / UTC+2 (summer); use ±13h for safety
+  return Math.floor((endOfDay ? new Date(dkey + 'T23:59:00+02:00') : new Date(dkey + 'T00:00:00+01:00')).getTime() / 1000);
+}
+
+async function loadFlightsIfNeeded(){
+  if (!State.from || !State.to || State.flightsFetching) return;
+
+  // Find dates not yet cached (null = known error, undefined = not tried)
+  const days = []; let d = State.from; while(d<=State.to){ days.push(d); d=shiftDate(d,1); }
+  const needed = days.filter(d => State.flights[d] === undefined);
+  if (!needed.length){ renderFlightsKPI(); return; }
+
+  State.flightsFetching = true;
+
+  // Chunk into ≤7-day windows
+  needed.sort();
+  const chunks = [];
+  let cs = needed[0], ce = needed[0];
+  for (let i = 1; i < needed.length; i++){
+    const gap = (new Date(needed[i]) - new Date(ce)) / 86400000;
+    if (gap <= 7){ ce = needed[i]; }
+    else { chunks.push([cs,ce]); cs = ce = needed[i]; }
+  }
+  chunks.push([cs,ce]);
+
+  for (const [from, to] of chunks){
+    const begin = dkeyToUnix(from, false);
+    const end   = dkeyToUnix(to,   true);
+    // Mark all days in window as "null" (error) first; overwrite on success
+    let dd = from; while(dd<=to){ State.flights[dd] = null; dd = shiftDate(dd,1); }
+    try {
+      const ctrl = new AbortController();
+      const tid  = setTimeout(() => ctrl.abort(), 10000);
+      const r = await fetch(
+        `https://opensky-network.org/api/flights/arrival?airport=${OPENSKY_AIRPORT}&begin=${begin}&end=${end}`,
+        { signal: ctrl.signal }
+      ).catch(() => null);
+      clearTimeout(tid);
+      if (r && r.ok){
+        const data = await r.json();
+        // Count arrivals per local date (use lastSeen Unix → Madrid date)
+        const counts = {};
+        for (const f of data){
+          const ts = (f.lastSeen || f.firstSeen || 0) * 1000;
+          if (!ts) continue;
+          // Format as YYYY-MM-DD in Europe/Madrid timezone
+          const dk = new Date(ts).toLocaleDateString('sv-SE', { timeZone:'Europe/Madrid' });
+          counts[dk] = (counts[dk]||0) + 1;
+        }
+        let d2 = from; while(d2<=to){ State.flights[d2] = counts[d2] ?? 0; d2 = shiftDate(d2,1); }
+      }
+    } catch(e){}
+  }
+
+  flightsCacheSave();
+  State.flightsFetching = false;
+  renderFlightsKPI();
+}
+
+function renderFlightsKPI(){
+  const el = document.getElementById('flightsKPI');
+  if (el) el.innerHTML = buildFlightsKPIHTML(State.from, State.to);
+}
+
+function buildFlightsKPIHTML(from, to){
+  if (!from || !to) return '';
+  const isRange = from !== to;
+  const days = []; let d = from; while(d<=to){ days.push(d); d=shiftDate(d,1); }
+
+  const known = days.filter(d => State.flights[d] !== undefined && State.flights[d] !== null);
+  if (!known.length){
+    const allNull = days.every(d => State.flights[d] === null);
+    if (allNull) return `<div class="kpi"><div class="kpi-scoop" style="background:#8FA871"></div><div class="kpi-body"><div class="kpi-label">Vuelos SVQ</div><div class="kpi-value small" style="font-size:13px;color:var(--ink-soft)">No disponible</div></div></div>`;
+    return `<div class="kpi"><div class="kpi-scoop" style="background:#8FA871"></div><div class="kpi-body"><div class="kpi-label">Vuelos SVQ</div><div class="kpi-value small" style="font-size:13px;color:var(--ink-soft)">Cargando…</div></div></div>`;
+  }
+
+  const total  = known.reduce((s,d) => s + (State.flights[d]||0), 0);
+  const avg    = (total / known.length).toFixed(1);
+  const maxDay = known.reduce((best,d) => (State.flights[d]||0) > (State.flights[best]||0) ? d : best, known[0]);
+  const maxCnt = State.flights[maxDay] || 0;
+
+  let valStr, subStr;
+  if (isRange){
+    valStr = `${total} vuelos`;
+    subStr = `Media ${avg}/día · Máx ${maxCnt} (${dateLabel(maxDay)})`;
+  } else {
+    valStr = `${total} vuelos`;
+    subStr = known.length < days.length ? 'Dato parcial' : '';
+  }
+
+  return `<div class="kpi"><div class="kpi-scoop" style="background:#8FA871"></div><div class="kpi-body">
+    <div class="kpi-label">✈ Llegadas SVQ</div>
+    <div class="kpi-value small">${valStr}</div>
+    ${subStr ? `<div class="kpi-sub">${subStr}</div>` : ''}
+  </div></div>`;
+}
+
 function buildWeatherKPIsHTML(from, to){
   if (!from || !to) return '';
   const isRange = from !== to;
@@ -2711,6 +2829,7 @@ function renderAll(){
   const html = `
     ${renderKPIs(shop, from, to)}
     <div id="weatherKPIs">${buildWeatherKPIsHTML(from, to)}</div>
+    <div id="flightsKPI">${buildFlightsKPIHTML(from, to)}</div>
     <div class="section-title"><span class="swatch" style="background:var(--raspberry)"></span>Evolución diaria de ventas</div>
     ${renderDailySeriesCard(shop, from, to)}
     <div class="section-title"><span class="swatch" style="background:var(--raspberry)"></span>Ventas por hora</div>
@@ -2729,6 +2848,7 @@ function renderAll(){
   document.getElementById('content').innerHTML = html;
   attachSortHandler();
   fetchWeatherIfNeeded(from, to);
+  loadFlightsIfNeeded();
   if (!isRange) fetchRadiografiaIfNeeded(from, true); // true = also update panel KPI
   if (!isRange) loadDegustacionesIfNeeded();
 }
