@@ -1861,6 +1861,7 @@ async function loadLluviaFromSheets(){
         }
       }
       if (!fecha) return;
+      if (fecha < '2026-01-01') return; // datos pre-2026 en la hoja no son fiables; open-meteo cubre el histórico
       const precip = c[1]?.v ?? 0;
       State.weather[fecha] = { tempMax: State.weather[fecha]?.tempMax ?? null, precip, rain: precip > 0, src: 'tsev' };
     });
