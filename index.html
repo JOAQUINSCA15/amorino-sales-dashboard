@@ -816,7 +816,7 @@ const TSEV_RAIN_2025 = {"2025-10-25":8.2,"2025-10-26":6.4,"2025-10-27":1.6,"2025
 /* Visual Crossing (LEZL) — para temperatura y fechas sin datos tsev */
 const VC_LOCATION    = 'Sevilla,Spain';
 const WEATHER_LAT    = 37.39, WEATHER_LON = -5.98; // fallback Open-Meteo
-const RAIN_THRESHOLD = 1.0; // ≥1 mm para datos de modelo; tsev usa > 0
+const RAIN_THRESHOLD = 0; // cualquier mm cuenta como lluvia
 
 /* ================= DATA LOADING ================= */
 async function fetchTab(name){
@@ -2151,7 +2151,7 @@ function buildWeatherKPIsHTML(from, to){
     : getVcKey()
       ? `<span style="font-size:10px;color:var(--ink-soft);margin-left:6px;">● Visual Crossing</span>`
       : `<span style="font-size:10px;color:var(--ink-soft);margin-left:6px;">● Open-Meteo</span>`;
-  // Rain stats: for tsev days, threshold is > 0 (already set); for VC/OM days threshold is RAIN_THRESHOLD
+  // Rain stats: cualquier mm > 0 cuenta como lluvia (RAIN_THRESHOLD = 0)
   // (the .rain flag is already correctly set per source, so no extra logic needed here)
   return `<div class="kpi-section-label" style="margin-top:18px;display:flex;align-items:center;">Meteorología · Sevilla${srcBadge}</div>
   <div class="kpi-row" style="grid-template-columns:repeat(2,1fr);max-width:420px;">
