@@ -1847,10 +1847,21 @@ async function loadLluviaFromSheets(){
     const rows = json?.table?.rows || [];
     rows.forEach(row => {
       const c = row.c || [];
-      const fecha = c[0]?.v ? String(c[0].v) : null;
+      const raw = c[0]?.v;
+      if (!raw) return;
+      // gviz puede devolver "2026-11-09" o "Date(2026,10,9)" (mes 0-indexado)
+      let fecha = null;
+      const rawStr = String(raw).trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(rawStr)) {
+        fecha = rawStr;
+      } else {
+        const dm = rawStr.match(/Date\((\d+),(\d+),(\d+)\)/);
+        if (dm) {
+          fecha = `${dm[1]}-${String(Number(dm[2])+1).padStart(2,'0')}-${String(dm[3]).padStart(2,'0')}`;
+        }
+      }
+      if (!fecha) return;
       const precip = c[1]?.v ?? 0;
-      if (!fecha || !fecha.match(/^\d{4}-\d{2}-\d{2}$/)) return;
-      if (!fecha.startsWith('2026-')) return; // 2025 data in sheet is wrong (scraped from 2026)
       State.weather[fecha] = { tempMax: State.weather[fecha]?.tempMax ?? null, precip, rain: precip > 0, src: 'tsev' };
     });
   } catch(e){}
