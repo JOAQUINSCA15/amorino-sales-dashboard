@@ -2050,11 +2050,25 @@ function loadTrainsIfNeeded(){
   State.trainsFetching = true;
 
   loadViaJSONP_2(TRENES_SHEET_ID, TRENES_TAB)
-    .then(rows => {
+    .then(function(data){
+      const rows = data?.table?.rows || [];
       rows.forEach(row => {
-        const fecha = row[0]; // 'yyyy-MM-dd'
-        const cnt   = row[1];
+        const c = row.c || [];
+        const raw = c[0]?.v;
+        if (!raw) return;
+        let fecha = null;
+        const rawStr = String(raw).trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(rawStr)) {
+          fecha = rawStr;
+        } else {
+          const m = rawStr.match(/Date\((\d+),(\d+),(\d+)\)/);
+          if (m) {
+            const y = m[1], mo = String(Number(m[2])+1).padStart(2,'0'), dy = String(m[3]).padStart(2,'0');
+            fecha = `${y}-${mo}-${dy}`;
+          }
+        }
         if (!fecha) return;
+        const cnt = c[1]?.v ?? null;
         State.trains[fecha] = (cnt !== null && cnt !== '') ? Math.round(Number(cnt)) : null;
       });
       console.log('[Trenes] rows loaded:', rows.length, '| trains:', JSON.stringify(State.trains));
@@ -3690,7 +3704,7 @@ function renderUltimosCard(shop, from, to){
     const row = latestUltRow(s, from, to);
     const tickets = row ? row.tickets.slice(0,5) : [];
     return `<div class="ticket-card">
-      <h4>${esc(s.replace('Amorino',''))}</h4>
+      <h4>${esc(s.replace('Amorino ',''))}</h4>
       ${row ? `<div class="hint" style="margin-bottom:8px;">${dateLabel(row.dkey)}</div>` : ''}
       ${tickets.length ? tickets.map((t,i) => `<div class="ticket-row ${i===0?'latest':''}"><span class="t-idx">#${i+1}</span><span>${esc(t)}</span></div>`).join('') : '<div class="empty-note" style="padding:10px 0;">Sin datos</div>'}
     </div>`;
